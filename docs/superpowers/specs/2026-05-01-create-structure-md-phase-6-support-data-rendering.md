@@ -42,7 +42,8 @@ Evidence item:
 Rules:
 
 - `kind` is `source`, `requirement`, `note`, or `analysis`.
-- `id`, `kind`, `title`, `description`, and `confidence` are non-empty when the item is present.
+- `id`, `kind`, and `confidence` are non-empty when the item is present.
+- `title` and `description` may be empty only when the evidence item is intentionally a lightweight reference, but they should be populated when useful for review.
 - `location` may be empty when no stable location exists.
 
 Traceability item:
@@ -292,7 +293,9 @@ Chapter 7 fixed empty-state behavior:
 
 ## Table-Row Support Data Placement
 
-Fixed table rows can carry `evidence_refs`, `traceability_refs`, and `source_snippet_refs`, but support data must not be rendered inside Markdown table cells.
+Fixed table rows can carry `evidence_refs`, `traceability_refs`, and `source_snippet_refs` only when their schema explicitly allows those fields. `key_flows.flow_index.rows[]` is index-only and must not carry common metadata or support refs; support data for flows belongs on the matching `key_flows.flows[]` detail object.
+
+Support data must not be rendered inside Markdown table cells.
 
 Placement strategy:
 
@@ -311,7 +314,7 @@ Stable row IDs include:
 - `artifact_id`
 - `dependency_id`
 - `collaboration_id`
-- `flow_id`
+- `flow_id` on `key_flows.flows[]` detail objects, not on `key_flows.flow_index.rows[]`
 - `step_id`
 - `branch_id`
 

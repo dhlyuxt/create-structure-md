@@ -71,6 +71,23 @@ Reference files should hold detailed rules so `SKILL.md` remains concise.
 - no repo analysis by skill
 - module- or system-specific output file
 - generic filename rejection
+- final output path and temporary work directory rules
+- default output overwrite protection plus explicit `--overwrite` and `--backup`
+- Mermaid-only diagram output
+- strict Mermaid validation as the default final-generation gate
+- supported MVP core Mermaid diagram types only
+- Graphviz fully removed
+- no final image artifacts
+- no Jinja2, templates, or multi-file Markdown chapter rendering in the MVP
+- validation policy outside DSL; DSL instances must not contain `empty_allowed`, `required`, `min_rows`, or similar fields
+- common metadata, canonical module IDs, traceability target mappings, and ID reference rules
+- optional, required, and extra diagram rules
+- low-confidence summary whitelist
+- plain text and Markdown-capable field safety
+- structure-design lint for normal design text
+- source snippets as evidence-only exceptions
+- fixed table columns owned by renderer/schema/reference docs, not DSL instances
+- table-row support data rendered outside Markdown table cells
 - fixed 9 chapters
 - fixed numbering
 - required Mermaid diagrams
@@ -184,9 +201,12 @@ If strict Mermaid validation cannot run because local tooling is unavailable, Co
 Phase 7 tests cover:
 
 - both examples pass `validate_dsl.py`
-- both examples pass static Mermaid validation from DSL
+- both examples pass `validate_mermaid.py --from-dsl --strict` when strict tooling is available or mocked
+- when strict tooling is unavailable, tests cover `--check-env`, static fallback documentation, and explicit user-acceptance recording requirements
+- both examples pass static Mermaid validation from DSL as quick deterministic coverage
 - rendered Markdown exists at `document.output_file`
 - rendered Markdown passes `validate_mermaid.py --from-markdown --static`
+- rendered Markdown does not contain Graphviz/DOT fenced code blocks such as ```dot or ```graphviz
 - fixed section numbering in rendered Markdown
 - review checklist file exists and includes required review points
 - `SKILL.md` references the detailed reference files
@@ -214,3 +234,4 @@ Phase 7 tests cover:
 - Adding non-Markdown outputs.
 - Adding repository analysis or requirements inference.
 - Supporting Mermaid diagram types beyond the MVP core set.
+- Adding C2000, TI driverlib, CPU1/CPU2, ISR, or embedded-C-specific profiles in the MVP.

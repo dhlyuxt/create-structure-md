@@ -205,7 +205,7 @@ DSL Mermaid source must contain Mermaid source only:
 - no surrounding Markdown fences
 - no nested triple-backtick fences
 - no Graphviz code
-- no empty source when the diagram object is required by DSL validation
+- requiredness of empty source is enforced by `validate_dsl.py`, not by `validate_mermaid.py`
 
 Renderer-produced Markdown adds the final fenced block. `validate_mermaid.py --from-markdown` validates those fences after rendering.
 

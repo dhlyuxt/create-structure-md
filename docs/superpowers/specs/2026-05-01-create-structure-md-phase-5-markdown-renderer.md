@@ -37,9 +37,15 @@ Renderer writes exactly one Markdown file.
 
 - end with `.md`
 - be module- or system-specific
-- follow the recommended pattern `<documented-object-name>_STRUCTURE_DESIGN.md`
 - not be generic-only
 - not contain `/`, `\`, `..`, or control characters
+
+Filename recommendations and warnings:
+
+- `document.output_file` should normally follow the recommended pattern `<documented-object-name>_STRUCTURE_DESIGN.md`.
+- Spaces should be normalized to `_` before rendering.
+- The renderer writes exactly `document.output_file`; it does not silently rename the file.
+- Spaces are handled by the Phase 3 validation warning, not as a renderer-only failure condition.
 
 Backup path:
 
@@ -159,7 +165,7 @@ Chapter 3 renders:
 
 `module_id` is not a visible table column in `3.2`, but it is used for support-data grouping after the table.
 
-Chapter 4 renders one module subsection per `module_design.modules[]`, ordered by the chapter 3 module order. Each module subsection renders:
+Chapter 4 renders `module_design.summary` as chapter intro text before the first module subsection. It then renders one module subsection per `module_design.modules[]`, ordered by the chapter 3 module order. Each module subsection renders:
 
 - `4.x.1 模块概述`: module summary
 - `4.x.2 模块职责`: responsibilities
@@ -176,7 +182,7 @@ Chapter 5 renders:
 - `5.4 运行时序图（推荐）`: sequence diagram when non-empty, otherwise `未提供运行时序图。`
 - `5.5 补充运行时图表`: extras or empty state
 
-Chapter 6 renders:
+Chapter 6 renders `configuration_data_dependencies.summary` as chapter intro text when it is non-empty. When it is empty, the renderer does not invent a chapter intro. It then renders:
 
 - `6.1 配置项说明`: configuration table or `不适用。`
 - `6.2 关键结构数据与产物`: data/artifact table or `未识别到需要在结构设计阶段单独说明的关键结构数据或产物。`
@@ -185,7 +191,7 @@ Chapter 6 renders:
 
 Chapter 7 renders fixed subsections even in single-module mode:
 
-- `7.1 协作关系概述`: summary or single-module empty explanation
+- `7.1 协作关系概述`: summary when non-empty; if empty, do not invent an overview
 - `7.2 跨模块协作说明`: collaboration table, or `本系统当前仅识别到一个结构模块，暂无跨模块协作关系。`
 - `7.3 跨模块协作关系图`: Mermaid block or `未提供跨模块协作关系图。`
 - `7.4 补充协作图表`: extras or empty state

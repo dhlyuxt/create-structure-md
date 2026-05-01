@@ -84,7 +84,7 @@ Warnings include:
 - unreferenced `evidence[]`
 - source snippet longer than 20 lines and up to 50 lines
 - module relationship diagram that does not mention every listed module ID or module name
-- Mermaid strict tooling unavailability only when the user has explicitly accepted static-only validation outside this validator
+- `output_file` containing spaces; Codex should normalize spaces to `_` before writing the final DSL
 
 If Codex lacks enough content for a field that is allowed to be empty, it should use the documented empty representation. If Codex lacks enough content for a required non-empty field, validation fails and Codex must revise the structured design content rather than fabricate filler.
 
@@ -98,7 +98,7 @@ If Codex lacks enough content for a field that is allowed to be empty, it should
 - `generated_at`, when present, is treated as user-provided text and should follow ISO-8601 local datetime with timezone when available. The validator may warn rather than fail for format looseness.
 - `output_file` ends with `.md`.
 - `output_file` contains no `/`, `\`, `..`, or control characters.
-- Spaces in `output_file` are discouraged; renderer normalizes only if that behavior is explicitly implemented and tested.
+- Spaces in `output_file` should produce a validation warning recommending normalization to `_`; the renderer writes exactly `document.output_file` rather than silently renaming it.
 - Generic-only names fail: `STRUCTURE_DESIGN.md`, `structure_design.md`, `design.md`, and `软件结构设计说明书.md`.
 - The filename must include a concrete documented object name such as a module, subsystem, system, package, or tool name. A generic prefix alone is invalid.
 
@@ -208,6 +208,8 @@ Chapter 6:
 Chapter 7:
 
 - Single-module mode allows empty collaboration rows and omitted or empty collaboration diagram.
+- Single-module mode allows `cross_module_collaboration.summary` to be empty.
+- Multi-module mode requires a non-empty `cross_module_collaboration.summary` describing the collaboration scope.
 - Multi-module mode requires at least one collaboration row and non-empty collaboration diagram source.
 - In multi-module mode, every row has non-empty `collaboration_id`, `scenario`, `initiator_module_id`, `participant_module_ids`, `collaboration_method`, `description`, and `confidence`.
 - In multi-module mode, each row involves at least two distinct modules.

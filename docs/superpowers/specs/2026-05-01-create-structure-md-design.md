@@ -924,7 +924,7 @@ Rules:
 - `runtime_flow_diagram` must exist.
 - `runtime_flow_diagram.diagram_type` must be one of the supported Mermaid diagram types.
 - `runtime_flow_diagram.source` must be non-empty and pass Mermaid validation.
-- `runtime_sequence_diagram` is recommended but not required. If Codex does not generate it, the field may be omitted or present as a full diagram object with empty `source`; the renderer does not output it in either case. If it has a non-empty `source`, it must use `sequenceDiagram` and pass Mermaid validation.
+- `runtime_sequence_diagram` is recommended but not required. If Codex does not generate it, the field may be omitted or present as a full diagram object with empty `source`; the renderer still keeps the fixed `5.4 运行时序图（推荐）` section and outputs the documented empty-state sentence instead of a Mermaid block. If it has a non-empty `source`, it must use `sequenceDiagram` and pass Mermaid validation.
 
 ### Chapter 6: Configuration, Data, and Dependencies
 

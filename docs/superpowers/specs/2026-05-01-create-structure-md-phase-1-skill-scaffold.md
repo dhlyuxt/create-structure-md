@@ -107,7 +107,8 @@ The body of `SKILL.md` must state that Codex needs, at minimum:
 - configuration, structural data/artifact, and dependency information when applicable
 - cross-module collaboration scenarios when more than one module is identified
 - key flows and one diagram concept per key flow
-- confidence values and support-data references where available
+- confidence values and support-data references where the schema requires or allows them
+- evidence references or source snippets when available and safe to disclose
 
 If these inputs are missing, `SKILL.md` must instruct Codex to perform project or requirement understanding outside this skill before creating DSL JSON. It must not instruct Codex to run repository analysis tools as part of this skill.
 
@@ -131,13 +132,19 @@ The workflow text must make clear that strict Mermaid validation is the default.
 `SKILL.md` must describe the output and temporary directory rules even before the scripts are implemented:
 
 - Final output is one Markdown file named by `document.output_file`.
+- If the user provides an output directory, write `document.output_file` there.
+- Otherwise write `document.output_file` to the target repository root, or to the current working directory when no target repository root is known.
 - The output file must be module- or system-specific, normally `<documented-object-name>_STRUCTURE_DESIGN.md`.
 - Generic-only filenames such as `STRUCTURE_DESIGN.md`, `structure_design.md`, `design.md`, and `软件结构设计说明书.md` are forbidden.
+- The output filename must end with `.md`.
+- The output filename must not contain path separators `/` or `\`, must not contain `..`, and must not contain control characters.
+- Spaces in the output filename should already be normalized to `_` before writing `document.output_file`.
 - Preferred temporary work directory is `<workspace>/.codex-tmp/create-structure-md-<run-id>/`.
 - Fallback temporary work directory is a system temp directory such as `/tmp/create-structure-md-<run-id>`.
 - Temporary files in the skill working directory are not automatically deleted.
 - If cleanup is needed, Codex should give the cleanup command to the user rather than deleting files itself.
 - The workspace `.gitignore` should include `.codex-tmp/` unless the user intentionally versions temporary artifacts.
+- Codex must not edit `.gitignore` automatically unless the user asks it to.
 
 ## Reference Placeholder Requirements
 

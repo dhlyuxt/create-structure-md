@@ -21,7 +21,7 @@ Phase 2 owns:
 - Authoritative field contract.
 - Defining/reference ID field contract.
 - Diagram field policy.
-- Output filename schema rules.
+- Output filename structural rules.
 - Structurally valid example DSL files.
 
 Semantic validation that requires cross-object knowledge belongs to Phase 3.
@@ -32,10 +32,11 @@ Schema and examples must align with the authoritative field contract from the fu
 
 Key rules:
 
-- `document.output_file` is required, non-empty, safe, ends with `.md`, and is module- or system-specific.
-- Generic-only output filenames are invalid, including `STRUCTURE_DESIGN.md`, `structure_design.md`, `design.md`, and `软件结构设计说明书.md`.
+- `document.output_file` is required, non-empty, ends with `.md`, and must not contain path separators, `..`, or control characters.
+- Module/system specificity and generic-only filename rejection are semantic checks in Phase 3, not schema checks.
 - `system_overview.summary`, `system_overview.purpose`, `architecture_views.summary`, `module_design.summary`, `runtime_view.summary`, and `key_flows.summary` are schema-present and semantically non-empty.
-- `configuration_data_dependencies.summary` and `cross_module_collaboration.summary` are schema-present but may be empty.
+- `configuration_data_dependencies.summary` is schema-present but may be empty.
+- `cross_module_collaboration.summary` is schema-present; it may be empty in single-module mode, but multi-module content should summarize collaboration and is enforced semantically in Phase 3.
 - `runtime_sequence_diagram` is optional.
 - `collaboration_relationship_diagram` is optional in schema because it is semantically required only in multi-module mode.
 
@@ -59,6 +60,27 @@ Defining IDs include:
 - diagram `id`, extra table `id`, evidence `id`, traceability `id`, risk `id`, assumption `id`, source snippet `id`
 
 Schema must reject unknown `_id` or `_ids` fields through `additionalProperties: false` unless explicitly modeled.
+
+Reference ID fields registered by the schema include:
+
+- `module_design.modules[].module_id`
+- `runtime_view.runtime_units.rows[].related_module_ids`
+- `cross_module_collaboration.collaboration_scenarios.rows[].initiator_module_id`
+- `cross_module_collaboration.collaboration_scenarios.rows[].participant_module_ids`
+- `key_flows.flow_index.rows[].participant_module_ids`
+- `key_flows.flow_index.rows[].participant_runtime_unit_ids`
+- `key_flows.flows[].related_module_ids`
+- `key_flows.flows[].related_runtime_unit_ids`
+- `key_flows.flows[].steps[].related_module_ids`
+- `key_flows.flows[].steps[].related_runtime_unit_ids`
+- `key_flows.flows[].branches_or_exceptions[].related_module_ids`
+- `key_flows.flows[].branches_or_exceptions[].related_runtime_unit_ids`
+- `evidence_refs`
+- `traceability_refs`
+- `source_snippet_refs`
+- `traceability[].target_id`
+
+Reference existence and one-to-one matching are semantic checks in Phase 3. Phase 2 must still model these fields so the global `_id` and `_ids` rule has no ambiguous exceptions.
 
 ## Diagram Field Policy
 
@@ -577,7 +599,7 @@ Phase 2 tests cover:
 - Example DSL files pass JSON Schema validation.
 - Unknown fields fail.
 - Empty diagram object `{}` fails.
-- Generic-only output filenames fail.
+- Structurally unsafe output filenames fail, such as filenames without `.md`, filenames with path separators, filenames with `..`, or filenames with control characters.
 - Extra table rows reject `traceability_refs` and `source_snippet_refs`.
 - `additionalProperties: false` is applied to normal schema objects.
 - Fixed table nodes reject `columns`.
