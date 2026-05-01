@@ -27,6 +27,59 @@ Complete:
 
 Reference files should hold detailed rules so `SKILL.md` remains concise.
 
+## Reference File Content Requirements
+
+`references/dsl-spec.md` must include:
+
+- input readiness contract
+- DSL top-level fields
+- common metadata
+- ID prefix conventions
+- defining ID fields and reference ID fields
+- authoritative field contract
+- fixed table row fields
+- support data object shapes
+- traceability target mapping
+- validation policy outside DSL
+- source snippet rules
+
+`references/document-structure.md` must include:
+
+- output filename policy
+- fixed 9-chapter outline
+- fixed subchapter numbering
+- chapter-by-chapter rendering positions
+- fixed table visible columns
+- empty-state sentences
+- table-row support-data placement
+- Chapter 9 rendering behavior
+
+`references/mermaid-rules.md` must include:
+
+- Mermaid-only output rule
+- supported MVP diagram types
+- unsupported diagram types rule
+- diagram field policy
+- DSL source without fences
+- strict/static validation difference
+- CLI examples
+- Graphviz/DOT rejection
+- static-only acceptance reporting requirement
+
+`references/review-checklist.md` must include:
+
+- no repo analysis by skill
+- module- or system-specific output file
+- generic filename rejection
+- fixed 9 chapters
+- fixed numbering
+- required Mermaid diagrams
+- post-render Markdown Mermaid validation
+- evidence and snippet restraint
+- source snippet secret review
+- Chapter 9 risk/assumption/low-confidence visibility
+- output path and temporary directory in final report
+
 ## SKILL.md Final Behavior
 
 `SKILL.md` should:
@@ -57,6 +110,34 @@ Each example must:
 
 The examples should remain small enough to read quickly.
 
+Example minimum content:
+
+- concrete `document.output_file`
+- one non-empty system overview
+- at least one core capability
+- at least one module
+- Chapter 3 module intro table and module relationship diagram
+- Chapter 4 matching module design for every module
+- at least one provided capability per module
+- internal structure diagram or textual structure per module
+- at least one runtime unit
+- runtime flow diagram
+- Chapter 6 tables present, with empty rows allowed
+- Chapter 7 single-module or multi-module behavior exercised across the two examples
+- at least one key flow with steps and diagram
+- Chapter 9 string present, empty or non-empty
+- support data arrays present
+
+At least one example should include:
+
+- `evidence`
+- `traceability`
+- a risk or assumption
+- a low-confidence whitelisted item
+- a safe source snippet
+
+The examples must not include validation policy fields such as `empty_allowed`, `required`, or `min_rows`.
+
 ## End-To-End Workflow
 
 The required workflow:
@@ -71,6 +152,17 @@ python scripts/validate_mermaid.py --from-markdown .codex-tmp/create-structure-m
 Repeat equivalent coverage for `minimal-from-requirements.dsl.json`.
 
 If strict Mermaid tooling is unavailable, tests should cover `--check-env` and static validation, while documentation states that final generation requires either strict validation or explicit user acceptance of static-only validation.
+
+Final user-facing workflow documentation must say:
+
+- run `validate_dsl.py` before rendering
+- run `validate_mermaid.py --from-dsl --strict` before rendering
+- render exactly one output file
+- run `validate_mermaid.py --from-markdown --static` after rendering
+- review the document checklist
+- report output file and temporary directory
+
+If strict Mermaid validation cannot run because local tooling is unavailable, Codex must ask the user before using static-only validation. The final report must explicitly say that Mermaid diagrams were not proven renderable by Mermaid CLI.
 
 ## Review Checklist
 
@@ -99,6 +191,13 @@ Phase 7 tests cover:
 - review checklist file exists and includes required review points
 - `SKILL.md` references the detailed reference files
 - `python -m unittest discover -s tests` passes
+- reference files mention all fixed 9 chapters
+- reference files mention all supported Mermaid core diagram types
+- examples do not use generic-only output filenames
+- examples do not contain Graphviz/DOT source
+- examples do not contain schema policy fields
+- examples render without shifting optional section numbering
+- review checklist includes static-only Mermaid fallback reporting
 
 ## Acceptance Criteria
 
@@ -106,6 +205,8 @@ Phase 7 tests cover:
 - Both examples complete the full workflow.
 - The test suite passes using standard-library `unittest`.
 - The skill is ready for local personal use.
+- The reference files make the original monolithic design spec unnecessary for normal implementation and use.
+- End-to-end tests prove the phase contracts work together.
 
 ## Out of Scope
 
