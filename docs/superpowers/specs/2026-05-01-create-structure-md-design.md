@@ -200,8 +200,14 @@ Rules:
 ID prefix conventions:
 
 - Module IDs use `MOD-...`.
+- Capability IDs use `CAP-...`.
 - Runtime unit IDs use `RUN-...`.
 - Flow IDs use `FLOW-...`.
+- Configuration item IDs use `CFG-...`.
+- Data/artifact IDs use `DATA-...`.
+- Dependency IDs use `DEP-...`.
+- Collaboration IDs use `COL-...`.
+- Flow step IDs use `STEP-...`.
 - Mermaid diagram IDs use `MER-...`.
 - Extra table IDs use `TBL-...`.
 - Evidence IDs use `EV-...`.
@@ -212,7 +218,22 @@ ID prefix conventions:
 
 The validator checks prefixes and uniqueness, but the MVP does not require a strict three-digit numeric suffix. IDs such as `MOD-001` and `MOD-RENDER-001` are both acceptable when unique.
 
-Any field ending with `_id` or `_ids` is a strict reference unless it is the defining ID field itself. It must reference an existing object in the appropriate ID collection. Free-text fields must not be used for cross-node references.
+Fields ending with `_id` or `_ids` are strict internal references unless explicitly documented as defining IDs, paired flow IDs, or external identifiers. Strict references must point to existing objects in the appropriate ID collection. Free-text fields must not be used for cross-node references.
+
+Explicit exceptions:
+
+- `id` is the defining ID of the current object.
+- `module_intro.rows[].module_id` defines a module ID.
+- `runtime_units.rows[].unit_id` defines a runtime unit ID.
+- `flow_index.rows[].flow_id` and `flows[].flow_id` are paired flow IDs and must match one-to-one.
+- `traceability[].source_external_id` is an external source identifier and is not an internal DSL reference.
+
+Array field defaults:
+
+- Object-level `notes` and fields ending with `_notes` are arrays of non-empty plain-text strings unless explicitly specified otherwise.
+- `responsibilities` is an array of non-empty plain-text strings.
+- Empty strings inside these arrays are invalid.
+- Table-row `notes` fields are plain-text strings, not arrays.
 
 Markdown safety:
 
@@ -354,7 +375,10 @@ DSL instances must not include validation policy fields. In particular, JSON wri
 
 The selected policy split is:
 
-- `schemas/structure-design.schema.json` enforces structural shape, required object fields, primitive types, fixed table row content/metadata fields, and enum values.
+- `schemas/structure-design.schema.json` enforces structural shape, required object fields, primitive types, fixed table row content/metadata fields, enum values, and unknown-field rejection.
+- Schema objects should use `additionalProperties: false` by default.
+- Extra table row objects are an exception: their allowed keys come from `columns[].key` plus approved metadata keys and are checked by `validate_dsl.py`.
+- Future extension objects may explicitly opt into additional properties, but must document why.
 - `validate_dsl.py` must use the required `jsonschema` Python dependency to validate `schemas/structure-design.schema.json` before running semantic checks.
 - `validate_dsl.py` then enforces semantic rules that need project-wide knowledge: non-empty table rows, one-to-one references, module coverage, flow coverage, and Mermaid source presence.
 - `references/dsl-spec.md` and `references/document-structure.md` tell Codex which fields are required before it writes the DSL.
@@ -381,7 +405,7 @@ Support data is referenced by design nodes and rendered near those nodes or at t
   "traceability": [
     {
       "id": "TR-001",
-      "source_id": "REQ-001",
+      "source_external_id": "REQ-001",
       "source_type": "requirement",
       "target_type": "module",
       "target_id": "MOD-001",
@@ -419,8 +443,13 @@ Rules:
 
 - `evidence[].kind` must be `source`, `requirement`, `note`, or `analysis`.
 - `traceability[].source_type` must be `requirement`, `note`, `code`, or `user_input`.
-- `traceability[].target_type` must be `module`, `capability`, `flow`, `flow_step`, `runtime_unit`, `collaboration`, `configuration_item`, `data_artifact`, or `dependency`.
-- `traceability_refs` reference `traceability[].id`; source identifiers such as `REQ-001` belong in `traceability[].source_id`.
+- `traceability[].source_external_id` is an external source identifier such as `REQ-001`; it is not an internal DSL reference.
+- `traceability[].target_type` must be `module`, `core_capability`, `provided_capability`, `runtime_unit`, `flow`, `flow_step`, `collaboration`, `configuration_item`, `data_artifact`, `dependency`, `risk`, `assumption`, or `source_snippet`.
+- `traceability[].target_id` must reference an existing object in the ID collection implied by `target_type`.
+- `traceability[].target_type` and `traceability[].target_id` are the authoritative binding.
+- `traceability_refs` on design nodes are optional local backlinks. When present, each referenced traceability item must target the current node.
+- The renderer may attach traceability entries to target nodes by scanning `traceability[].target_type` and `traceability[].target_id`, even when the target node does not list `traceability_refs`.
+- If the same traceability item is found through both authoritative target scanning and local backlinks, the renderer emits it only once.
 - `risks` and `assumptions` are appended to chapter 9 by the renderer when present.
 - Common metadata is allowed on module introduction rows, `module_design.modules[]`, provided capability rows, runtime unit rows, chapter 6 rows, collaboration scenario rows, flow objects, flow steps, branch/exception items, risks, and assumptions.
 
@@ -466,7 +495,7 @@ Rules:
     "purpose": "",
     "core_capabilities": [
       {
-        "id": "CAP-001",
+        "capability_id": "CAP-001",
         "name": "",
         "description": "",
         "confidence": "observed"
@@ -476,6 +505,11 @@ Rules:
   }
 }
 ```
+
+Rules:
+
+- `core_capabilities[].capability_id` must be non-empty, unique across all capability IDs, and use the `CAP-...` prefix.
+- Each core capability must have non-empty `name`, `description`, and `confidence`.
 
 ### Chapter 3: Architecture Views
 
@@ -522,10 +556,13 @@ Rules:
 - `module_intro` must exist.
 - `module_intro.rows` must include `module_id` plus five visible table fields: `module_name`, `responsibility`, `inputs`, `outputs`, and `notes`, plus common metadata.
 - `module_intro.rows[].module_id` is validation metadata, not a visible table column. It must be non-empty and unique.
+- Each `module_intro.rows[]` item must have non-empty `module_id`, `module_name`, `responsibility`, and `confidence`.
+- `inputs`, `outputs`, and `notes` are optional plain-text fields.
 - `module_intro.rows` must contain at least one module. If no module can be identified, Codex must revise its structure understanding before rendering.
 - `module_relationship_diagram` must exist.
 - `module_relationship_diagram.diagram_type` is not fixed, but it must be one of the supported Mermaid diagram types.
 - `module_relationship_diagram.source` must be non-empty and pass Mermaid validation.
+- `validate_dsl.py` should warn, not fail, when a `module_id` or `module_name` from `module_intro.rows[]` does not appear in `module_relationship_diagram.source`.
 - `extra_tables` and `extra_diagrams` may be used for additional architecture material.
 
 ### Chapter 4: Module Design
@@ -553,6 +590,7 @@ Chapter 4 expands each module listed in chapter 3. Every module must be explaina
           "provided_capabilities": {
             "rows": [
               {
+                "capability_id": "CAP-MOD-001-001",
                 "capability_name": "",
                 "interface_style": "",
                 "description": "",
@@ -605,9 +643,10 @@ Rules:
 - `external_capability_summary.description` must be non-empty.
 - `external_capability_summary.interface_style` is free text, not an enum.
 - `external_capability_details.provided_capabilities` must exist.
-- The provided capabilities table uses fixed visible row fields: `capability_name`, `interface_style`, `description`, `inputs`, `outputs`, and `notes`, plus common metadata fields.
+- The provided capabilities table uses fixed visible row fields: `capability_name`, `interface_style`, `description`, `inputs`, `outputs`, and `notes`, plus `capability_id` and common metadata fields.
 - The provided capabilities table must have at least one row.
-- Each provided capability row must include non-empty `capability_name` and `description`.
+- Each provided capability row must include non-empty `capability_id`, `capability_name`, and `description`.
+- `capability_id` values must be unique across core capabilities and provided capabilities, and use the `CAP-...` prefix.
 - Each provided capability row must include `confidence`.
 - `internal_structure.summary` must be non-empty.
 - `internal_structure.diagram.source` is preferred. If present, it must use a supported Mermaid `diagram_type` and pass Mermaid validation.
@@ -673,6 +712,9 @@ Rules:
 - `runtime_units.rows[].unit_id` must be non-empty, unique, and use the `RUN-...` prefix.
 - `runtime_units.rows[].related_module_ids` must reference module IDs from `architecture_views.module_intro.rows`.
 - `runtime_units.rows` must contain at least one runtime unit.
+- Each runtime unit row must have non-empty `unit_id`, `unit_name`, `unit_type`, `responsibility`, and `confidence`.
+- `entrypoint` may be empty only when `notes` explains why no explicit entrypoint exists.
+- `related_module_ids` must contain at least one module ID unless `notes` explains that the runtime unit is external or environmental.
 - `runtime_flow_diagram` must exist.
 - `runtime_flow_diagram.diagram_type` must be one of the supported Mermaid diagram types.
 - `runtime_flow_diagram.source` must be non-empty and pass Mermaid validation.
@@ -704,14 +746,19 @@ Chapter 6 is named `配置、数据与依赖关系`. It uses tables as the prima
 
 Rules:
 
-- `configuration_items` must exist and its rows use fixed visible fields: `config_name`, `source`, `used_by`, `purpose`, and `notes`, plus common metadata.
+- `configuration_items` must exist and its rows use fixed visible fields: `config_name`, `source`, `used_by`, `purpose`, and `notes`, plus `config_id` and common metadata.
 - `configuration_items.rows` may be empty. If empty, the final Markdown renders a fixed `不适用` statement instead of an empty table.
-- `structural_data_artifacts` must exist and its rows use fixed visible fields: `artifact_name`, `artifact_type`, `owner`, `producer`, `consumer`, and `notes`, plus common metadata.
+- Non-empty configuration item rows must have non-empty `config_id`, `config_name`, `purpose`, and `confidence`.
+- `config_id` values use the `CFG-...` prefix.
+- `structural_data_artifacts` must exist and its rows use fixed visible fields: `artifact_name`, `artifact_type`, `owner`, `producer`, `consumer`, and `notes`, plus `artifact_id` and common metadata.
 - `structural_data_artifacts.rows` may be empty. If empty, the final Markdown renders `未识别到需要在结构设计阶段单独说明的关键结构数据或产物。`
+- Non-empty structural data/artifact rows must have non-empty `artifact_id`, `artifact_name`, `artifact_type`, `owner`, and `confidence`.
+- `artifact_id` values use the `DATA-...` prefix.
 - Codex must not invent generic artifacts only to populate this table.
-- `dependencies` must exist and its rows use fixed visible fields: `dependency_name`, `dependency_type`, `used_by`, `purpose`, and `notes`, plus common metadata.
+- `dependencies` must exist and its rows use fixed visible fields: `dependency_name`, `dependency_type`, `used_by`, `purpose`, and `notes`, plus `dependency_id` and common metadata.
 - `dependencies.rows` may be empty. If empty, the final Markdown renders `未识别到需要在结构设计阶段单独说明的外部依赖项。`
-- Every non-empty chapter 6 row must include `confidence`.
+- Non-empty dependency rows must have non-empty `dependency_id`, `dependency_name`, `dependency_type`, `purpose`, and `confidence`.
+- `dependency_id` values use the `DEP-...` prefix.
 - `dependencies` describes external, environment, tool, file, template, service, or product dependencies that need structural explanation. Internal module dependencies belong in chapter 3 module relationship diagrams or chapter 7 collaboration relationships.
 - `extra_diagrams` are allowed only for a single clear subject, such as product flow or template dependency. There is no recommended combined diagram for this chapter.
 
@@ -727,6 +774,7 @@ Chapter 7 is named `跨模块协作关系`. It explains how multiple modules wor
     "collaboration_scenarios": {
       "rows": [
         {
+          "collaboration_id": "COL-001",
           "scenario": "",
           "initiator_module_id": "MOD-001",
           "participant_module_ids": [],
@@ -756,9 +804,14 @@ Chapter 7 is named `跨模块协作关系`. It explains how multiple modules wor
 
 Rules:
 
-- `collaboration_scenarios` must exist and its rows use fixed visible fields: `scenario`, `initiator_module_id`, `participant_module_ids`, `collaboration_method`, and `description`, plus common metadata.
+- `collaboration_scenarios` must exist and its rows use fixed visible fields: `scenario`, `initiator_module_id`, `participant_module_ids`, `collaboration_method`, and `description`, plus `collaboration_id` and common metadata.
 - `initiator_module_id` and `participant_module_ids` must reference module IDs from `architecture_views.module_intro.rows`.
 - If chapter 3 defines two or more modules, `collaboration_scenarios.rows` must contain at least one collaboration scenario.
+- In multi-module mode, every collaboration row must have non-empty `collaboration_id`, `scenario`, `initiator_module_id`, `participant_module_ids`, `collaboration_method`, `description`, and `confidence`.
+- `collaboration_id` values use the `COL-...` prefix.
+- In multi-module mode, `participant_module_ids` must contain at least one module ID.
+- In multi-module mode, at least one `participant_module_ids` item must be different from `initiator_module_id`.
+- A multi-module collaboration scenario must involve at least two distinct modules.
 - If chapter 3 defines two or more modules, `collaboration_relationship_diagram` must exist, have a supported `diagram_type`, and have non-empty `source` that passes Mermaid validation.
 - If chapter 3 defines exactly one module, `collaboration_scenarios.rows` may be empty and `collaboration_relationship_diagram` may be omitted or have empty `source`.
 - In single-module mode, if Codex provides collaboration rows or a diagram source, they must still pass normal validation.
@@ -795,6 +848,7 @@ Chapter 8 is named `关键流程`. It explains the most important end-to-end flo
         "overview": "",
         "steps": [
           {
+            "step_id": "STEP-FLOW-001-001",
             "order": 1,
             "description": "",
             "actor": "",
@@ -847,13 +901,16 @@ Rules:
 
 - `flow_index` must exist and its rows use fixed fields: `flow_id`, `flow_name`, `trigger_condition`, `participant_module_ids`, `participant_runtime_unit_ids`, `main_steps`, `output_result`, and `notes`.
 - `flow_index.rows` must contain at least one key flow.
+- Each flow index row must have non-empty `flow_id`, `flow_name`, `trigger_condition`, `main_steps`, and `output_result`.
+- Each flow index row must include at least one participant through `participant_module_ids` or `participant_runtime_unit_ids`.
 - Every `flow_index.rows[].flow_id` must match exactly one `flows[].flow_id`.
 - Every `flows[].flow_id` must appear exactly once in `flow_index.rows`.
 - `participant_module_ids` and `related_module_ids` must reference module IDs from chapter 3.
 - `participant_runtime_unit_ids` and `related_runtime_unit_ids` must reference runtime unit IDs from chapter 5.
 - Every flow must have non-empty `name`, `overview`, `confidence`, and `steps`.
 - `flows[].steps` must be a non-empty array of step objects.
-- Each step must have integer `order >= 1`, non-empty `description`, and `confidence`.
+- Each step must have non-empty `step_id`, integer `order >= 1`, non-empty `description`, and `confidence`.
+- `step_id` values use the `STEP-...` prefix.
 - Step `order` values must be unique within one flow.
 - `branches_or_exceptions` may be empty. If present, each item must have non-empty `condition`, `handling`, and `confidence`.
 - Every flow must have a `diagram`.
@@ -909,9 +966,11 @@ Rules:
 - Prototype/detail-design lint rules do not apply inside `source_snippets.content`, but they do apply to normal design text.
 - Snippets must be rendered explicitly as evidence snippets, not as design definitions.
 - Snippets must not include secrets, credentials, tokens, private keys, passwords, or personal data. Codex must redact such content before writing the DSL.
+- Secret and personal-data validation is best-effort. `validate_dsl.py` must fail on obvious high-risk patterns such as private key headers, common token variable names, password-like key/value pairs, and long high-entropy credential-looking strings. This does not prove that snippets are free of secrets or personal data.
 - Snippets should be short. More than 20 lines produces a validation warning. More than 50 lines fails validation unless `--allow-long-snippets` is passed.
 - Snippets must not substitute for module responsibility, interface requirement, internal structure, or flow descriptions.
 - Rendered snippets appear near the relevant module, runtime unit, collaboration scenario, or flow only when helpful. They must not become a standalone appendix.
+- Every `source_snippets[]` item must be referenced by at least one `source_snippet_refs` field. Unreferenced source snippets fail validation.
 - If a snippet is used, `confidence` should normally be `observed`.
 
 ### Support Data Rendering Rules
@@ -919,7 +978,9 @@ Rules:
 Support data does not become standalone Markdown chapters.
 
 - `evidence`: referenced through `evidence_refs` on related modules, capabilities, runtime units, collaborations, or flows when the schema explicitly allows those refs, and rendered near those items as `依据：EV-001, EV-002`.
-- `traceability`: referenced through `traceability_refs` on related modules, capabilities, or flows when the schema explicitly allows those refs, and rendered near those items as `关联来源：REQ-001 / NOTE-002`.
+- Unreferenced `evidence[]` items produce a validation warning, not a failure.
+- `traceability`: attached to target nodes by authoritative `target_type` and `target_id`, and optionally mirrored through local `traceability_refs` backlinks. Rendered traceability should show source identifiers such as `REQ-001 / NOTE-002`.
+- Local `traceability_refs` must point to traceability entries whose target is the current node. Conflicting backlinks fail validation.
 - `risks`: appended to the end of chapter 9 under `风险` when present.
 - `assumptions`: appended to the end of chapter 9 under `假设` when present.
 - Low-confidence key items with `confidence: unknown` are summarized at the end of chapter 9 under `低置信度项`.
@@ -1062,14 +1123,17 @@ Rules:
 - `--check-env` is used by itself and does not require an input file.
 - `--strict` and `--static` are mutually exclusive.
 - If neither `--strict` nor `--static` is passed, the script defaults to `--strict`.
-- DSL input extracts all Mermaid diagram node `source` fields.
+- DSL input extracts Mermaid diagram node `source` fields only when `source` is non-empty.
+- Empty or missing diagram `source` fields in DSL input are skipped by `validate_mermaid.py`.
+- Requiredness of diagram `source` is decided by `validate_dsl.py`, not `validate_mermaid.py`.
 - Markdown input extracts fenced code blocks whose language is `mermaid`.
+- Every Mermaid block extracted from Markdown must have a non-empty body.
 - Errors must include diagram ID and JSON path for DSL input, or Mermaid block index for Markdown input.
 
 Static checks:
 
 - Code block language is `mermaid`.
-- Diagram body is non-empty.
+- Extracted diagram body is non-empty.
 - `diagram_type` is one of the supported MVP enum values.
 - The first meaningful line is compatible with `diagram_type`.
 - Markdown fences are balanced.
@@ -1088,18 +1152,21 @@ Validates the complete JSON DSL against `schemas/structure-design.schema.json` w
 Core checks:
 
 - Required top-level fields exist.
+- Unknown properties fail schema validation by default through `additionalProperties: false`, except documented extension points.
 - IDs are unique within their collections.
 - IDs use the documented prefixes.
 - References point to existing IDs.
 - `confidence` values use the allowed enum.
 - Required content items with `confidence: unknown` can be collected for chapter 9 low-confidence rendering.
 - Required document sections can be rendered.
+- Fixed table row required fields are non-empty according to chapter-specific rules.
 - DSL instances do not contain validation policy fields such as `empty_allowed`, `required`, `min_rows`, `max_rows`, or `render_when_empty`.
 - Fixed table nodes do not contain `id`, `title`, or `columns`; they contain `rows`, and row objects contain only schema-approved content fields and support metadata.
 - Extra table nodes include `id`, `title`, `columns`, and `rows`; `columns[].key` values are unique; rows only use declared column keys plus allowed metadata.
 - Plain text fields do not contain unsafe Markdown injection patterns; Mermaid diagram source does not contain Markdown fences.
 - Chapter 3 has the module introduction table and module relationship diagram.
 - Chapter 3 module IDs are unique.
+- Chapter 3 module relationship diagram coverage warning is emitted when a listed module ID or name is missing from the diagram source.
 - Chapter 4 covers every module listed in chapter 3 by matching `module_design.modules[].id` to `architecture_views.module_intro.rows[].module_id`.
 - Chapter 4 module details have non-empty provided capability rows and non-empty internal structure information.
 - Chapter 5 has at least one runtime unit and a non-empty runtime flow diagram.
@@ -1108,9 +1175,16 @@ Core checks:
 - Chapter 7 enforces collaboration rows and collaboration diagram only when chapter 3 has two or more modules.
 - Chapter 8 has at least one key flow, the flow index and `flows` array are one-to-one by `flow_id`, flow references use valid module/runtime-unit IDs, every listed flow has structured steps and a non-empty Mermaid diagram.
 - Chapter 9 is a string, may be empty, uses only allowed lightweight Markdown, and contains no headings.
-- Source snippets satisfy path, line, language, purpose, content, confidence, redaction, and length rules.
+- Traceability authoritative targets exist, local `traceability_refs` backlinks target the current node, and duplicate rendering candidates are de-duplicated by renderer.
+- Every source snippet is referenced by at least one `source_snippet_refs` field.
+- Source snippets satisfy path, line, language, purpose, content, confidence, best-effort secret/personal-data risk checks, and length rules.
 
 CLI option:
+
+```bash
+python scripts/validate_dsl.py structure.dsl.json
+python scripts/validate_dsl.py structure.dsl.json --allow-long-snippets
+```
 
 - `--allow-long-snippets` permits source snippets longer than 50 lines after warning. Without this flag, snippets longer than 50 lines fail validation.
 
@@ -1122,8 +1196,17 @@ Extracts and validates Mermaid definitions from DSL or rendered Markdown. It doe
 
 Programmatically renders `STRUCTURE_DESIGN.md` from the DSL. It does not use Jinja2 or a `.tpl` template. It should not invent content. It owns fixed chapter order, fixed table headers, empty-state text, support-data insertion, Mermaid fence generation, source snippet rendering, chapter 9 appended sections, and Markdown escaping.
 
+`render_markdown.py` assumes the input DSL has already passed `validate_dsl.py`, but it may still perform lightweight defensive checks and fail rather than producing malformed Markdown.
+
 CLI options:
 
+```bash
+python scripts/render_markdown.py structure.dsl.json --output-dir .
+python scripts/render_markdown.py structure.dsl.json --output-dir . --overwrite
+python scripts/render_markdown.py structure.dsl.json --output-dir . --backup
+```
+
+- `render_markdown.py` requires one positional DSL JSON path.
 - `--output-dir <path>` writes `STRUCTURE_DESIGN.md` to that directory.
 - `--overwrite` explicitly replaces an existing `STRUCTURE_DESIGN.md`.
 - `--backup` preserves an existing `STRUCTURE_DESIGN.md` as `STRUCTURE_DESIGN.md.bak-YYYYMMDD_HHMMSS` before writing the new file.
@@ -1149,14 +1232,19 @@ Tests should cover:
 
 - The two example DSL files validate successfully.
 - `validate_dsl.py` runs `jsonschema` validation before semantic validation.
+- Schema validation rejects unknown fields by default through `additionalProperties: false`, while documented extension points are handled by semantic validation.
 - Missing required fields fail validation with clear errors.
+- Required fixed table row content fields fail validation when they are present but empty.
 - Invalid references fail validation.
 - Invalid ID prefixes fail validation.
 - Invalid `confidence` values fail validation.
+- Traceability tests cover `source_external_id`, authoritative `target_type`/`target_id` binding, invalid targets, valid local backlinks, conflicting backlinks, and renderer de-duplication.
 - Mermaid diagrams with Graphviz/DOT syntax fail validation.
 - Mermaid diagram source containing Markdown fences fails validation.
 - Valid Mermaid examples across MVP core diagram types pass lightweight validation.
 - Non-core Mermaid diagram types fail validation in the MVP.
+- `validate_mermaid.py --from-dsl` skips optional empty diagram sources, while required empty diagram sources fail in `validate_dsl.py`.
+- `validate_mermaid.py --from-markdown` fails when a Mermaid fenced block has an empty body.
 - Rendering creates exactly one `STRUCTURE_DESIGN.md`.
 - Rendering fails by default when `STRUCTURE_DESIGN.md` already exists.
 - Rendering with `--overwrite` replaces an existing output.
@@ -1165,6 +1253,7 @@ Tests should cover:
 - Plain text DSL fields are escaped so they cannot inject headings, tables, Mermaid fences, or raw HTML into the final document.
 - Chapter 3 fails validation if the fixed module introduction table or required module relationship diagram is missing.
 - Chapter 3 and chapter 4 fail validation if module IDs do not match one-to-one.
+- Chapter 3 emits a warning, not a failure, when the module relationship diagram source does not mention every listed module ID or module name.
 - Required fixed tables fail validation if they contain `columns`; extra tables fail validation if they omit `columns`.
 - Extra tables fail validation for duplicate column keys or row keys not declared by columns.
 - Chapter 4 fails validation if any listed module lacks a provided capability row.
@@ -1174,12 +1263,13 @@ Tests should cover:
 - Chapter 6 passes validation with empty configuration item, structural data/artifact, and dependency tables.
 - Chapter 7 passes validation with empty collaboration rows and empty diagram when chapter 3 has exactly one module.
 - Chapter 7 fails validation with empty collaboration rows or empty diagram when chapter 3 has two or more modules.
+- Chapter 7 fails validation in multi-module mode when a collaboration scenario does not involve at least two distinct modules.
 - Chapter 8 fails validation if flow index rows and `flows` entries do not match one-to-one by `flow_id`, if module/runtime-unit references do not exist, if any flow lacks structured steps, or if any flow lacks a Mermaid diagram.
 - Flow step tests cover required fields, unique `order`, branch/exception optionality, and metadata refs.
 - Chapter 9 accepts an empty string.
 - Chapter 9 fails validation for any Markdown headings, Mermaid code blocks, Markdown tables, unbalanced fences, or HTML blocks.
-- Support data tests cover evidence, traceability, risks, assumptions, refs, and automatic low-confidence summary collection.
-- Source snippet tests cover required fields, line range sanity, redaction checks, warning at more than 20 lines, failure at more than 50 lines, and `--allow-long-snippets`.
+- Support data tests cover evidence, traceability, risks, assumptions, refs, unreferenced evidence warnings, and automatic low-confidence summary collection.
+- Source snippet tests cover required fields, line range sanity, missing references, unreferenced snippet failures, best-effort secret/personal-data risk checks, warning at more than 20 lines, failure at more than 50 lines, and `--allow-long-snippets`.
 - DSL examples and tests prove that `empty_allowed` and similar validation policy fields do not appear in JSON instances.
 
 ## Examples
