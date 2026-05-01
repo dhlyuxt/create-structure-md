@@ -196,7 +196,7 @@ Rules:
 - `evidence_refs` must reference `evidence[].id`.
 - `traceability_refs` must reference `traceability[].id`.
 - `source_snippet_refs` must reference `source_snippets[].id`.
-- Required content items with `confidence: unknown` are automatically summarized by the renderer at the end of chapter 9 under `低置信度项`.
+- Whitelisted design content items with `confidence: unknown` are automatically summarized by the renderer at the end of chapter 9 under `低置信度项`.
 
 ID prefix conventions:
 
@@ -209,6 +209,7 @@ ID prefix conventions:
 - Dependency IDs use `DEP-...`.
 - Collaboration IDs use `COL-...`.
 - Flow step IDs use `STEP-...`.
+- Flow branch/exception IDs use `BR-...`.
 - Mermaid diagram IDs use `MER-...`.
 - Extra table IDs use `TBL-...`.
 - Evidence IDs use `EV-...`.
@@ -228,6 +229,8 @@ Explicit exceptions:
 - `module_design.modules[].module_id` is a required reference to a canonical module ID, not a new module definition.
 - `runtime_units.rows[].unit_id` defines a runtime unit ID.
 - `flow_index.rows[].flow_id` and `flows[].flow_id` are paired flow IDs and must match one-to-one.
+- `key_flows.flows[].steps[].step_id` defines a globally unique flow step ID.
+- `key_flows.flows[].branches_or_exceptions[].branch_id` defines a globally unique branch/exception ID.
 - `traceability[].source_external_id` is an external source identifier and is not an internal DSL reference.
 
 Array field defaults:
@@ -264,7 +267,15 @@ The MVP uses semantic chapter fields instead of generic `required_tables`, `requ
   "architecture_views": {
     "summary": "",
     "module_intro": { "rows": [] },
-    "module_relationship_diagram": {},
+    "module_relationship_diagram": {
+      "id": "MER-ARCH-MODULES",
+      "kind": "module_relationship",
+      "title": "",
+      "diagram_type": "flowchart",
+      "description": "",
+      "source": "",
+      "confidence": "observed"
+    },
     "extra_tables": [],
     "extra_diagrams": []
   },
@@ -275,8 +286,15 @@ The MVP uses semantic chapter fields instead of generic `required_tables`, `requ
   "runtime_view": {
     "summary": "",
     "runtime_units": { "rows": [] },
-    "runtime_flow_diagram": {},
-    "runtime_sequence_diagram": {},
+    "runtime_flow_diagram": {
+      "id": "MER-RUNTIME-FLOW",
+      "kind": "runtime_flow",
+      "title": "",
+      "diagram_type": "flowchart",
+      "description": "",
+      "source": "",
+      "confidence": "observed"
+    },
     "extra_tables": [],
     "extra_diagrams": []
   },
@@ -291,7 +309,15 @@ The MVP uses semantic chapter fields instead of generic `required_tables`, `requ
   "cross_module_collaboration": {
     "summary": "",
     "collaboration_scenarios": { "rows": [] },
-    "collaboration_relationship_diagram": {},
+    "collaboration_relationship_diagram": {
+      "id": "MER-COLLABORATION-RELATIONSHIP",
+      "kind": "collaboration_relationship",
+      "title": "",
+      "diagram_type": "flowchart",
+      "description": "",
+      "source": "",
+      "confidence": "observed"
+    },
     "extra_tables": [],
     "extra_diagrams": []
   },
@@ -310,6 +336,8 @@ The MVP uses semantic chapter fields instead of generic `required_tables`, `requ
   "source_snippets": []
 }
 ```
+
+Optional diagram fields such as `runtime_sequence_diagram` may be omitted from the DSL. When present, they must use the full diagram object shape rather than `{}`.
 
 Fixed table nodes contain only rows:
 
@@ -344,7 +372,8 @@ Extra table rules:
 
 - `columns[].key` must be unique.
 - `columns[].title` must be non-empty.
-- Rows may use only declared column keys plus schema-approved metadata fields.
+- Rows may use only declared column keys plus `evidence_refs` in the MVP.
+- Extra table rows must not use `traceability_refs` or `source_snippet_refs` in the MVP because they do not have stable row IDs or traceability target mappings.
 - Missing declared column keys render as empty strings.
 - Unknown row keys fail validation.
 
@@ -380,6 +409,14 @@ The MVP validates Mermaid syntax and performs only lightweight coverage warnings
 
 All other Mermaid diagram types are not supported in the MVP.
 
+Diagram field policy:
+
+- Required diagram fields must be full diagram objects with non-empty `source`.
+- Optional diagram fields may be omitted entirely, or may be present as full diagram objects with `source` possibly empty.
+- Empty object `{}` is not allowed for any diagram field.
+- Optional diagrams with empty `source` are skipped by the renderer and by `validate_mermaid.py --from-dsl`.
+- Any `extra_diagrams[]` item must be a full diagram object with non-empty `source`; optionality is expressed by omitting the extra diagram item, not by including an empty diagram.
+
 ### Validation Policy Outside DSL
 
 DSL instances must not include validation policy fields. In particular, JSON written by Codex must not contain `empty_allowed`, `required`, `min_rows`, `max_rows`, `render_when_empty`, or similar control fields. The DSL says what the document contains; `validate_dsl.py` decides whether that content is sufficient.
@@ -388,7 +425,7 @@ The selected policy split is:
 
 - `schemas/structure-design.schema.json` enforces structural shape, required object fields, primitive types, fixed table row content/metadata fields, enum values, and unknown-field rejection.
 - Schema objects should use `additionalProperties: false` by default.
-- Extra table row objects are an exception: their allowed keys come from `columns[].key` plus approved metadata keys and are checked by `validate_dsl.py`.
+- Extra table row objects are an exception: their allowed keys come from `columns[].key` plus `evidence_refs` in the MVP and are checked by `validate_dsl.py`.
 - Future extension objects may explicitly opt into additional properties, but must document why.
 - `validate_dsl.py` must use the required `jsonschema` Python dependency to validate `schemas/structure-design.schema.json` before running semantic checks.
 - `validate_dsl.py` then enforces semantic rules that need project-wide knowledge: non-empty table rows, one-to-one references, module coverage, flow coverage, and Mermaid source presence.
@@ -455,7 +492,7 @@ Rules:
 - `evidence[].kind` must be `source`, `requirement`, `note`, or `analysis`.
 - `traceability[].source_type` must be `requirement`, `note`, `code`, or `user_input`.
 - `traceability[].source_external_id` is an external source identifier such as `REQ-001`; it is not an internal DSL reference.
-- `traceability[].target_type` must be `module`, `core_capability`, `provided_capability`, `runtime_unit`, `flow`, `flow_step`, `collaboration`, `configuration_item`, `data_artifact`, `dependency`, `risk`, `assumption`, or `source_snippet`.
+- `traceability[].target_type` must be `module`, `core_capability`, `provided_capability`, `runtime_unit`, `flow`, `flow_step`, `flow_branch`, `collaboration`, `configuration_item`, `data_artifact`, `dependency`, `risk`, `assumption`, or `source_snippet`.
 - `traceability[].target_id` must reference an existing object in the ID collection implied by `target_type`.
 - `traceability[].target_type` and `traceability[].target_id` are the authoritative binding.
 - `traceability_refs` on design nodes are optional local backlinks. When present, each referenced traceability item must target the current node.
@@ -474,6 +511,7 @@ Traceability target mapping:
 | `runtime_unit` | `runtime_view.runtime_units.rows[].unit_id` |
 | `flow` | `key_flows.flows[].flow_id` |
 | `flow_step` | `key_flows.flows[].steps[].step_id` |
+| `flow_branch` | `key_flows.flows[].branches_or_exceptions[].branch_id` |
 | `collaboration` | `cross_module_collaboration.collaboration_scenarios.rows[].collaboration_id` |
 | `configuration_item` | `configuration_data_dependencies.configuration_items.rows[].config_id` |
 | `data_artifact` | `configuration_data_dependencies.structural_data_artifacts.rows[].artifact_id` |
@@ -483,6 +521,11 @@ Traceability target mapping:
 | `source_snippet` | `source_snippets[].id` |
 
 Local `traceability_refs` validation uses this same mapping table to determine whether a referenced traceability entry targets the current node.
+
+Low-confidence summary collection:
+
+- The renderer summarizes `confidence: unknown` only for design content items in this whitelist: `architecture_views.module_intro.rows[]`, `module_design.modules[]`, provided capability rows, `runtime_view.runtime_units.rows[]`, chapter 6 fixed table rows, `cross_module_collaboration.collaboration_scenarios.rows[]`, `key_flows.flows[]`, `key_flows.flows[].steps[]`, and `key_flows.flows[].branches_or_exceptions[]`.
+- The low-confidence summary excludes `evidence[]`, `traceability[]`, `source_snippets[]`, `risks[]`, `assumptions[]`, and Mermaid diagram nodes.
 
 ### Chapter 1: Document Information
 
@@ -513,6 +556,7 @@ Rules:
 - `status` must be `draft`, `reviewed`, or `final`.
 - `source_type` must be `code`, `requirements`, `mixed`, or `notes`.
 - `generated_at` may be supplied by Codex or filled by the renderer. When present, it should be an ISO-8601 local datetime with timezone when available.
+- If `generated_at` is empty, `render_markdown.py` fills the rendered Markdown value but does not mutate the DSL file.
 - `language` defaults to `zh-CN`.
 - `output_file` must equal `STRUCTURE_DESIGN.md`.
 
@@ -540,6 +584,7 @@ Rules:
 
 Rules:
 
+- `system_overview.summary` and `system_overview.purpose` must be non-empty.
 - `core_capabilities[].capability_id` must be non-empty, unique across all capability IDs, and use the `CAP-...` prefix.
 - Each core capability must have non-empty `name`, `description`, and `confidence`.
 
@@ -585,6 +630,7 @@ Chapter 3 is the architecture overview. It must include a fixed module introduct
 
 Rules:
 
+- `architecture_views.summary` must be non-empty.
 - `module_intro` must exist.
 - `module_intro.rows` must include `module_id` plus five visible table fields: `module_name`, `responsibility`, `inputs`, `outputs`, and `notes`, plus common metadata.
 - `module_intro.rows[].module_id` is validation metadata, not a visible table column. It must be non-empty and unique.
@@ -668,6 +714,7 @@ Chapter 4 expands each module listed in chapter 3. Every module must be explaina
 
 Rules:
 
+- `module_design.summary` must be non-empty.
 - `module_design.modules` must cover every module in `architecture_views.module_intro.rows` by matching `modules[].module_id` to `module_intro.rows[].module_id`.
 - `module_design.modules[].module_id` is a required reference to a canonical module ID from chapter 3, not a new module definition.
 - `module_design.modules[].module_id` and `architecture_views.module_intro.rows[].module_id` must form an exact one-to-one set: no missing modules, no extra modules, and no duplicate modules.
@@ -744,6 +791,7 @@ Chapter 5 explains how the system runs. A runtime unit is something that is star
 
 Rules:
 
+- `runtime_view.summary` must be non-empty.
 - `runtime_units` must exist and its rows use fixed visible fields: `unit_name`, `unit_type`, `entrypoint`, `entrypoint_not_applicable_reason`, `responsibility`, `related_module_ids`, `external_environment_reason`, and `notes`, plus `unit_id` and common metadata.
 - `runtime_units.rows[].unit_id` must be non-empty, unique, and use the `RUN-...` prefix.
 - `runtime_units.rows[].related_module_ids` must reference module IDs from `architecture_views.module_intro.rows`.
@@ -755,7 +803,7 @@ Rules:
 - `runtime_flow_diagram` must exist.
 - `runtime_flow_diagram.diagram_type` must be one of the supported Mermaid diagram types.
 - `runtime_flow_diagram.source` must be non-empty and pass Mermaid validation.
-- `runtime_sequence_diagram` is recommended but not required. If Codex does not generate it, the field may be omitted or left empty and the renderer does not output it. If it has a non-empty `source`, it must use `sequenceDiagram` and pass Mermaid validation.
+- `runtime_sequence_diagram` is recommended but not required. If Codex does not generate it, the field may be omitted or present as a full diagram object with empty `source`; the renderer does not output it in either case. If it has a non-empty `source`, it must use `sequenceDiagram` and pass Mermaid validation.
 
 ### Chapter 6: Configuration, Data, and Dependencies
 
@@ -852,7 +900,7 @@ Rules:
 - In multi-module mode, at least one `participant_module_ids` item must be different from `initiator_module_id`.
 - A multi-module collaboration scenario must involve at least two distinct modules.
 - If chapter 3 defines two or more modules, `collaboration_relationship_diagram` must exist, have a supported `diagram_type`, and have non-empty `source` that passes Mermaid validation.
-- If chapter 3 defines exactly one module, `collaboration_scenarios.rows` may be empty and `collaboration_relationship_diagram` may be omitted or have empty `source`.
+- If chapter 3 defines exactly one module, `collaboration_scenarios.rows` may be empty and `collaboration_relationship_diagram` may be omitted or present as a full diagram object with empty `source`.
 - In single-module mode, if Codex provides collaboration rows or a diagram source, they must still pass normal validation.
 - In single-module mode with no collaboration content, the renderer outputs: `本系统当前仅识别到一个结构模块，暂无跨模块协作关系。`
 - This chapter describes cross-module collaboration only. It must not duplicate chapter 4 external interface tables or turn into a function signature list.
@@ -903,6 +951,7 @@ Chapter 8 is named `关键流程`. It explains the most important end-to-end flo
         ],
         "branches_or_exceptions": [
           {
+            "branch_id": "BR-FLOW-001-001",
             "condition": "",
             "handling": "",
             "related_module_ids": [],
@@ -938,6 +987,7 @@ Chapter 8 is named `关键流程`. It explains the most important end-to-end flo
 
 Rules:
 
+- `key_flows.summary` must be non-empty.
 - `flow_index` must exist and its rows use fixed fields: `flow_id`, `flow_name`, `trigger_condition`, `participant_module_ids`, `participant_runtime_unit_ids`, `main_steps`, `output_result`, and `notes`.
 - `flow_index.rows[]` is an index-only row and does not carry common metadata. Its confidence and support references are carried by the matching `key_flows.flows[]` object.
 - `flow_index.rows` must contain at least one key flow.
@@ -951,8 +1001,12 @@ Rules:
 - `flows[].steps` must be a non-empty array of step objects.
 - Each step must have non-empty `step_id`, integer `order >= 1`, non-empty `description`, and `confidence`.
 - `step_id` values use the `STEP-...` prefix.
+- `step_id` values must be globally unique across all `key_flows.flows[].steps[]`.
+- Traceability target `flow_step` resolves by global `step_id`.
 - Step `order` values must be unique within one flow.
-- `branches_or_exceptions` may be empty. If present, each item must have non-empty `condition`, `handling`, and `confidence`.
+- `branches_or_exceptions` may be empty. If present, each item must have non-empty `branch_id`, `condition`, `handling`, and `confidence`.
+- `branch_id` values use the `BR-...` prefix and must be globally unique across all `key_flows.flows[].branches_or_exceptions[]`.
+- Traceability target `flow_branch` resolves by global `branch_id`.
 - Every flow must have a `diagram`.
 - Every flow diagram must use a supported Mermaid `diagram_type`.
 - Every flow diagram `source` must be non-empty and pass Mermaid validation.
@@ -1027,7 +1081,7 @@ Support data does not become standalone Markdown chapters.
 - Local `traceability_refs` must point to traceability entries whose target is the current node. Conflicting backlinks fail validation.
 - `risks`: appended to the end of chapter 9 under `风险` when present.
 - `assumptions`: appended to the end of chapter 9 under `假设` when present.
-- Low-confidence key items with `confidence: unknown` are summarized at the end of chapter 9 under `低置信度项`.
+- Low-confidence whitelisted design content items with `confidence: unknown` are summarized at the end of chapter 9 under `低置信度项`.
 - `source_snippets`: rendered only near items that reference them through `source_snippet_refs`.
 - When a fixed table row references evidence, traceability, or source snippets, the table renders only its visible columns. Support data for those rows is rendered immediately after the table as grouped notes keyed by the row's stable ID when available, or by the row's display name when no stable ID exists.
 - Source snippets referenced by table rows are rendered outside the Markdown table so code blocks never appear inside table cells.
@@ -1139,7 +1193,7 @@ Mermaid diagram `source` values in the DSL must not contain Markdown fences. The
 
 `validate_mermaid.py` should validate Mermaid text without network access. Because the skill is expected to support Mermaid reliably rather than maintain a partial custom grammar, strict validation should delegate to local Mermaid CLI tooling. If strict validation tooling is unavailable, the script must say so clearly and must not claim that diagrams were proven renderable.
 
-`validate_mermaid.py` does not produce final image artifacts. In strict mode, it may render Mermaid diagrams to temporary files under the temporary working directory solely for validation. Those temporary files are not part of the final deliverable.
+`validate_mermaid.py` does not produce final image artifacts. In strict mode, it may render Mermaid diagrams to temporary files under `--work-dir` when provided, or under an implementation-local system temporary directory otherwise, solely for validation. Those temporary files are not part of the final deliverable.
 
 Strict validation requires local dependencies:
 
@@ -1178,14 +1232,18 @@ Rules:
 - Requiredness of diagram `source` is decided by `validate_dsl.py`, not `validate_mermaid.py`.
 - Markdown input extracts fenced code blocks whose language is `mermaid`.
 - Every Mermaid block extracted from Markdown must have a non-empty body.
+- For `--from-dsl`, `diagram_type` comes from the diagram node and must match the first meaningful Mermaid line.
+- For `--from-markdown`, there is no explicit `diagram_type`; the script infers it from the first meaningful Mermaid line.
+- Markdown mode infers `flowchart`, `graph`, `sequenceDiagram`, `classDiagram`, or `stateDiagram-v2` from the matching first meaningful line. It fails if the inferred type is missing or not in the MVP supported set.
 - Errors must include diagram ID and JSON path for DSL input, or Mermaid block index for Markdown input.
 
 Static checks:
 
 - Code block language is `mermaid`.
 - Extracted diagram body is non-empty.
-- `diagram_type` is one of the supported MVP enum values.
-- The first meaningful line is compatible with `diagram_type`; blank lines, Mermaid comments starting with `%%`, and Mermaid init directives are ignored before this check.
+- For DSL input, `diagram_type` is one of the supported MVP enum values and is compatible with the first meaningful line.
+- For Markdown input, the inferred diagram type is one of the supported MVP enum values.
+- Blank lines, Mermaid comments starting with `%%`, and Mermaid init directives are ignored before first-line compatibility or inference checks.
 - Markdown fences are balanced.
 - Mermaid source from the DSL does not contain Markdown fences.
 - Disallowed Graphviz/DOT constructs such as `digraph`, `rankdir`, and `node -> node;` are rejected when they appear as diagram source. Mermaid arrows such as `-->` and `->>` remain allowed.
@@ -1208,13 +1266,15 @@ Core checks:
 - References point to existing IDs.
 - Traceability target validation uses the explicit `target_type` mapping table.
 - `confidence` values use the allowed enum.
-- Required content items with `confidence: unknown` can be collected for chapter 9 low-confidence rendering.
+- Whitelisted design content items with `confidence: unknown` can be collected for chapter 9 low-confidence rendering.
 - Required document sections can be rendered.
+- Required summary fields are non-empty according to chapter-specific rules.
 - Fixed table row required fields are non-empty according to chapter-specific rules.
 - Document metadata required fields are non-empty according to chapter 1 rules.
 - DSL instances do not contain validation policy fields such as `empty_allowed`, `required`, `min_rows`, `max_rows`, or `render_when_empty`.
 - Fixed table nodes do not contain `id`, `title`, or `columns`; they contain `rows`, and row objects contain only schema-approved content fields and support metadata.
-- Extra table nodes include `id`, `title`, `columns`, and `rows`; `columns[].key` values are unique; rows only use declared column keys plus allowed metadata.
+- Extra table nodes include `id`, `title`, `columns`, and `rows`; `columns[].key` values are unique; rows only use declared column keys plus `evidence_refs`.
+- Required diagrams, optional diagrams, and extra diagrams follow the diagram field policy.
 - Plain text fields do not contain unsafe Markdown injection patterns; Mermaid diagram source does not contain Markdown fences.
 - Chapter 3 has the module introduction table and module relationship diagram.
 - Chapter 3 module IDs are unique.
@@ -1227,19 +1287,22 @@ Core checks:
 - Chapter 7 enforces collaboration rows and collaboration diagram only when chapter 3 has two or more modules.
 - Chapter 8 has at least one key flow, the flow index and `flows` array are one-to-one by `flow_id`, flow references use valid module/runtime-unit IDs, every listed flow has structured steps and a non-empty Mermaid diagram.
 - Chapter 8 `flow_index.rows[]` is validated as an index-only table and does not carry common metadata.
+- Flow step IDs and branch/exception IDs are globally unique in their respective collections.
 - Chapter 9 is a string, may be empty, uses only allowed lightweight Markdown, and contains no headings.
 - Traceability authoritative targets exist, local `traceability_refs` backlinks target the current node, and duplicate rendering candidates are de-duplicated by renderer.
 - Normal design text does not contain prototype/detail-design patterns outside Mermaid source and source snippet content.
 - Every source snippet is referenced by at least one `source_snippet_refs` field.
 - Source snippets satisfy path, positive line range, language, purpose, content, confidence, best-effort secret/personal-data risk checks, and length rules.
 
-CLI option:
+CLI contract:
 
 ```bash
 python scripts/validate_dsl.py structure.dsl.json
 python scripts/validate_dsl.py structure.dsl.json --allow-long-snippets
 ```
 
+- `validate_dsl.py` requires one positional DSL JSON path.
+- It fails if the input file does not exist, is not valid JSON, or does not match the schema.
 - `--allow-long-snippets` permits source snippets longer than 50 lines after warning. Without this flag, snippets longer than 50 lines fail validation.
 
 ### `validate_mermaid.py`
@@ -1252,7 +1315,7 @@ Programmatically renders `STRUCTURE_DESIGN.md` from the DSL. It does not use Jin
 
 `render_markdown.py` assumes the input DSL has already passed `validate_dsl.py`, but it may still perform lightweight defensive checks and fail rather than producing malformed Markdown.
 
-CLI options:
+CLI contract:
 
 ```bash
 python scripts/render_markdown.py structure.dsl.json --output-dir .
@@ -1261,6 +1324,8 @@ python scripts/render_markdown.py structure.dsl.json --output-dir . --backup
 ```
 
 - `render_markdown.py` requires one positional DSL JSON path.
+- It fails if the input file does not exist, is not valid JSON, or does not contain `document.output_file == "STRUCTURE_DESIGN.md"`.
+- It may perform defensive validation, but it should not duplicate the full semantic validator.
 - `--output-dir <path>` writes `STRUCTURE_DESIGN.md` to that directory.
 - `--overwrite` explicitly replaces an existing `STRUCTURE_DESIGN.md`.
 - `--backup` preserves an existing `STRUCTURE_DESIGN.md` as `STRUCTURE_DESIGN.md.bak-YYYYMMDD_HHMMSS` before writing the new file.
@@ -1275,6 +1340,8 @@ If Codex lacks enough content to populate a section that is allowed to be empty,
 If Codex lacks enough content to populate a required non-empty section, final generation must stop and require Codex to revise its structured content. Chapter 4 missing module-level capabilities or internal structure requires revising module design. Missing a function call graph alone does not require module re-partitioning.
 
 If Mermaid strict validation tooling is unavailable, final generation should stop with a clear message unless the user explicitly accepts static-only validation for that run. If strict validation fails only because tooling is unavailable, Codex may run `validate_mermaid.py --static` only after that explicit acceptance, and must report that diagrams were not proven renderable by Mermaid CLI.
+
+If the user explicitly accepts static-only Mermaid validation, Codex records that decision in the final report and may write a temporary note file at `.codex-tmp/create-structure-md-<run-id>/VALIDATION_NOTES.md`. The final report must state that Mermaid strict validation was not performed, the reason was local Mermaid CLI tooling unavailable, and the user accepted static-only validation for this run.
 
 If `STRUCTURE_DESIGN.md` already exists, rendering fails by default. The user must explicitly choose `--overwrite` or `--backup`. `--backup` preserves the existing file using `STRUCTURE_DESIGN.md.bak-YYYYMMDD_HHMMSS` and must not overwrite an existing backup.
 
@@ -1293,14 +1360,17 @@ Tests should cover:
 - Invalid references fail validation.
 - Invalid ID prefixes fail validation.
 - Invalid `confidence` values fail validation.
+- Required summary fields fail validation when empty.
 - Canonical module ID tests prove that module IDs are defined only by chapter 3 and chapter 4 `module_id` values are exact one-to-one references.
-- Traceability tests cover `source_external_id`, the target mapping table, authoritative `target_type`/`target_id` binding, invalid targets, valid local backlinks, conflicting backlinks, and renderer de-duplication.
+- Traceability tests cover `source_external_id`, the target mapping table including `flow_branch`, authoritative `target_type`/`target_id` binding, invalid targets, valid local backlinks, conflicting backlinks, and renderer de-duplication.
 - Prototype/detail-design lint tests fail for function prototypes, `typedef struct`, `typedef enum`, and Python `def`/`class` definitions outside source snippets, while allowing the same content inside `source_snippets[].content`.
 - Mermaid diagrams with Graphviz/DOT syntax fail validation.
 - Mermaid diagram source containing Markdown fences fails validation.
 - Valid Mermaid examples across MVP core diagram types pass lightweight validation.
 - Non-core Mermaid diagram types fail validation in the MVP.
+- Diagram policy tests cover optional diagram omission, optional full diagram object with empty `source`, rejection of `{}`, required diagram non-empty `source`, and `extra_diagrams[]` non-empty `source`.
 - Mermaid static checks ignore leading blank lines, Mermaid comments, and Mermaid init directives when checking the first meaningful line.
+- Markdown Mermaid validation infers diagram type from the first meaningful line and fails for missing or unsupported inferred types.
 - `validate_mermaid.py --from-dsl` skips optional empty diagram sources, while required empty diagram sources fail in `validate_dsl.py`.
 - `validate_mermaid.py --from-markdown` fails when a Mermaid fenced block has an empty body.
 - `validate_mermaid.py --strict --work-dir ...` writes temporary validation artifacts under the requested work directory.
@@ -1318,6 +1388,7 @@ Tests should cover:
 - Chapter 3 emits a warning, not a failure, when the module relationship diagram source does not mention every listed module ID or module name.
 - Required fixed tables fail validation if they contain `columns`; extra tables fail validation if they omit `columns`.
 - Extra tables fail validation for duplicate column keys or row keys not declared by columns.
+- Extra table rows may use `evidence_refs` but fail validation if they use `traceability_refs` or `source_snippet_refs`.
 - Chapter 4 fails validation if any listed module lacks a provided capability row.
 - Chapter 4 fails validation if any listed module lacks both an internal structure diagram and textual internal structure.
 - Chapter 5 fails validation if runtime units are empty or runtime flow Mermaid source is missing.
@@ -1330,13 +1401,14 @@ Tests should cover:
 - Chapter 7 fails validation in multi-module mode when a collaboration scenario does not involve at least two distinct modules.
 - Chapter 8 fails validation if flow index rows and `flows` entries do not match one-to-one by `flow_id`, if module/runtime-unit references do not exist, if any flow lacks structured steps, or if any flow lacks a Mermaid diagram.
 - Chapter 8 fails validation if `flow_index.rows[]` contains common metadata fields.
-- Flow step tests cover required fields, unique `order`, branch/exception optionality, and metadata refs.
+- Flow step tests cover required fields, globally unique `step_id`, unique `order`, branch/exception optionality, globally unique `branch_id`, and metadata refs.
 - Chapter 9 accepts an empty `structure_issues_and_suggestions` string.
 - Chapter 9 empty-state rendering appears only when the free-form string is empty and no risks, assumptions, or low-confidence items exist.
 - Chapter 9 fails validation for any Markdown headings, Mermaid code blocks, Markdown tables, unbalanced fences, or HTML blocks.
-- Support data tests cover evidence, traceability, risks, assumptions, refs, unreferenced evidence warnings, and automatic low-confidence summary collection.
+- Support data tests cover evidence, traceability, risks, assumptions, refs, unreferenced evidence warnings, and whitelist-based low-confidence summary collection.
 - Source snippet tests cover required fields, positive line range sanity, missing references, unreferenced snippet failures, best-effort secret/personal-data risk checks, warning at more than 20 lines, failure at more than 50 lines, and `--allow-long-snippets`.
 - Strict Mermaid tooling unavailable tests cover explicit user acceptance before static-only fallback and the required warning that diagrams were not proven renderable by Mermaid CLI.
+- `render_markdown.py` tests cover missing input file, invalid JSON, `document.output_file != STRUCTURE_DESIGN.md`, and filling rendered `generated_at` without mutating the DSL.
 - DSL examples and tests prove that `empty_allowed` and similar validation policy fields do not appear in JSON instances.
 
 ## Examples
@@ -1353,6 +1425,8 @@ The examples should stay small enough to read quickly but complete enough to exe
 The first implementation should avoid unnecessary Python dependencies. `jsonschema` is required for JSON Schema validation. Markdown rendering, semantic validation glue, and tests should otherwise prefer the Python standard library. Jinja2 is not used in the MVP. Mermaid validation is the other exception: strict Mermaid confidence should come from local Mermaid CLI tooling rather than an incomplete hand-written grammar.
 
 Future document types can reuse Python rendering helpers for headings, tables, Mermaid blocks, empty states, support-data references, and source snippets. The MVP does not introduce a template engine to solve future migration early.
+
+Markdown escaping should use separate paths for paragraph text and table cells, such as `escape_plain_text()` and `escape_table_cell()`. Table cells need escaping for pipes and newlines; ordinary paragraph text should preserve normal prose while blocking heading, fence, and raw HTML block injection.
 
 The skill should keep `SKILL.md` concise. Detailed DSL fields, document outline, Mermaid rules, and review criteria belong in `references/` so Codex loads them only when needed.
 
@@ -1373,6 +1447,8 @@ Before implementation begins, verify:
 - Temporary JSON files are allowed but not part of the final deliverable.
 - The DSL includes confidence, evidence, traceability, risk, assumption, and source snippet support.
 - Common metadata, canonical module IDs, traceability target mappings, and ID reference rules are explicit.
+- Optional diagrams, required diagrams, and extra diagrams have distinct schema and validation rules.
+- Low-confidence summary collection uses an explicit whitelist.
 - Plain text and Markdown-capable fields have clear escaping and validation rules.
 - Prototype/detail-design lint applies to normal design text while source snippets remain evidence-only exceptions.
 - DSL instances contain content only, while requiredness and emptiness rules live in schema, validator code, and reference documentation.
