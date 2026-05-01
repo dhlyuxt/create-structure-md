@@ -6,7 +6,7 @@ Ready for user review.
 
 ## Purpose
 
-`create-structure-md` is a local personal Codex skill for creating a single software structure design document. It does not analyze code, infer requirements, run repository intelligence tools, or decide what the system means. Codex performs any code or requirement understanding outside the skill. This skill only turns Codex-prepared structured design content into a validated `STRUCTURE_DESIGN.md`.
+`create-structure-md` is a local personal Codex skill for creating a single software structure design document. It does not analyze code, infer requirements, run repository intelligence tools, or decide what the system means. Codex performs any code or requirement understanding outside the skill. This skill only turns Codex-prepared structured design content into a validated module- or system-specific Markdown file named by `document.output_file`.
 
 The skill optimizes for document quality, repeatability, and renderable Mermaid diagrams. Mermaid is a first-class output surface, not a decorative afterthought.
 
@@ -14,7 +14,8 @@ The skill optimizes for document quality, repeatability, and renderable Mermaid 
 
 - Skill name: `create-structure-md`.
 - Scope: local personal skill.
-- Final output: one Markdown file named `STRUCTURE_DESIGN.md`.
+- Final output: one Markdown file named by Codex through `document.output_file`.
+- Output file names must be module- or system-specific, typically `<documented-object-name>_STRUCTURE_DESIGN.md`, and must not use a generic-only filename.
 - Intermediate outputs: one or more JSON DSL files may be created in a temporary working directory.
 - Language: Chinese by default, with English terms where they are clearer or conventional.
 - Mermaid only: Graphviz, DOT, SVG files, and image export are out of scope as final deliverables.
@@ -50,7 +51,7 @@ The old direction used static analysis scripts, repository facts, evidence index
 
 ### Direct Markdown Generation
 
-Codex could write `STRUCTURE_DESIGN.md` directly from its understanding. This is simple, but it gives up validation, reusable examples, Mermaid checks, and consistent structure. It also makes later improvements hard because document shape is embedded in free-form Markdown.
+Codex could write the final Markdown directly from its understanding. This is simple, but it gives up validation, reusable examples, Mermaid checks, and consistent structure. It also makes later improvements hard because document shape is embedded in free-form Markdown.
 
 ### DSL-Driven Single Document
 
@@ -88,7 +89,37 @@ create-structure-md/
 jsonschema
 ```
 
+Testing uses Python standard library `unittest`; no third-party test framework is required in the MVP.
+
+`requirements.txt` contains runtime dependencies only. The MVP does not require `requirements-dev.txt`, `pytest`, or any other third-party test dependency.
+
+Test command:
+
+```bash
+python -m unittest discover -s tests
+```
+
 Jinja2 is intentionally not used in the MVP. Markdown rendering is code-driven so fixed chapter order, fixed table headers, empty states, support-data insertion, and Markdown escaping stay under deterministic renderer control.
+
+## SKILL.md Contract
+
+`SKILL.md` must include YAML front matter.
+
+Required front matter:
+
+```yaml
+---
+name: create-structure-md
+description: Use when the user asks Codex to generate a single module-specific software structure design document, such as <documented-object-name>_STRUCTURE_DESIGN.md, from already-prepared structured design content using the create-structure-md DSL and Mermaid diagrams. Do not use for repo analysis, requirements inference, multi-document generation, Word/PDF output, or image export.
+---
+```
+
+Rules:
+
+- `name` must be exactly `create-structure-md`.
+- `description` must mention `software structure design document`, `STRUCTURE_DESIGN.md`, `DSL`, and `Mermaid`.
+- `description` must explicitly exclude repo analysis, requirements inference, multi-document generation, Word/PDF output, and image export.
+- The description should make clear that the final file is module- or system-specific rather than the generic-only `STRUCTURE_DESIGN.md`.
 
 ## Input Readiness Contract
 
@@ -118,8 +149,8 @@ If these inputs are not available, Codex must not invoke the renderer and must n
 4. Codex writes one complete DSL JSON file and may write smaller staged JSON files first.
 5. Codex runs `validate_dsl.py structure.dsl.json` against the complete DSL.
 6. Codex runs `validate_mermaid.py --from-dsl structure.dsl.json --strict` to validate Mermaid diagram blocks.
-7. Codex runs `render_markdown.py structure.dsl.json --output-dir ...` to create `STRUCTURE_DESIGN.md`.
-8. Codex runs `validate_mermaid.py --from-markdown STRUCTURE_DESIGN.md --static` to verify renderer-produced Mermaid fences and non-empty blocks.
+7. Codex runs `render_markdown.py structure.dsl.json --output-dir ...` to create the Markdown file named by `document.output_file`.
+8. Codex runs `validate_mermaid.py --from-markdown <output-file> --static` to verify renderer-produced Mermaid fences and non-empty blocks.
 9. Codex reviews the generated document with `references/review-checklist.md`.
 10. Codex reports the output path, temporary working directory path, and any assumptions or low-confidence items.
 
@@ -129,9 +160,13 @@ Temporary files in the skill working directory are not automatically deleted. If
 
 Default final output path:
 
-- If the user provides an output directory, write `STRUCTURE_DESIGN.md` there.
-- Otherwise write `STRUCTURE_DESIGN.md` to the target repository root, or to the current working directory when no target repository root is known.
-- The final file name must be exactly `STRUCTURE_DESIGN.md`.
+- If the user provides an output directory, write `document.output_file` there.
+- Otherwise write `document.output_file` to the target repository root, or to the current working directory when no target repository root is known.
+- The final file name must be a safe Markdown filename chosen by Codex and must include the documented module, subsystem, system, or scope name.
+- Recommended filename format: `<documented-object-name>_STRUCTURE_DESIGN.md`.
+- `<documented-object-name>` must come from the actual documented module, subsystem, system, or scope, not from a generic prefix such as `software`, `structure`, or `design`.
+- Generic-only filenames are forbidden, including `STRUCTURE_DESIGN.md`, `structure_design.md`, `design.md`, and `软件结构设计说明书.md`.
+- The file name must end with `.md`, must not contain path separators `/` or `\`, must not contain `..`, and must not contain control characters. Spaces should be normalized to `_`.
 
 Temporary work directory:
 
@@ -142,10 +177,10 @@ Temporary work directory:
 
 Output overwrite policy:
 
-- `render_markdown.py` must not overwrite an existing `STRUCTURE_DESIGN.md` by default.
+- `render_markdown.py` must not overwrite an existing output file by default.
 - If the target file already exists, default rendering fails with a clear message.
 - `--overwrite` explicitly replaces the existing output file.
-- `--backup` first preserves the existing file as `STRUCTURE_DESIGN.md.bak-<YYYYMMDD_HHMMSS>`, then writes the new output.
+- `--backup` first preserves the existing file as `<output_file>.bak-<YYYYMMDD_HHMMSS>`, then writes the new output.
 - The backup timestamp comes from the local system clock when `render_markdown.py` runs and uses `%Y%m%d_%H%M%S`.
 - `--backup` and `--overwrite` are mutually exclusive.
 - If the computed backup path already exists, rendering fails and tells the user to retry. It must not overwrite or delete an existing backup.
@@ -220,18 +255,59 @@ ID prefix conventions:
 
 The validator checks prefixes and uniqueness, but the MVP does not require a strict three-digit numeric suffix. IDs such as `MOD-001` and `MOD-RENDER-001` are both acceptable when unique.
 
-Fields ending with `_id` or `_ids` are strict internal references unless explicitly documented as defining IDs, paired flow IDs, or external identifiers. Strict references must point to existing objects in the appropriate ID collection. Free-text fields must not be used for cross-node references.
+ID field policy:
 
-Explicit exceptions:
-
-- `id` is the defining ID of the current object only for objects that intentionally use generic `id`, such as diagrams, extra tables, evidence, traceability, risks, assumptions, and source snippets.
-- Canonical module IDs are defined only by `architecture_views.module_intro.rows[].module_id`.
-- `module_design.modules[].module_id` is a required reference to a canonical module ID, not a new module definition.
-- `runtime_units.rows[].unit_id` defines a runtime unit ID.
-- `flow_index.rows[].flow_id` and `flows[].flow_id` are paired flow IDs and must match one-to-one.
-- `key_flows.flows[].steps[].step_id` defines a globally unique flow step ID.
-- `key_flows.flows[].branches_or_exceptions[].branch_id` defines a globally unique branch/exception ID.
+- Fields listed in `Defining ID fields` define IDs.
+- Fields listed in `Reference ID fields` must reference existing IDs.
+- `key_flows.flow_index.rows[].flow_id` and `key_flows.flows[].flow_id` are paired identity fields for the same flow and must match one-to-one.
 - `traceability[].source_external_id` is an external source identifier and is not an internal DSL reference.
+- Any other `_id` or `_ids` field is invalid unless the schema explicitly allows it and this section registers it.
+- Free-text fields must not be used for cross-node references.
+
+Defining ID fields:
+
+| Field | Defines |
+| --- | --- |
+| `architecture_views.module_intro.rows[].module_id` | canonical module ID |
+| `system_overview.core_capabilities[].capability_id` | core capability ID |
+| `module_design.modules[].external_capability_details.provided_capabilities.rows[].capability_id` | provided capability ID |
+| `runtime_view.runtime_units.rows[].unit_id` | runtime unit ID |
+| `configuration_data_dependencies.configuration_items.rows[].config_id` | configuration item ID |
+| `configuration_data_dependencies.structural_data_artifacts.rows[].artifact_id` | data/artifact ID |
+| `configuration_data_dependencies.dependencies.rows[].dependency_id` | dependency ID |
+| `cross_module_collaboration.collaboration_scenarios.rows[].collaboration_id` | collaboration scenario ID |
+| `key_flows.flow_index.rows[].flow_id` | paired flow identity |
+| `key_flows.flows[].flow_id` | paired flow identity |
+| `key_flows.flows[].steps[].step_id` | globally unique flow step ID |
+| `key_flows.flows[].branches_or_exceptions[].branch_id` | globally unique branch/exception ID |
+| Mermaid diagram `id` fields | Mermaid diagram ID |
+| `extra_tables[].id` | extra table ID |
+| `evidence[].id` | evidence ID |
+| `traceability[].id` | traceability ID |
+| `risks[].id` | risk ID |
+| `assumptions[].id` | assumption ID |
+| `source_snippets[].id` | source snippet ID |
+
+Reference ID fields:
+
+| Field | References |
+| --- | --- |
+| `module_design.modules[].module_id` | `architecture_views.module_intro.rows[].module_id` |
+| `runtime_view.runtime_units.rows[].related_module_ids` | module IDs |
+| `cross_module_collaboration.collaboration_scenarios.rows[].initiator_module_id` | module ID |
+| `cross_module_collaboration.collaboration_scenarios.rows[].participant_module_ids` | module IDs |
+| `key_flows.flow_index.rows[].participant_module_ids` | module IDs |
+| `key_flows.flow_index.rows[].participant_runtime_unit_ids` | runtime unit IDs |
+| `key_flows.flows[].related_module_ids` | module IDs |
+| `key_flows.flows[].related_runtime_unit_ids` | runtime unit IDs |
+| `key_flows.flows[].steps[].related_module_ids` | module IDs |
+| `key_flows.flows[].steps[].related_runtime_unit_ids` | runtime unit IDs |
+| `key_flows.flows[].branches_or_exceptions[].related_module_ids` | module IDs |
+| `key_flows.flows[].branches_or_exceptions[].related_runtime_unit_ids` | runtime unit IDs |
+| `evidence_refs` | `evidence[].id` |
+| `traceability_refs` | `traceability[].id` |
+| `source_snippet_refs` | `source_snippets[].id` |
+| `traceability[].target_id` | ID resolved by `traceability[].target_type` mapping |
 
 Array field defaults:
 
@@ -338,6 +414,48 @@ The MVP uses semantic chapter fields instead of generic `required_tables`, `requ
 ```
 
 Optional diagram fields such as `runtime_sequence_diagram` may be omitted from the DSL. When present, they must use the full diagram object shape rather than `{}`.
+
+### Authoritative Field Contract
+
+JSON examples in this spec illustrate shape, but schema, validator, and renderer behavior must follow this authoritative field contract plus the chapter-specific rules.
+
+| Field | Required in schema | May be empty | Semantic required | Rendering position | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `dsl_version` | yes | no | yes | not rendered | Schema version. |
+| `document` | yes | no | yes | Chapter 1 | Contains output filename and document metadata. |
+| `document.output_file` | yes | no | yes | Output path and Chapter 1 | Codex-chosen safe filename; recommended `<documented-object-name>_STRUCTURE_DESIGN.md`; generic-only filenames forbidden. |
+| `system_overview` | yes | no | yes | Chapter 2 |  |
+| `system_overview.summary` | yes | no | yes | Chapter 2 intro |  |
+| `system_overview.purpose` | yes | no | yes | Chapter 2 |  |
+| `architecture_views` | yes | no | yes | Chapter 3 |  |
+| `architecture_views.summary` | yes | no | yes | 3.1 |  |
+| `architecture_views.module_intro` | yes | no | yes | 3.2 | Must contain at least one row. |
+| `architecture_views.module_relationship_diagram` | yes | no | yes | 3.3 | Full diagram object with non-empty `source`. |
+| `module_design` | yes | no | yes | Chapter 4 |  |
+| `module_design.summary` | yes | no | yes | Chapter 4 intro | Rendered before per-module subsections. |
+| `module_design.modules` | yes | no | yes | 4.x subsections | One-to-one with chapter 3 modules. |
+| `runtime_view` | yes | no | yes | Chapter 5 |  |
+| `runtime_view.summary` | yes | no | yes | 5.1 |  |
+| `runtime_view.runtime_units` | yes | no | yes | 5.2 | Must contain at least one row. |
+| `runtime_view.runtime_flow_diagram` | yes | no | yes | 5.3 | Full diagram object with non-empty `source`. |
+| `runtime_view.runtime_sequence_diagram` | no | yes | no | 5.4 | Omitted or full diagram object. Empty source renders fixed empty state. |
+| `configuration_data_dependencies` | yes | no | yes | Chapter 6 |  |
+| `configuration_data_dependencies.summary` | yes | yes | no | Chapter 6 intro | Empty summary is allowed to avoid invented content. |
+| `configuration_data_dependencies.configuration_items` | yes | yes | no | 6.1 | Empty table renders fixed empty state. |
+| `configuration_data_dependencies.structural_data_artifacts` | yes | yes | no | 6.2 | Empty table renders fixed empty state. |
+| `configuration_data_dependencies.dependencies` | yes | yes | no | 6.3 | Empty table renders fixed empty state. |
+| `cross_module_collaboration` | yes | no | yes | Chapter 7 |  |
+| `cross_module_collaboration.summary` | yes | yes | conditional | 7.1 | Multi-module content should summarize collaboration; single-module may be empty. |
+| `cross_module_collaboration.collaboration_scenarios` | yes | conditional | conditional | 7.2 | Required non-empty only when module count is at least two. |
+| `cross_module_collaboration.collaboration_relationship_diagram` | no | yes | conditional | 7.3 | Required with non-empty `source` only when module count is at least two. |
+| `key_flows` | yes | no | yes | Chapter 8 |  |
+| `key_flows.summary` | yes | no | yes | 8.1 |  |
+| `key_flows.flow_index` | yes | no | yes | 8.2 | Index-only table. |
+| `key_flows.flows` | yes | no | yes | 8.x subsections | One detail node per flow index row. |
+| `structure_issues_and_suggestions` | yes | yes | no | Chapter 9 | Empty state depends on risks, assumptions, and low-confidence items. |
+| `extra_tables` | yes where present in chapter objects | yes | no | chapter-specific supplement section | Empty arrays render fixed empty state in fixed numbered sections. |
+| `extra_diagrams` | yes where present in chapter objects | yes | no | chapter-specific supplement section | Items, when present, must have non-empty `source`. |
+| `evidence`, `traceability`, `risks`, `assumptions`, `source_snippets` | yes | yes | no | support data / Chapter 9 appendices | Support data does not create standalone chapters. |
 
 Fixed table nodes contain only rows:
 
@@ -545,7 +663,7 @@ Low-confidence summary collection:
     "source_type": "mixed",
     "scope_summary": "",
     "not_applicable_policy": "固定章节；按章节规则处理空内容",
-    "output_file": "STRUCTURE_DESIGN.md"
+    "output_file": "create-structure-md_STRUCTURE_DESIGN.md"
   }
 }
 ```
@@ -558,7 +676,10 @@ Rules:
 - `generated_at` may be supplied by Codex or filled by the renderer. When present, it should be an ISO-8601 local datetime with timezone when available.
 - If `generated_at` is empty, `render_markdown.py` fills the rendered Markdown value but does not mutate the DSL file.
 - `language` defaults to `zh-CN`.
-- `output_file` must equal `STRUCTURE_DESIGN.md`.
+- `output_file` must be a safe Markdown filename chosen by Codex and must include the documented module, subsystem, system, or scope name.
+- `output_file` should normally follow `<documented-object-name>_STRUCTURE_DESIGN.md`.
+- The documented object name must be concrete, such as a module, subsystem, system, package, or tool name; generic prefixes alone are invalid.
+- `output_file` must not be a generic-only filename such as `STRUCTURE_DESIGN.md`, `structure_design.md`, `design.md`, or `软件结构设计说明书.md`.
 
 ### Chapter 2: System Overview
 
@@ -1088,7 +1209,7 @@ Support data does not become standalone Markdown chapters.
 
 ## Markdown Document Structure
 
-`STRUCTURE_DESIGN.md` should use a stable single-file outline:
+The rendered Markdown file should use a stable single-file outline:
 
 ```text
 # 软件结构设计说明书
@@ -1105,6 +1226,14 @@ Support data does not become standalone Markdown chapters.
 ```
 
 The final document always keeps the fixed chapters. Section-specific non-empty rules override the general fallback. Missing required content means the DSL is invalid and Codex must revise its structured content before rendering.
+
+Section numbering policy:
+
+- The renderer uses fixed numbering for all chapters and subchapters.
+- Optional content absence must not cause later sections to move forward.
+- Optional sections render their heading and a fixed empty-state sentence when their content is absent.
+- Empty `extra_tables` or `extra_diagrams` arrays render the corresponding supplement section with `无补充表格。`, `无补充图表。`, or a chapter-specific `无补充内容。` sentence.
+- Single-module chapter 7 still renders `7.1` through `7.4`; sections without collaboration content use fixed empty states.
 
 The chapters render as follows:
 
@@ -1134,7 +1263,7 @@ The chapters render as follows:
    5.1 运行时概述
    5.2 运行单元说明
    5.3 运行时流程图
-   5.4 运行时序图（推荐，存在时渲染）
+   5.4 运行时序图（推荐）
    5.5 补充运行时图表
 
 6. 配置、数据与依赖关系
@@ -1161,6 +1290,13 @@ The chapters render as follows:
 9. 结构问题与改进建议
    - Free-form Markdown string, appended risk/assumption/low-confidence sections, or a fixed empty-state sentence when all are empty.
 ```
+
+Required empty-state sentences include:
+
+- `5.4 运行时序图（推荐）`: `未提供运行时序图。`
+- Single-module `7.2 跨模块协作说明`: `本系统当前仅识别到一个结构模块，暂无跨模块协作关系。`
+- Empty `7.3 跨模块协作关系图`: `未提供跨模块协作关系图。`
+- Empty supplement sections: `无补充内容。` unless a more specific table or diagram empty state is clearer.
 
 ## Mermaid Requirements
 
@@ -1213,8 +1349,8 @@ CLI contract:
 python scripts/validate_mermaid.py --from-dsl structure.dsl.json --strict
 python scripts/validate_mermaid.py --from-dsl structure.dsl.json --strict --work-dir .codex-tmp/create-structure-md-xxx/mermaid
 python scripts/validate_mermaid.py --from-dsl structure.dsl.json --static
-python scripts/validate_mermaid.py --from-markdown STRUCTURE_DESIGN.md --strict
-python scripts/validate_mermaid.py --from-markdown STRUCTURE_DESIGN.md --static
+python scripts/validate_mermaid.py --from-markdown <output-file> --strict
+python scripts/validate_mermaid.py --from-markdown <output-file> --static
 python scripts/validate_mermaid.py --check-env
 ```
 
@@ -1268,9 +1404,12 @@ Core checks:
 - `confidence` values use the allowed enum.
 - Whitelisted design content items with `confidence: unknown` can be collected for chapter 9 low-confidence rendering.
 - Required document sections can be rendered.
+- The authoritative field contract is internally consistent with schema-required fields and chapter rules.
+- ID fields are classified by the defining/reference ID field tables; unregistered `_id` or `_ids` fields fail validation.
 - Required summary fields are non-empty according to chapter-specific rules.
 - Fixed table row required fields are non-empty according to chapter-specific rules.
 - Document metadata required fields are non-empty according to chapter 1 rules.
+- `document.output_file` is safe, module- or system-specific, ends with `.md`, and is not generic-only.
 - DSL instances do not contain validation policy fields such as `empty_allowed`, `required`, `min_rows`, `max_rows`, or `render_when_empty`.
 - Fixed table nodes do not contain `id`, `title`, or `columns`; they contain `rows`, and row objects contain only schema-approved content fields and support metadata.
 - Extra table nodes include `id`, `title`, `columns`, and `rows`; `columns[].key` values are unique; rows only use declared column keys plus `evidence_refs`.
@@ -1311,7 +1450,7 @@ Extracts and validates Mermaid definitions from DSL or rendered Markdown. It doe
 
 ### `render_markdown.py`
 
-Programmatically renders `STRUCTURE_DESIGN.md` from the DSL. It does not use Jinja2 or a `.tpl` template. It should not invent content. It owns fixed chapter order, fixed table headers, empty-state text, support-data insertion, table-row support-data grouping, Mermaid fence generation, source snippet fence safety, source snippet rendering, chapter 9 appended sections, and Markdown escaping.
+Programmatically renders the Markdown file named by `document.output_file` from the DSL. It does not use Jinja2 or a `.tpl` template. It should not invent content. It owns fixed chapter order, fixed section numbering, fixed table headers, empty-state text, support-data insertion, table-row support-data grouping, Mermaid fence generation, source snippet fence safety, source snippet rendering, chapter 9 appended sections, and Markdown escaping.
 
 `render_markdown.py` assumes the input DSL has already passed `validate_dsl.py`, but it may still perform lightweight defensive checks and fail rather than producing malformed Markdown.
 
@@ -1324,11 +1463,11 @@ python scripts/render_markdown.py structure.dsl.json --output-dir . --backup
 ```
 
 - `render_markdown.py` requires one positional DSL JSON path.
-- It fails if the input file does not exist, is not valid JSON, or does not contain `document.output_file == "STRUCTURE_DESIGN.md"`.
+- It fails if the input file does not exist, is not valid JSON, or does not contain a valid module- or system-specific `document.output_file`.
 - It may perform defensive validation, but it should not duplicate the full semantic validator.
-- `--output-dir <path>` writes `STRUCTURE_DESIGN.md` to that directory.
-- `--overwrite` explicitly replaces an existing `STRUCTURE_DESIGN.md`.
-- `--backup` preserves an existing `STRUCTURE_DESIGN.md` as `STRUCTURE_DESIGN.md.bak-YYYYMMDD_HHMMSS` before writing the new file.
+- `--output-dir <path>` writes `document.output_file` to that directory.
+- `--overwrite` explicitly replaces an existing output file.
+- `--backup` preserves an existing output file as `<output_file>.bak-YYYYMMDD_HHMMSS` before writing the new file.
 - `--overwrite` and `--backup` are mutually exclusive.
 
 ## Error Handling
@@ -1343,7 +1482,7 @@ If Mermaid strict validation tooling is unavailable, final generation should sto
 
 If the user explicitly accepts static-only Mermaid validation, Codex records that decision in the final report and may write a temporary note file at `.codex-tmp/create-structure-md-<run-id>/VALIDATION_NOTES.md`. The final report must state that Mermaid strict validation was not performed, the reason was local Mermaid CLI tooling unavailable, and the user accepted static-only validation for this run.
 
-If `STRUCTURE_DESIGN.md` already exists, rendering fails by default. The user must explicitly choose `--overwrite` or `--backup`. `--backup` preserves the existing file using `STRUCTURE_DESIGN.md.bak-YYYYMMDD_HHMMSS` and must not overwrite an existing backup.
+If the target output file already exists, rendering fails by default. The user must explicitly choose `--overwrite` or `--backup`. `--backup` preserves the existing file using `<output_file>.bak-YYYYMMDD_HHMMSS` and must not overwrite an existing backup.
 
 If a source snippet exceeds 50 lines, validation fails unless `--allow-long-snippets` is passed. Snippets longer than 20 lines and up to 50 lines produce a warning.
 
@@ -1352,6 +1491,10 @@ If a source snippet exceeds 50 lines, validation fails unless `--allow-long-snip
 Tests should cover:
 
 - The two example DSL files validate successfully.
+- Tests use Python standard library `unittest` and run with `python -m unittest discover -s tests`.
+- Tests do not require `pytest` or other third-party test frameworks in the MVP.
+- `requirements.txt` contains runtime dependencies only, with `jsonschema` as the MVP Python dependency.
+- `SKILL.md` front matter satisfies the skill contract.
 - `validate_dsl.py` runs `jsonschema` validation before semantic validation.
 - Schema validation rejects unknown fields by default through `additionalProperties: false`, while documented extension points are handled by semantic validation.
 - Missing required fields fail validation with clear errors.
@@ -1374,12 +1517,12 @@ Tests should cover:
 - `validate_mermaid.py --from-dsl` skips optional empty diagram sources, while required empty diagram sources fail in `validate_dsl.py`.
 - `validate_mermaid.py --from-markdown` fails when a Mermaid fenced block has an empty body.
 - `validate_mermaid.py --strict --work-dir ...` writes temporary validation artifacts under the requested work directory.
-- Rendering creates exactly one `STRUCTURE_DESIGN.md`.
-- Rendering fails by default when `STRUCTURE_DESIGN.md` already exists.
+- Rendering creates exactly one Markdown file named by `document.output_file`.
+- Rendering fails by default when the target output file already exists.
 - Rendering with `--overwrite` replaces an existing output.
-- Rendering with `--backup` preserves an existing output as `STRUCTURE_DESIGN.md.bak-YYYYMMDD_HHMMSS` before writing the new output, and does not overwrite an existing backup.
+- Rendering with `--backup` preserves an existing output as `<output_file>.bak-YYYYMMDD_HHMMSS` before writing the new output, and does not overwrite an existing backup.
 - Rendered Markdown includes balanced fences and no Graphviz code block.
-- Rendered Markdown passes `validate_mermaid.py --from-markdown STRUCTURE_DESIGN.md --static` after generation.
+- Rendered Markdown passes `validate_mermaid.py --from-markdown <output-file> --static` after generation.
 - Plain text DSL fields are escaped so they cannot inject headings, tables, Mermaid fences, or raw HTML into the final document.
 - Source snippet rendering uses a fence or escaping strategy that cannot be broken by snippet content containing backticks.
 - Table row evidence, traceability, and source snippets render after the table as grouped notes rather than inside table cells.
@@ -1408,7 +1551,10 @@ Tests should cover:
 - Support data tests cover evidence, traceability, risks, assumptions, refs, unreferenced evidence warnings, and whitelist-based low-confidence summary collection.
 - Source snippet tests cover required fields, positive line range sanity, missing references, unreferenced snippet failures, best-effort secret/personal-data risk checks, warning at more than 20 lines, failure at more than 50 lines, and `--allow-long-snippets`.
 - Strict Mermaid tooling unavailable tests cover explicit user acceptance before static-only fallback and the required warning that diagrams were not proven renderable by Mermaid CLI.
-- `render_markdown.py` tests cover missing input file, invalid JSON, `document.output_file != STRUCTURE_DESIGN.md`, and filling rendered `generated_at` without mutating the DSL.
+- `render_markdown.py` tests cover missing input file, invalid JSON, invalid or generic-only `document.output_file`, and filling rendered `generated_at` without mutating the DSL.
+- Fixed numbering tests verify that optional sections do not cause later sections to move forward, including empty runtime sequence diagrams and single-module chapter 7.
+- Authoritative field contract tests verify that schema, validator, and renderer agree on requiredness, emptiness, semantic requiredness, and rendering position for key fields.
+- ID field contract tests verify defining ID fields, reference ID fields, paired flow identity, external source IDs, and rejection of unregistered `_id` or `_ids` fields.
 - DSL examples and tests prove that `empty_allowed` and similar validation policy fields do not appear in JSON instances.
 
 ## Examples
@@ -1435,18 +1581,22 @@ The skill should keep `SKILL.md` concise. Detailed DSL fields, document outline,
 Before implementation begins, verify:
 
 - The design keeps project understanding outside the skill.
-- The output contract is one `STRUCTURE_DESIGN.md`.
+- `SKILL.md` front matter is present and satisfies the skill contract.
+- The output contract is one module- or system-specific Markdown file named by `document.output_file`.
+- Generic-only output filenames are rejected.
 - Final output path and temporary work directory rules are explicit.
 - Existing output files are protected by default, with explicit `--overwrite` and `--backup` modes.
 - Mermaid is the only supported diagram output.
 - Mermaid validation script is named `validate_mermaid.py` and final generation defaults to strict validation.
-- The workflow validates rendered Markdown Mermaid blocks after `STRUCTURE_DESIGN.md` is generated.
+- The workflow validates rendered Markdown Mermaid blocks after the output file is generated.
 - Mermaid MVP supports only the five core diagram types.
 - Graphviz is fully removed.
 - Markdown rendering is code-driven and does not use `templates/` or Jinja2.
 - Temporary JSON files are allowed but not part of the final deliverable.
 - The DSL includes confidence, evidence, traceability, risk, assumption, and source snippet support.
 - Common metadata, canonical module IDs, traceability target mappings, and ID reference rules are explicit.
+- SKILL.md front matter, authoritative field contract, ID field contract, fixed numbering policy, and unittest test framework are explicit.
+- `requirements.txt` contains runtime dependencies only and tests use `python -m unittest discover -s tests`.
 - Optional diagrams, required diagrams, and extra diagrams have distinct schema and validation rules.
 - Low-confidence summary collection uses an explicit whitelist.
 - Plain text and Markdown-capable fields have clear escaping and validation rules.
