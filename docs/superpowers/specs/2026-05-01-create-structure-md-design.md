@@ -21,7 +21,7 @@ The skill optimizes for document quality, repeatability, and renderable Mermaid 
 - Mermaid diagrams are written as Markdown Mermaid code blocks; no final image files are generated.
 - `validate_mermaid.py` is an independent script because Mermaid validity is critical.
 - DSL coverage is complete for the document, not only a minimal subset.
-- Key design items and fixed table rows carry confidence according to the DSL schema: `observed`, `inferred`, or `unknown`.
+- Key design items and fixed table rows that represent design items carry confidence according to the DSL schema: `observed`, `inferred`, or `unknown`. Index-only rows such as `flow_index.rows[]` do not carry confidence; their matching detail objects carry it.
 - DSL JSON contains document content only. Validation policy fields such as `empty_allowed`, `required`, `min_rows`, or rendering control flags must not appear in DSL instances.
 - Necessary source snippets are allowed when they improve the document.
 - Architecture issues such as cycles, reverse dependencies, and unclear ownership are recorded honestly when Codex supplies them.
@@ -40,7 +40,7 @@ The skill will not:
 - Create multiple Markdown chapter files.
 - Generate Word, PDF, SVG, PNG, or other rendered document formats as final deliverables.
 - Include C2000, TI driverlib, CPU1/CPU2, ISR, or embedded-C-specific profiles in the first version.
-- Automatically delete temporary files or generated artifacts.
+- Automatically delete the skill working directory or generated artifacts.
 
 ## Alternatives Considered
 
@@ -116,13 +116,14 @@ If these inputs are not available, Codex must not invoke the renderer and must n
 2. Codex invokes `create-structure-md` when the user asks for a software structure design document.
 3. The skill instructs Codex to create a temporary working directory.
 4. Codex writes one complete DSL JSON file and may write smaller staged JSON files first.
-5. Codex runs `validate_dsl.py` against the complete DSL.
-6. Codex runs `validate_mermaid.py` to validate Mermaid diagram blocks.
-7. Codex runs `render_markdown.py` to create `STRUCTURE_DESIGN.md`.
-8. Codex reviews the generated document with `references/review-checklist.md`.
-9. Codex reports the output path, temporary working directory path, and any assumptions or low-confidence items.
+5. Codex runs `validate_dsl.py structure.dsl.json` against the complete DSL.
+6. Codex runs `validate_mermaid.py --from-dsl structure.dsl.json --strict` to validate Mermaid diagram blocks.
+7. Codex runs `render_markdown.py structure.dsl.json --output-dir ...` to create `STRUCTURE_DESIGN.md`.
+8. Codex runs `validate_mermaid.py --from-markdown STRUCTURE_DESIGN.md --static` to verify renderer-produced Mermaid fences and non-empty blocks.
+9. Codex reviews the generated document with `references/review-checklist.md`.
+10. Codex reports the output path, temporary working directory path, and any assumptions or low-confidence items.
 
-Temporary files are not automatically deleted. If cleanup is needed, Codex should provide the command for the user to run.
+Temporary files in the skill working directory are not automatically deleted. If cleanup is needed, Codex should provide the command for the user to run. Tool-local temporary files created by strict Mermaid validation may be cleaned up only when `--work-dir` is not provided.
 
 ## Output Location
 
@@ -136,7 +137,7 @@ Temporary work directory:
 
 - Preferred: `<workspace>/.codex-tmp/create-structure-md-<run-id>/`.
 - Fallback: system temp directory, such as `/tmp/create-structure-md-<run-id>`, if the workspace temp directory cannot be created.
-- Temporary files are not automatically deleted. Codex reports the temporary work directory path after generation.
+- Temporary files in this working directory are not automatically deleted. Codex reports the temporary work directory path after generation.
 - The workspace `.gitignore` should include `.codex-tmp/` unless the user intentionally wants to version temporary artifacts. Codex should not edit `.gitignore` automatically unless requested.
 
 Output overwrite policy:
@@ -222,8 +223,9 @@ Fields ending with `_id` or `_ids` are strict internal references unless explici
 
 Explicit exceptions:
 
-- `id` is the defining ID of the current object.
-- `module_intro.rows[].module_id` defines a module ID.
+- `id` is the defining ID of the current object only for objects that intentionally use generic `id`, such as diagrams, extra tables, evidence, traceability, risks, assumptions, and source snippets.
+- Canonical module IDs are defined only by `architecture_views.module_intro.rows[].module_id`.
+- `module_design.modules[].module_id` is a required reference to a canonical module ID, not a new module definition.
 - `runtime_units.rows[].unit_id` defines a runtime unit ID.
 - `flow_index.rows[].flow_id` and `flows[].flow_id` are paired flow IDs and must match one-to-one.
 - `traceability[].source_external_id` is an external source identifier and is not an internal DSL reference.
@@ -242,6 +244,13 @@ Markdown safety:
 - The renderer must escape Markdown-sensitive content in plain text fields, including table pipes, table-cell newlines, fenced-code markers, leading heading markers, and raw HTML blocks.
 - Mermaid diagram `source` fields must contain Mermaid source only and must not contain Markdown fences. The renderer adds the final Mermaid code fences.
 - Source snippet content is rendered as evidence code and must be fenced or escaped safely by the renderer so it cannot break the surrounding Markdown.
+
+Structure-design boundary lint:
+
+- Prototype/detail-design lint applies to all normal plain-text fields and Markdown-capable chapter 9 text.
+- The lint does not apply to Mermaid diagram `source` or `source_snippets[].content`.
+- High-risk code-definition patterns in normal design text fail validation, including C/C++ function prototype-like lines, Python `def`/`class` definition-like lines, `typedef struct`, `typedef enum`, `enum { ... }`, `class { ... }`, full parameter-list style API definitions, and large code-like blocks outside source snippets.
+- Function names and existing identifiers may still appear as short observed evidence or capability names when they are not written as prototypes, data definitions, or implementation blocks.
 
 ### MVP DSL Shape
 
@@ -367,6 +376,8 @@ MVP Mermaid `diagram_type` values are fully supported and tested:
 
 Mermaid diagrams are embedded under the section that renders them. There is no global diagram routing field and no attempt to model Mermaid nodes or edges in the DSL.
 
+The MVP validates Mermaid syntax and performs only lightweight coverage warnings. It does not prove that diagram edges semantically match module relationships, runtime paths, collaboration scenarios, or flow steps.
+
 All other Mermaid diagram types are not supported in the MVP.
 
 ### Validation Policy Outside DSL
@@ -453,6 +464,26 @@ Rules:
 - `risks` and `assumptions` are appended to chapter 9 by the renderer when present.
 - Common metadata is allowed on module introduction rows, `module_design.modules[]`, provided capability rows, runtime unit rows, chapter 6 rows, collaboration scenario rows, flow objects, flow steps, branch/exception items, risks, and assumptions.
 
+Traceability target mapping:
+
+| `target_type` | `target_id` must reference |
+| --- | --- |
+| `module` | `architecture_views.module_intro.rows[].module_id` |
+| `core_capability` | `system_overview.core_capabilities[].capability_id` |
+| `provided_capability` | `module_design.modules[].external_capability_details.provided_capabilities.rows[].capability_id` |
+| `runtime_unit` | `runtime_view.runtime_units.rows[].unit_id` |
+| `flow` | `key_flows.flows[].flow_id` |
+| `flow_step` | `key_flows.flows[].steps[].step_id` |
+| `collaboration` | `cross_module_collaboration.collaboration_scenarios.rows[].collaboration_id` |
+| `configuration_item` | `configuration_data_dependencies.configuration_items.rows[].config_id` |
+| `data_artifact` | `configuration_data_dependencies.structural_data_artifacts.rows[].artifact_id` |
+| `dependency` | `configuration_data_dependencies.dependencies.rows[].dependency_id` |
+| `risk` | `risks[].id` |
+| `assumption` | `assumptions[].id` |
+| `source_snippet` | `source_snippets[].id` |
+
+Local `traceability_refs` validation uses this same mapping table to determine whether a referenced traceability entry targets the current node.
+
 ### Chapter 1: Document Information
 
 `document` renders as a compact information table.
@@ -478,9 +509,10 @@ Rules:
 
 Rules:
 
+- `title`, `project_name`, `document_version`, `status`, `language`, `source_type`, and `output_file` must be non-empty.
 - `status` must be `draft`, `reviewed`, or `final`.
 - `source_type` must be `code`, `requirements`, `mixed`, or `notes`.
-- `generated_at` should be an ISO-8601 local datetime with timezone when available.
+- `generated_at` may be supplied by Codex or filled by the renderer. When present, it should be an ISO-8601 local datetime with timezone when available.
 - `language` defaults to `zh-CN`.
 - `output_file` must equal `STRUCTURE_DESIGN.md`.
 
@@ -576,7 +608,7 @@ Chapter 4 expands each module listed in chapter 3. Every module must be explaina
     "notes": [],
     "modules": [
       {
-        "id": "MOD-001",
+        "module_id": "MOD-001",
         "name": "",
         "summary": "",
         "responsibilities": [],
@@ -636,9 +668,11 @@ Chapter 4 expands each module listed in chapter 3. Every module must be explaina
 
 Rules:
 
-- `module_design.modules` must cover every module in `architecture_views.module_intro.rows` by matching `modules[].id` to `module_intro.rows[].module_id`.
+- `module_design.modules` must cover every module in `architecture_views.module_intro.rows` by matching `modules[].module_id` to `module_intro.rows[].module_id`.
+- `module_design.modules[].module_id` is a required reference to a canonical module ID from chapter 3, not a new module definition.
+- `module_design.modules[].module_id` and `architecture_views.module_intro.rows[].module_id` must form an exact one-to-one set: no missing modules, no extra modules, and no duplicate modules.
 - Each module renders as its own subsection.
-- Each module must have a non-empty `id`, `name`, and `summary`.
+- Each module must have a non-empty `module_id`, `name`, and `summary`.
 - Each module must have at least one responsibility.
 - `external_capability_summary.description` must be non-empty.
 - `external_capability_summary.interface_style` is free text, not an enum.
@@ -672,8 +706,10 @@ Chapter 5 explains how the system runs. A runtime unit is something that is star
           "unit_name": "",
           "unit_type": "",
           "entrypoint": "",
+          "entrypoint_not_applicable_reason": "",
           "responsibility": "",
           "related_module_ids": [],
+          "external_environment_reason": "",
           "notes": "",
           "confidence": "observed",
           "evidence_refs": [],
@@ -708,13 +744,14 @@ Chapter 5 explains how the system runs. A runtime unit is something that is star
 
 Rules:
 
-- `runtime_units` must exist and its rows use fixed visible fields: `unit_name`, `unit_type`, `entrypoint`, `responsibility`, `related_module_ids`, and `notes`, plus `unit_id` and common metadata.
+- `runtime_units` must exist and its rows use fixed visible fields: `unit_name`, `unit_type`, `entrypoint`, `entrypoint_not_applicable_reason`, `responsibility`, `related_module_ids`, `external_environment_reason`, and `notes`, plus `unit_id` and common metadata.
 - `runtime_units.rows[].unit_id` must be non-empty, unique, and use the `RUN-...` prefix.
 - `runtime_units.rows[].related_module_ids` must reference module IDs from `architecture_views.module_intro.rows`.
 - `runtime_units.rows` must contain at least one runtime unit.
 - Each runtime unit row must have non-empty `unit_id`, `unit_name`, `unit_type`, `responsibility`, and `confidence`.
-- `entrypoint` may be empty only when `notes` explains why no explicit entrypoint exists.
-- `related_module_ids` must contain at least one module ID unless `notes` explains that the runtime unit is external or environmental.
+- `entrypoint` may be empty only when `entrypoint_not_applicable_reason` is non-empty.
+- `related_module_ids` may be empty only when `external_environment_reason` is non-empty.
+- `notes` is supplemental display text and must not be used as a validation condition.
 - `runtime_flow_diagram` must exist.
 - `runtime_flow_diagram.diagram_type` must be one of the supported Mermaid diagram types.
 - `runtime_flow_diagram.source` must be non-empty and pass Mermaid validation.
@@ -760,6 +797,8 @@ Rules:
 - Non-empty dependency rows must have non-empty `dependency_id`, `dependency_name`, `dependency_type`, `purpose`, and `confidence`.
 - `dependency_id` values use the `DEP-...` prefix.
 - `dependencies` describes external, environment, tool, file, template, service, or product dependencies that need structural explanation. Internal module dependencies belong in chapter 3 module relationship diagrams or chapter 7 collaboration relationships.
+- Chapter 6 visible fields such as `used_by`, `owner`, `producer`, and `consumer` are display text only. They are not validated as module or runtime-unit references.
+- If strict references are needed in a future version, they should use explicit metadata fields such as `used_by_module_ids`, `owner_module_id`, `producer_module_ids`, or `consumer_module_ids`; these fields are not part of the MVP DSL.
 - `extra_diagrams` are allowed only for a single clear subject, such as product flow or template dependency. There is no recommended combined diagram for this chapter.
 
 ### Chapter 7: Cross-Module Collaboration
@@ -900,6 +939,7 @@ Chapter 8 is named `关键流程`. It explains the most important end-to-end flo
 Rules:
 
 - `flow_index` must exist and its rows use fixed fields: `flow_id`, `flow_name`, `trigger_condition`, `participant_module_ids`, `participant_runtime_unit_ids`, `main_steps`, `output_result`, and `notes`.
+- `flow_index.rows[]` is an index-only row and does not carry common metadata. Its confidence and support references are carried by the matching `key_flows.flows[]` object.
 - `flow_index.rows` must contain at least one key flow.
 - Each flow index row must have non-empty `flow_id`, `flow_name`, `trigger_condition`, `main_steps`, and `output_result`.
 - Each flow index row must include at least one participant through `participant_module_ids` or `participant_runtime_unit_ids`.
@@ -934,7 +974,8 @@ Rules:
 - Codex may write lightweight Markdown text in this string, such as paragraphs, unordered lists, ordered lists, emphasis, and inline code.
 - It must not contain any Markdown headings, Mermaid code blocks, Markdown tables, unbalanced fenced code blocks, HTML blocks, embedded diagrams, raw graph definitions, or structured table/diagram objects.
 - The renderer owns all chapter 9 headings, including `风险`, `假设`, and `低置信度项`.
-- If empty, the final Markdown renders `未识别到明确的结构问题与改进建议。`
+- If empty and there are no risks, assumptions, or low-confidence items, the final Markdown renders `未识别到明确的结构问题与改进建议。`
+- If empty but risks, assumptions, or low-confidence items exist, the renderer does not render the empty-state sentence and directly renders the appended sections.
 
 ### Source Snippet Rules
 
@@ -961,6 +1002,8 @@ Rules:
 
 - Source snippets may support observed facts such as entrypoints, module boundaries, dependency relations, or flow evidence.
 - Each snippet must include `id`, `path`, `line_start`, `line_end`, `language`, `purpose`, `content`, and `confidence`.
+- `line_start` and `line_end` must be positive integers, and `line_end` must be greater than or equal to `line_start`.
+- If snippet content is redacted or excerpted, the validator does not require the number of content lines to equal the line range.
 - Source snippets may contain existing source code, including existing function, class, struct, enum, data model, or implementation fragments.
 - Snippets must not introduce newly invented APIs, structs, enums, data models, or implementation logic.
 - Prototype/detail-design lint rules do not apply inside `source_snippets.content`, but they do apply to normal design text.
@@ -970,6 +1013,7 @@ Rules:
 - Snippets should be short. More than 20 lines produces a validation warning. More than 50 lines fails validation unless `--allow-long-snippets` is passed.
 - Snippets must not substitute for module responsibility, interface requirement, internal structure, or flow descriptions.
 - Rendered snippets appear near the relevant module, runtime unit, collaboration scenario, or flow only when helpful. They must not become a standalone appendix.
+- When rendering source snippets, the renderer must choose a fence delimiter longer than any consecutive backtick run found in the snippet content, or use an escaping or indented-code strategy that cannot be broken by snippet content.
 - Every `source_snippets[]` item must be referenced by at least one `source_snippet_refs` field. Unreferenced source snippets fail validation.
 - If a snippet is used, `confidence` should normally be `observed`.
 
@@ -985,6 +1029,8 @@ Support data does not become standalone Markdown chapters.
 - `assumptions`: appended to the end of chapter 9 under `假设` when present.
 - Low-confidence key items with `confidence: unknown` are summarized at the end of chapter 9 under `低置信度项`.
 - `source_snippets`: rendered only near items that reference them through `source_snippet_refs`.
+- When a fixed table row references evidence, traceability, or source snippets, the table renders only its visible columns. Support data for those rows is rendered immediately after the table as grouped notes keyed by the row's stable ID when available, or by the row's display name when no stable ID exists.
+- Source snippets referenced by table rows are rendered outside the Markdown table so code blocks never appear inside table cells.
 
 ## Markdown Document Structure
 
@@ -1059,7 +1105,7 @@ The chapters render as follows:
    8.x.4 流程图
 
 9. 结构问题与改进建议
-   - Free-form Markdown string, or a fixed empty-state sentence.
+   - Free-form Markdown string, appended risk/assumption/low-confidence sections, or a fixed empty-state sentence when all are empty.
 ```
 
 ## Mermaid Requirements
@@ -1111,6 +1157,7 @@ CLI contract:
 
 ```bash
 python scripts/validate_mermaid.py --from-dsl structure.dsl.json --strict
+python scripts/validate_mermaid.py --from-dsl structure.dsl.json --strict --work-dir .codex-tmp/create-structure-md-xxx/mermaid
 python scripts/validate_mermaid.py --from-dsl structure.dsl.json --static
 python scripts/validate_mermaid.py --from-markdown STRUCTURE_DESIGN.md --strict
 python scripts/validate_mermaid.py --from-markdown STRUCTURE_DESIGN.md --static
@@ -1123,6 +1170,9 @@ Rules:
 - `--check-env` is used by itself and does not require an input file.
 - `--strict` and `--static` are mutually exclusive.
 - If neither `--strict` nor `--static` is passed, the script defaults to `--strict`.
+- If `--work-dir <path>` is provided in strict mode, validation artifacts are created there and preserved for inspection.
+- If `--work-dir` is not provided in strict mode, the script uses an implementation-local system temporary directory and may clean up its own temporary files.
+- Final image artifacts are never copied to the output directory.
 - DSL input extracts Mermaid diagram node `source` fields only when `source` is non-empty.
 - Empty or missing diagram `source` fields in DSL input are skipped by `validate_mermaid.py`.
 - Requiredness of diagram `source` is decided by `validate_dsl.py`, not `validate_mermaid.py`.
@@ -1135,7 +1185,7 @@ Static checks:
 - Code block language is `mermaid`.
 - Extracted diagram body is non-empty.
 - `diagram_type` is one of the supported MVP enum values.
-- The first meaningful line is compatible with `diagram_type`.
+- The first meaningful line is compatible with `diagram_type`; blank lines, Mermaid comments starting with `%%`, and Mermaid init directives are ignored before this check.
 - Markdown fences are balanced.
 - Mermaid source from the DSL does not contain Markdown fences.
 - Disallowed Graphviz/DOT constructs such as `digraph`, `rankdir`, and `node -> node;` are rejected when they appear as diagram source. Mermaid arrows such as `-->` and `->>` remain allowed.
@@ -1156,10 +1206,12 @@ Core checks:
 - IDs are unique within their collections.
 - IDs use the documented prefixes.
 - References point to existing IDs.
+- Traceability target validation uses the explicit `target_type` mapping table.
 - `confidence` values use the allowed enum.
 - Required content items with `confidence: unknown` can be collected for chapter 9 low-confidence rendering.
 - Required document sections can be rendered.
 - Fixed table row required fields are non-empty according to chapter-specific rules.
+- Document metadata required fields are non-empty according to chapter 1 rules.
 - DSL instances do not contain validation policy fields such as `empty_allowed`, `required`, `min_rows`, `max_rows`, or `render_when_empty`.
 - Fixed table nodes do not contain `id`, `title`, or `columns`; they contain `rows`, and row objects contain only schema-approved content fields and support metadata.
 - Extra table nodes include `id`, `title`, `columns`, and `rows`; `columns[].key` values are unique; rows only use declared column keys plus allowed metadata.
@@ -1167,17 +1219,19 @@ Core checks:
 - Chapter 3 has the module introduction table and module relationship diagram.
 - Chapter 3 module IDs are unique.
 - Chapter 3 module relationship diagram coverage warning is emitted when a listed module ID or name is missing from the diagram source.
-- Chapter 4 covers every module listed in chapter 3 by matching `module_design.modules[].id` to `architecture_views.module_intro.rows[].module_id`.
+- Chapter 4 covers every module listed in chapter 3 by matching `module_design.modules[].module_id` to `architecture_views.module_intro.rows[].module_id`.
 - Chapter 4 module details have non-empty provided capability rows and non-empty internal structure information.
 - Chapter 5 has at least one runtime unit and a non-empty runtime flow diagram.
-- Chapter 5 runtime unit IDs are unique and `related_module_ids` references exist.
+- Chapter 5 runtime unit IDs are unique, `related_module_ids` references exist, and empty `entrypoint` or empty `related_module_ids` use the structured reason fields rather than `notes`.
 - Chapter 6 allows empty configuration item, structural data/artifact, and dependency tables.
 - Chapter 7 enforces collaboration rows and collaboration diagram only when chapter 3 has two or more modules.
 - Chapter 8 has at least one key flow, the flow index and `flows` array are one-to-one by `flow_id`, flow references use valid module/runtime-unit IDs, every listed flow has structured steps and a non-empty Mermaid diagram.
+- Chapter 8 `flow_index.rows[]` is validated as an index-only table and does not carry common metadata.
 - Chapter 9 is a string, may be empty, uses only allowed lightweight Markdown, and contains no headings.
 - Traceability authoritative targets exist, local `traceability_refs` backlinks target the current node, and duplicate rendering candidates are de-duplicated by renderer.
+- Normal design text does not contain prototype/detail-design patterns outside Mermaid source and source snippet content.
 - Every source snippet is referenced by at least one `source_snippet_refs` field.
-- Source snippets satisfy path, line, language, purpose, content, confidence, best-effort secret/personal-data risk checks, and length rules.
+- Source snippets satisfy path, positive line range, language, purpose, content, confidence, best-effort secret/personal-data risk checks, and length rules.
 
 CLI option:
 
@@ -1190,11 +1244,11 @@ python scripts/validate_dsl.py structure.dsl.json --allow-long-snippets
 
 ### `validate_mermaid.py`
 
-Extracts and validates Mermaid definitions from DSL or rendered Markdown. It does not produce final image artifacts. In strict mode, it may create temporary render-check artifacts under the temporary working directory solely for validation. It exists to keep diagram correctness visible and independently testable.
+Extracts and validates Mermaid definitions from DSL or rendered Markdown. It does not produce final image artifacts. In strict mode, it may create temporary render-check artifacts under `--work-dir` when provided, or under an implementation-local system temporary directory otherwise, solely for validation. It exists to keep diagram correctness visible and independently testable.
 
 ### `render_markdown.py`
 
-Programmatically renders `STRUCTURE_DESIGN.md` from the DSL. It does not use Jinja2 or a `.tpl` template. It should not invent content. It owns fixed chapter order, fixed table headers, empty-state text, support-data insertion, Mermaid fence generation, source snippet rendering, chapter 9 appended sections, and Markdown escaping.
+Programmatically renders `STRUCTURE_DESIGN.md` from the DSL. It does not use Jinja2 or a `.tpl` template. It should not invent content. It owns fixed chapter order, fixed table headers, empty-state text, support-data insertion, table-row support-data grouping, Mermaid fence generation, source snippet fence safety, source snippet rendering, chapter 9 appended sections, and Markdown escaping.
 
 `render_markdown.py` assumes the input DSL has already passed `validate_dsl.py`, but it may still perform lightweight defensive checks and fail rather than producing malformed Markdown.
 
@@ -1220,7 +1274,7 @@ If Codex lacks enough content to populate a section that is allowed to be empty,
 
 If Codex lacks enough content to populate a required non-empty section, final generation must stop and require Codex to revise its structured content. Chapter 4 missing module-level capabilities or internal structure requires revising module design. Missing a function call graph alone does not require module re-partitioning.
 
-If Mermaid strict validation tooling is unavailable, final generation should stop with a clear message unless the user explicitly accepts static-only validation for that run.
+If Mermaid strict validation tooling is unavailable, final generation should stop with a clear message unless the user explicitly accepts static-only validation for that run. If strict validation fails only because tooling is unavailable, Codex may run `validate_mermaid.py --static` only after that explicit acceptance, and must report that diagrams were not proven renderable by Mermaid CLI.
 
 If `STRUCTURE_DESIGN.md` already exists, rendering fails by default. The user must explicitly choose `--overwrite` or `--backup`. `--backup` preserves the existing file using `STRUCTURE_DESIGN.md.bak-YYYYMMDD_HHMMSS` and must not overwrite an existing backup.
 
@@ -1234,23 +1288,31 @@ Tests should cover:
 - `validate_dsl.py` runs `jsonschema` validation before semantic validation.
 - Schema validation rejects unknown fields by default through `additionalProperties: false`, while documented extension points are handled by semantic validation.
 - Missing required fields fail validation with clear errors.
+- Document metadata required fields fail validation when empty.
 - Required fixed table row content fields fail validation when they are present but empty.
 - Invalid references fail validation.
 - Invalid ID prefixes fail validation.
 - Invalid `confidence` values fail validation.
-- Traceability tests cover `source_external_id`, authoritative `target_type`/`target_id` binding, invalid targets, valid local backlinks, conflicting backlinks, and renderer de-duplication.
+- Canonical module ID tests prove that module IDs are defined only by chapter 3 and chapter 4 `module_id` values are exact one-to-one references.
+- Traceability tests cover `source_external_id`, the target mapping table, authoritative `target_type`/`target_id` binding, invalid targets, valid local backlinks, conflicting backlinks, and renderer de-duplication.
+- Prototype/detail-design lint tests fail for function prototypes, `typedef struct`, `typedef enum`, and Python `def`/`class` definitions outside source snippets, while allowing the same content inside `source_snippets[].content`.
 - Mermaid diagrams with Graphviz/DOT syntax fail validation.
 - Mermaid diagram source containing Markdown fences fails validation.
 - Valid Mermaid examples across MVP core diagram types pass lightweight validation.
 - Non-core Mermaid diagram types fail validation in the MVP.
+- Mermaid static checks ignore leading blank lines, Mermaid comments, and Mermaid init directives when checking the first meaningful line.
 - `validate_mermaid.py --from-dsl` skips optional empty diagram sources, while required empty diagram sources fail in `validate_dsl.py`.
 - `validate_mermaid.py --from-markdown` fails when a Mermaid fenced block has an empty body.
+- `validate_mermaid.py --strict --work-dir ...` writes temporary validation artifacts under the requested work directory.
 - Rendering creates exactly one `STRUCTURE_DESIGN.md`.
 - Rendering fails by default when `STRUCTURE_DESIGN.md` already exists.
 - Rendering with `--overwrite` replaces an existing output.
 - Rendering with `--backup` preserves an existing output as `STRUCTURE_DESIGN.md.bak-YYYYMMDD_HHMMSS` before writing the new output, and does not overwrite an existing backup.
 - Rendered Markdown includes balanced fences and no Graphviz code block.
+- Rendered Markdown passes `validate_mermaid.py --from-markdown STRUCTURE_DESIGN.md --static` after generation.
 - Plain text DSL fields are escaped so they cannot inject headings, tables, Mermaid fences, or raw HTML into the final document.
+- Source snippet rendering uses a fence or escaping strategy that cannot be broken by snippet content containing backticks.
+- Table row evidence, traceability, and source snippets render after the table as grouped notes rather than inside table cells.
 - Chapter 3 fails validation if the fixed module introduction table or required module relationship diagram is missing.
 - Chapter 3 and chapter 4 fail validation if module IDs do not match one-to-one.
 - Chapter 3 emits a warning, not a failure, when the module relationship diagram source does not mention every listed module ID or module name.
@@ -1260,16 +1322,21 @@ Tests should cover:
 - Chapter 4 fails validation if any listed module lacks both an internal structure diagram and textual internal structure.
 - Chapter 5 fails validation if runtime units are empty or runtime flow Mermaid source is missing.
 - Chapter 5 fails validation if runtime unit IDs are duplicate or if runtime unit module references do not exist.
+- Chapter 5 fails validation if `entrypoint` is empty without `entrypoint_not_applicable_reason`, or if `related_module_ids` is empty without `external_environment_reason`.
 - Chapter 6 passes validation with empty configuration item, structural data/artifact, and dependency tables.
+- Chapter 6 display fields such as `used_by`, `owner`, `producer`, and `consumer` are not treated as strict references.
 - Chapter 7 passes validation with empty collaboration rows and empty diagram when chapter 3 has exactly one module.
 - Chapter 7 fails validation with empty collaboration rows or empty diagram when chapter 3 has two or more modules.
 - Chapter 7 fails validation in multi-module mode when a collaboration scenario does not involve at least two distinct modules.
 - Chapter 8 fails validation if flow index rows and `flows` entries do not match one-to-one by `flow_id`, if module/runtime-unit references do not exist, if any flow lacks structured steps, or if any flow lacks a Mermaid diagram.
+- Chapter 8 fails validation if `flow_index.rows[]` contains common metadata fields.
 - Flow step tests cover required fields, unique `order`, branch/exception optionality, and metadata refs.
-- Chapter 9 accepts an empty string.
+- Chapter 9 accepts an empty `structure_issues_and_suggestions` string.
+- Chapter 9 empty-state rendering appears only when the free-form string is empty and no risks, assumptions, or low-confidence items exist.
 - Chapter 9 fails validation for any Markdown headings, Mermaid code blocks, Markdown tables, unbalanced fences, or HTML blocks.
 - Support data tests cover evidence, traceability, risks, assumptions, refs, unreferenced evidence warnings, and automatic low-confidence summary collection.
-- Source snippet tests cover required fields, line range sanity, missing references, unreferenced snippet failures, best-effort secret/personal-data risk checks, warning at more than 20 lines, failure at more than 50 lines, and `--allow-long-snippets`.
+- Source snippet tests cover required fields, positive line range sanity, missing references, unreferenced snippet failures, best-effort secret/personal-data risk checks, warning at more than 20 lines, failure at more than 50 lines, and `--allow-long-snippets`.
+- Strict Mermaid tooling unavailable tests cover explicit user acceptance before static-only fallback and the required warning that diagrams were not proven renderable by Mermaid CLI.
 - DSL examples and tests prove that `empty_allowed` and similar validation policy fields do not appear in JSON instances.
 
 ## Examples
@@ -1299,14 +1366,17 @@ Before implementation begins, verify:
 - Existing output files are protected by default, with explicit `--overwrite` and `--backup` modes.
 - Mermaid is the only supported diagram output.
 - Mermaid validation script is named `validate_mermaid.py` and final generation defaults to strict validation.
+- The workflow validates rendered Markdown Mermaid blocks after `STRUCTURE_DESIGN.md` is generated.
 - Mermaid MVP supports only the five core diagram types.
 - Graphviz is fully removed.
 - Markdown rendering is code-driven and does not use `templates/` or Jinja2.
 - Temporary JSON files are allowed but not part of the final deliverable.
 - The DSL includes confidence, evidence, traceability, risk, assumption, and source snippet support.
-- Common metadata and ID reference rules are explicit.
+- Common metadata, canonical module IDs, traceability target mappings, and ID reference rules are explicit.
 - Plain text and Markdown-capable fields have clear escaping and validation rules.
+- Prototype/detail-design lint applies to normal design text while source snippets remain evidence-only exceptions.
 - DSL instances contain content only, while requiredness and emptiness rules live in schema, validator code, and reference documentation.
 - Fixed tables keep columns in renderer/schema/reference, not in DSL instances.
+- Table-row support data rendering is defined outside table cells.
 - Tests cover schema, Mermaid validation, Markdown rendering, overwrite behavior, single-module chapter 7 behavior, chapter 6 empty tables, support data, source snippets, and Markdown injection resistance.
 - The design is small enough for one implementation plan.
