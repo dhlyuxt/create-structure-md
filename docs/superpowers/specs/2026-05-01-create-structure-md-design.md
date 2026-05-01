@@ -24,6 +24,7 @@ The skill optimizes for document quality, repeatability, and renderable Mermaid 
 - Every design item should carry confidence where useful: `observed`, `inferred`, or `unknown`.
 - Necessary source snippets are allowed when they improve the document.
 - Architecture issues such as cycles, reverse dependencies, and unclear ownership are recorded honestly when Codex supplies them.
+- The final Markdown uses fixed chapters. Chapters without applicable content must say `不适用` or `未识别`, except module details where missing required content means Codex must re-partition modules.
 - Examples and tests are required.
 
 ## Non-Goals
@@ -101,19 +102,15 @@ The DSL is the contract between Codex's understanding and the renderer. It shoul
 Top-level fields:
 
 - `dsl_version`: schema version.
-- `document`: title, project name, version, status, authoring context, date.
-- `source_basis`: user-provided inputs, code-derived observations, requirement documents, notes, and evidence supplied by Codex.
-- `summary`: system purpose, design scope, major decisions.
-- `architecture`: architecture style, views, layers, boundaries, quality attributes.
-- `modules`: module inventory and module details.
+- `document`: rendered as chapter 1, with title, project name, versions, status, source type, generation metadata, and output filename.
+- `system_overview`: rendered as chapter 2, with a compact system summary and core capabilities.
+- `architecture_views`: rendered as chapter 3, with architecture summary, fixed module introduction table, and required module relationship Mermaid diagram.
+- `module_design`: rendered as chapter 4, with one subsection per module from chapter 3.
 - `runtime`: processes, tasks, jobs, event loops, command flows, or other runtime units when relevant.
 - `data_and_dependencies`: dependencies, data ownership, data flow, external integrations.
 - `interfaces`: provided and required capabilities, collaboration contracts, API surfaces at design level.
 - `flows`: key workflows, sequences, state transitions, and operational scenarios.
-- `risks_and_assumptions`: risks, assumptions, unknowns, architecture issues.
-- `traceability`: mappings between requirements, modules, flows, risks, and evidence.
-- `mermaid`: diagram definitions, diagram IDs, diagram type, placement hints, and source item mappings.
-- `appendices`: optional source snippets, glossary, evidence list, or extended notes.
+- `evidence`, `traceability`, `risks`, `assumptions`, and `source_snippets`: DSL support data only. They may inform rendered chapters, but they do not become standalone Markdown chapters.
 
 Important repeated fields:
 
@@ -124,6 +121,252 @@ Important repeated fields:
 - `evidence_refs`: references to evidence items supplied in the DSL.
 - `notes`: short supplemental notes where needed.
 
+### Common Content Nodes
+
+Most rendered chapters follow this lightweight structure:
+
+```json
+{
+  "summary": "",
+  "notes": [],
+  "required_tables": {},
+  "required_diagrams": {},
+  "extra_tables": [],
+  "extra_diagrams": []
+}
+```
+
+Required tables and diagrams are schema-controlled and have fixed meanings. Extra tables and diagrams are Codex-controlled supplemental content, validated only for renderability.
+
+Common table node:
+
+```json
+{
+  "id": "TBL-001",
+  "title": "表格标题",
+  "columns": [
+    { "key": "name", "title": "名称" }
+  ],
+  "rows": [
+    { "name": "示例" }
+  ],
+  "empty_text": "未识别"
+}
+```
+
+Common Mermaid diagram node:
+
+```json
+{
+  "id": "MER-001",
+  "kind": "module_relationship",
+  "title": "图标题",
+  "diagram_type": "flowchart",
+  "description": "",
+  "source": "flowchart TD\n  A[模块A] --> B[模块B]",
+  "confidence": "observed"
+}
+```
+
+The first version supports these `diagram_type` values:
+
+```json
+[
+  "flowchart",
+  "graph",
+  "sequenceDiagram",
+  "classDiagram",
+  "stateDiagram-v2",
+  "erDiagram",
+  "journey",
+  "gantt",
+  "timeline",
+  "mindmap",
+  "quadrantChart",
+  "requirementDiagram",
+  "C4Context",
+  "C4Container",
+  "C4Component",
+  "C4Dynamic"
+]
+```
+
+Mermaid diagrams are embedded under the section that renders them. There is no global diagram routing field and no attempt to model Mermaid nodes or edges in the DSL.
+
+### Chapter 1: Document Information
+
+`document` renders as a compact information table.
+
+```json
+{
+  "document": {
+    "title": "软件结构设计说明书",
+    "project_name": "",
+    "project_version": "",
+    "document_version": "",
+    "status": "draft",
+    "generated_at": "",
+    "generated_by": "Codex",
+    "language": "zh-CN",
+    "source_type": "mixed",
+    "scope_summary": "",
+    "not_applicable_policy": "固定章节；无内容时写不适用/未识别",
+    "output_file": "STRUCTURE_DESIGN.md"
+  }
+}
+```
+
+### Chapter 2: System Overview
+
+`system_overview` is intentionally brief. It should not duplicate architecture or module details.
+
+```json
+{
+  "system_overview": {
+    "summary": "",
+    "purpose": "",
+    "core_capabilities": [
+      {
+        "id": "CAP-001",
+        "name": "",
+        "description": "",
+        "confidence": "observed"
+      }
+    ],
+    "notes": []
+  }
+}
+```
+
+### Chapter 3: Architecture Views
+
+Chapter 3 is the architecture overview. It must include a fixed module introduction table and at least one module relationship Mermaid diagram. It does not include an architecture-view inventory table.
+
+```json
+{
+  "architecture_views": {
+    "summary": "",
+    "notes": [],
+    "required_tables": {
+      "module_intro": {
+        "id": "TBL-ARCH-MODULES",
+        "title": "各模块介绍",
+        "columns": [
+          { "key": "module_name", "title": "模块名称" },
+          { "key": "responsibility", "title": "主要职责" },
+          { "key": "inputs", "title": "输入/依赖" },
+          { "key": "outputs", "title": "输出/提供能力" },
+          { "key": "notes", "title": "备注" }
+        ],
+        "rows": []
+      }
+    },
+    "required_diagrams": {
+      "module_relationship": {
+        "id": "MER-ARCH-MODULES",
+        "kind": "module_relationship",
+        "title": "模块关系图",
+        "diagram_type": "flowchart",
+        "description": "展示系统内部主要模块及其关系。",
+        "source": "",
+        "confidence": "observed"
+      }
+    },
+    "extra_tables": [],
+    "extra_diagrams": []
+  }
+}
+```
+
+Rules:
+
+- `required_tables.module_intro` must exist.
+- `module_intro.columns` are fixed to `module_name`, `responsibility`, `inputs`, `outputs`, and `notes`.
+- `module_intro.rows` must contain at least one module. If no module can be identified, Codex must revise its structure understanding before rendering.
+- `required_diagrams.module_relationship` must exist.
+- `module_relationship.diagram_type` is not fixed, but it must be one of the supported Mermaid diagram types.
+- `module_relationship.source` must be non-empty and pass Mermaid validation.
+- `extra_tables` and `extra_diagrams` may be used for additional architecture material.
+
+### Chapter 4: Module Design
+
+Chapter 4 expands each module listed in chapter 3. Every module must be explainable. If a module has no external interface or no internal call graph, Codex must re-partition the modules instead of emitting `未识别`.
+
+```json
+{
+  "module_design": {
+    "summary": "",
+    "notes": [],
+    "modules": [
+      {
+        "id": "MOD-001",
+        "name": "",
+        "summary": "",
+        "responsibilities": [],
+        "external_interface_summary": {
+          "description": "",
+          "callers": [],
+          "interface_style": "",
+          "boundary_notes": []
+        },
+        "external_interface_details": {
+          "required_tables": {
+            "external_interfaces": {
+              "id": "TBL-MOD-001-IFACE",
+              "title": "对外函数接口",
+              "columns": [
+                { "key": "interface_name", "title": "接口名称" },
+                { "key": "interface_type", "title": "接口类型" },
+                { "key": "description", "title": "说明" },
+                { "key": "inputs", "title": "输入" },
+                { "key": "outputs", "title": "输出" },
+                { "key": "notes", "title": "备注" }
+              ],
+              "rows": []
+            }
+          },
+          "extra_tables": [],
+          "extra_diagrams": []
+        },
+        "required_diagrams": {
+          "internal_call_graph": {
+            "id": "MER-MOD-001-CALLS",
+            "kind": "internal_call_graph",
+            "title": "内部主要函数调用图",
+            "diagram_type": "flowchart",
+            "description": "展示模块内部主要函数调用关系。",
+            "source": "",
+            "confidence": "observed"
+          }
+        },
+        "extra_tables": [],
+        "extra_diagrams": [],
+        "source_snippets": [],
+        "notes": [],
+        "confidence": "observed"
+      }
+    ]
+  }
+}
+```
+
+Rules:
+
+- `module_design.modules` must cover every module in `architecture_views.required_tables.module_intro.rows` by matching `modules[].name` to `module_intro.rows[].module_name`.
+- Each module renders as its own subsection.
+- Each module must have a non-empty `summary`.
+- Each module must have at least one responsibility.
+- `external_interface_summary.description` must be non-empty.
+- `external_interface_summary.interface_style` is free text, not an enum.
+- `external_interface_details.required_tables.external_interfaces` must exist.
+- The external interface table has fixed columns: `interface_name`, `interface_type`, `description`, `inputs`, `outputs`, and `notes`.
+- The external interface table must have at least one row.
+- Each external interface row must include non-empty `interface_name` and `description`.
+- `required_diagrams.internal_call_graph` must exist.
+- `internal_call_graph.diagram_type` must be one of the supported Mermaid diagram types.
+- `internal_call_graph.source` must be non-empty and pass Mermaid validation.
+- If these requirements cannot be satisfied, final rendering stops and Codex must revise the module partitioning.
+
 ## Markdown Document Structure
 
 `STRUCTURE_DESIGN.md` should use a stable single-file outline:
@@ -132,20 +375,41 @@ Important repeated fields:
 # 软件结构设计说明书
 
 1. 文档信息
-2. 设计依据与范围
-3. 系统概览
-4. 架构视图
-5. 模块设计
-6. 运行时视图
-7. 数据与依赖关系
-8. 接口与协作关系
-9. 关键流程
-10. 约束、风险与假设
-11. 追踪关系
-12. 附录
+2. 系统概览
+3. 架构视图
+4. 模块设计
+5. 运行时视图
+6. 数据与依赖关系
+7. 接口与协作关系
+8. 关键流程
 ```
 
-Sections may be omitted only when the DSL marks them as not applicable and the rendered document explains why. The default is to keep the section and state that no relevant item was identified.
+The final document always keeps the fixed chapters. Chapters without applicable content render `不适用` or `未识别`, except chapter 4 module details. Missing required module details means the DSL is invalid and Codex must revise the module partitioning.
+
+The first four chapters render as follows:
+
+```text
+1. 文档信息
+   - Compact document metadata table.
+
+2. 系统概览
+   - System summary, purpose, core capabilities, and brief notes.
+
+3. 架构视图
+   3.1 架构概述
+   3.2 各模块介绍
+   3.3 模块关系图
+   3.4 补充架构图表
+
+4. 模块设计
+   4.x 模块名
+   4.x.1 模块概述
+   4.x.2 模块职责
+   4.x.3 对外接口说明
+   4.x.4 对外接口详情
+   4.x.5 内部主要函数调用图
+   4.x.6 补充说明
+```
 
 ## Mermaid Requirements
 
@@ -158,7 +422,30 @@ flowchart TD
 ```
 ````
 
-Codex may choose the Mermaid diagram type according to content, including `flowchart`, `graph`, `sequenceDiagram`, `classDiagram`, `stateDiagram-v2`, `erDiagram`, `journey`, `gantt`, `timeline`, `mindmap`, `quadrantChart`, `requirementDiagram`, `C4Context`, or any Mermaid syntax supported by common Markdown renderers.
+Mermaid diagrams are section-local child nodes. The DSL does not use global diagram routing metadata.
+
+Supported `diagram_type` values:
+
+```json
+[
+  "flowchart",
+  "graph",
+  "sequenceDiagram",
+  "classDiagram",
+  "stateDiagram-v2",
+  "erDiagram",
+  "journey",
+  "gantt",
+  "timeline",
+  "mindmap",
+  "quadrantChart",
+  "requirementDiagram",
+  "C4Context",
+  "C4Container",
+  "C4Component",
+  "C4Dynamic"
+]
+```
 
 `render_mermaid.py` should validate Mermaid text without network access. Because the skill is expected to support Mermaid broadly rather than maintain a partial custom grammar, strict validation should delegate to a local Mermaid-compatible parser or CLI when one is available. If strict validation tooling is unavailable, the script must say so clearly and must not claim that diagrams were proven renderable.
 
@@ -171,8 +458,8 @@ Static checks:
 
 - Code block language is `mermaid`.
 - Diagram body is non-empty.
-- The first meaningful line declares a Mermaid diagram type or Mermaid directive accepted by the validator.
-- Node IDs referenced from DSL placement metadata exist in the DSL.
+- `diagram_type` is one of the supported enum values.
+- The first meaningful line is compatible with `diagram_type`.
 - Markdown fences are balanced.
 - Disallowed Graphviz/DOT constructs such as `digraph`, `rankdir`, and `node -> node;` are rejected when they appear as diagram source. Mermaid arrows such as `-->` and `->>` remain allowed.
 - Diagram IDs are unique.
@@ -191,9 +478,10 @@ Core checks:
 - IDs are unique within their collections.
 - References point to existing IDs.
 - `confidence` values use the allowed enum.
-- Mermaid diagram placements point to valid section IDs or item IDs.
 - Required document sections can be rendered.
-- Architecture issue entries have severity and rationale.
+- Chapter 3 has the required module introduction table and module relationship diagram.
+- Chapter 4 covers every module listed in chapter 3.
+- Chapter 4 module details have non-empty external interface tables and non-empty internal call graph diagrams.
 
 ### `render_mermaid.py`
 
@@ -207,7 +495,9 @@ Renders `STRUCTURE_DESIGN.md` from the DSL and `templates/STRUCTURE_DESIGN.md.tp
 
 Validation failures should stop rendering. Rendering failures should preserve the DSL and temporary working directory so the issue can be inspected. Error messages should include the failing file, JSON path or diagram ID, and a short correction hint.
 
-If Codex lacks enough content to populate an important section, it should write an explicit `unknown` or `not_applicable` item in the DSL rather than making up facts.
+If Codex lacks enough content to populate a non-module section, it should write an explicit `unknown` or `not_applicable` item in the DSL rather than making up facts.
+
+If Codex lacks enough content to populate chapter 4 module details, final generation must stop and require module re-partitioning.
 
 If Mermaid strict validation tooling is unavailable, final generation should stop with a clear message unless the user explicitly accepts static-only validation for that run.
 
@@ -223,6 +513,8 @@ Tests should cover:
 - Valid Mermaid examples across multiple diagram types pass lightweight validation.
 - Rendering creates exactly one `STRUCTURE_DESIGN.md`.
 - Rendered Markdown includes balanced fences and no Graphviz code block.
+- Chapter 3 fails validation if the fixed module introduction table or required module relationship diagram is missing.
+- Chapter 4 fails validation if any listed module lacks an external interface row or internal call graph source.
 
 ## Examples
 
