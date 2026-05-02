@@ -135,14 +135,154 @@
         "output_file": { "$ref": "#/$defs/safeMarkdownFilename" }
       }
     },
+    "capability": {
+      "type": "object",
+      "required": ["capability_id", "name", "description", "confidence"],
+      "additionalProperties": false,
+      "properties": {
+        "capability_id": { "$ref": "#/$defs/nonEmptyString" },
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "description": { "$ref": "#/$defs/nonEmptyString" },
+        "confidence": { "$ref": "#/$defs/confidence" }
+      }
+    },
     "systemOverview": {
-      "type": "object"
+      "type": "object",
+      "required": ["summary", "purpose", "core_capabilities", "notes"],
+      "additionalProperties": false,
+      "properties": {
+        "summary": { "$ref": "#/$defs/nonEmptyString" },
+        "purpose": { "$ref": "#/$defs/nonEmptyString" },
+        "core_capabilities": { "type": "array", "items": { "$ref": "#/$defs/capability" } },
+        "notes": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "moduleIntroRow": {
+      "type": "object",
+      "required": ["module_id", "module_name", "responsibility", "inputs", "outputs", "notes", "confidence", "evidence_refs", "traceability_refs", "source_snippet_refs"],
+      "additionalProperties": false,
+      "properties": {
+        "module_id": { "$ref": "#/$defs/nonEmptyString" },
+        "module_name": { "$ref": "#/$defs/nonEmptyString" },
+        "responsibility": { "$ref": "#/$defs/nonEmptyString" },
+        "inputs": { "type": "string" },
+        "outputs": { "type": "string" },
+        "notes": { "type": "string" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" },
+        "traceability_refs": { "$ref": "#/$defs/referenceArray" },
+        "source_snippet_refs": { "$ref": "#/$defs/referenceArray" }
+      }
+    },
+    "moduleIntroTable": {
+      "type": "object",
+      "required": ["rows"],
+      "additionalProperties": false,
+      "properties": {
+        "rows": { "type": "array", "items": { "$ref": "#/$defs/moduleIntroRow" } }
+      }
     },
     "architectureViews": {
-      "type": "object"
+      "type": "object",
+      "required": ["summary", "notes", "module_intro", "module_relationship_diagram", "extra_tables", "extra_diagrams"],
+      "additionalProperties": false,
+      "properties": {
+        "summary": { "$ref": "#/$defs/nonEmptyString" },
+        "notes": { "$ref": "#/$defs/stringArray" },
+        "module_intro": { "$ref": "#/$defs/moduleIntroTable" },
+        "module_relationship_diagram": { "$ref": "#/$defs/diagram" },
+        "extra_tables": { "$ref": "#/$defs/extraTables" },
+        "extra_diagrams": { "$ref": "#/$defs/extraDiagrams" }
+      }
+    },
+    "providedCapabilityRow": {
+      "type": "object",
+      "required": ["capability_id", "capability_name", "interface_style", "description", "inputs", "outputs", "notes", "confidence", "evidence_refs", "traceability_refs", "source_snippet_refs"],
+      "additionalProperties": false,
+      "properties": {
+        "capability_id": { "$ref": "#/$defs/nonEmptyString" },
+        "capability_name": { "$ref": "#/$defs/nonEmptyString" },
+        "interface_style": { "type": "string" },
+        "description": { "$ref": "#/$defs/nonEmptyString" },
+        "inputs": { "type": "string" },
+        "outputs": { "type": "string" },
+        "notes": { "type": "string" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" },
+        "traceability_refs": { "$ref": "#/$defs/referenceArray" },
+        "source_snippet_refs": { "$ref": "#/$defs/referenceArray" }
+      }
+    },
+    "providedCapabilitiesTable": {
+      "type": "object",
+      "required": ["rows"],
+      "additionalProperties": false,
+      "properties": {
+        "rows": { "type": "array", "items": { "$ref": "#/$defs/providedCapabilityRow" } }
+      }
+    },
+    "externalCapabilitySummary": {
+      "type": "object",
+      "required": ["description", "consumers", "interface_style", "boundary_notes"],
+      "additionalProperties": false,
+      "properties": {
+        "description": { "$ref": "#/$defs/nonEmptyString" },
+        "consumers": { "$ref": "#/$defs/stringArray" },
+        "interface_style": { "type": "string" },
+        "boundary_notes": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "externalCapabilityDetails": {
+      "type": "object",
+      "required": ["provided_capabilities", "extra_tables", "extra_diagrams"],
+      "additionalProperties": false,
+      "properties": {
+        "provided_capabilities": { "$ref": "#/$defs/providedCapabilitiesTable" },
+        "extra_tables": { "$ref": "#/$defs/extraTables" },
+        "extra_diagrams": { "$ref": "#/$defs/extraDiagrams" }
+      }
+    },
+    "internalStructure": {
+      "type": "object",
+      "required": ["summary", "diagram", "textual_structure", "not_applicable_reason"],
+      "additionalProperties": false,
+      "properties": {
+        "summary": { "$ref": "#/$defs/nonEmptyString" },
+        "diagram": { "$ref": "#/$defs/diagram" },
+        "textual_structure": { "type": "string" },
+        "not_applicable_reason": { "type": "string" }
+      }
+    },
+    "moduleDesignItem": {
+      "type": "object",
+      "required": ["module_id", "name", "summary", "responsibilities", "external_capability_summary", "external_capability_details", "internal_structure", "extra_tables", "extra_diagrams", "evidence_refs", "traceability_refs", "source_snippet_refs", "notes", "confidence"],
+      "additionalProperties": false,
+      "properties": {
+        "module_id": { "$ref": "#/$defs/nonEmptyString" },
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "summary": { "$ref": "#/$defs/nonEmptyString" },
+        "responsibilities": { "$ref": "#/$defs/stringArray" },
+        "external_capability_summary": { "$ref": "#/$defs/externalCapabilitySummary" },
+        "external_capability_details": { "$ref": "#/$defs/externalCapabilityDetails" },
+        "internal_structure": { "$ref": "#/$defs/internalStructure" },
+        "extra_tables": { "$ref": "#/$defs/extraTables" },
+        "extra_diagrams": { "$ref": "#/$defs/extraDiagrams" },
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" },
+        "traceability_refs": { "$ref": "#/$defs/referenceArray" },
+        "source_snippet_refs": { "$ref": "#/$defs/referenceArray" },
+        "notes": { "$ref": "#/$defs/stringArray" },
+        "confidence": { "$ref": "#/$defs/confidence" }
+      }
     },
     "moduleDesign": {
-      "type": "object"
+      "type": "object",
+      "required": ["summary", "notes", "modules"],
+      "additionalProperties": false,
+      "properties": {
+        "summary": { "$ref": "#/$defs/nonEmptyString" },
+        "notes": { "$ref": "#/$defs/stringArray" },
+        "modules": { "type": "array", "items": { "$ref": "#/$defs/moduleDesignItem" } }
+      }
     },
     "runtimeView": {
       "type": "object"

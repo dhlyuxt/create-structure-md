@@ -379,5 +379,56 @@ class SchemaCommonShapeTests(unittest.TestCase):
                 )
 
 
+class SchemaChapterTwoThroughFourTests(unittest.TestCase):
+    def test_fixture_passes_with_chapter_two_through_four_schema(self):
+        validator().validate(valid_example())
+
+    def test_chapter_two_rejects_unknown_capability_field(self):
+        document = valid_example()
+        document["system_overview"]["core_capabilities"][0]["surprise_id"] = "CAP-BAD"
+        assert_invalid(
+            self,
+            document,
+            "Additional properties are not allowed",
+            expected_validator="additionalProperties",
+            expected_path=["system_overview", "core_capabilities", 0],
+        )
+
+    def test_module_intro_rejects_fixed_table_id_title_or_columns(self):
+        for forbidden in ["id", "title", "columns"]:
+            document = valid_example()
+            document["architecture_views"]["module_intro"][forbidden] = forbidden
+            with self.subTest(field=forbidden):
+                assert_invalid(
+                    self,
+                    document,
+                    "Additional properties are not allowed",
+                    expected_validator="additionalProperties",
+                    expected_path=["architecture_views", "module_intro"],
+                )
+
+    def test_module_design_module_id_is_modeled_reference_field(self):
+        document = valid_example()
+        document["module_design"]["modules"][0]["module_id"] = ""
+        assert_invalid(
+            self,
+            document,
+            "should be non-empty",
+            expected_validator="minLength",
+            expected_path=["module_design", "modules", 0, "module_id"],
+        )
+
+    def test_internal_structure_diagram_rejects_empty_object(self):
+        document = valid_example()
+        document["module_design"]["modules"][0]["internal_structure"]["diagram"] = {}
+        assert_invalid(
+            self,
+            document,
+            "is a required property",
+            expected_validator="required",
+            expected_path=["module_design", "modules", 0, "internal_structure", "diagram"],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
