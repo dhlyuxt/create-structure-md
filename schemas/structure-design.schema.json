@@ -533,19 +533,78 @@
       }
     },
     "evidence": {
-      "type": "object"
+      "type": "object",
+      "required": ["id", "kind", "title", "location", "description", "confidence"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "kind": { "type": "string", "enum": ["source", "requirement", "note", "analysis"] },
+        "title": { "type": "string" },
+        "location": { "type": "string" },
+        "description": { "type": "string" },
+        "confidence": { "$ref": "#/$defs/confidence" }
+      }
     },
     "traceability": {
-      "type": "object"
+      "type": "object",
+      "required": ["id", "source_external_id", "source_type", "target_type", "target_id", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "source_external_id": { "$ref": "#/$defs/nonEmptyString" },
+        "source_type": { "type": "string", "enum": ["requirement", "note", "code", "user_input"] },
+        "target_type": {
+          "type": "string",
+          "enum": ["module", "core_capability", "provided_capability", "runtime_unit", "flow", "flow_step", "flow_branch", "collaboration", "configuration_item", "data_artifact", "dependency", "risk", "assumption", "source_snippet"]
+        },
+        "target_id": { "$ref": "#/$defs/nonEmptyString" },
+        "description": { "type": "string" }
+      }
     },
     "risk": {
-      "type": "object"
+      "type": "object",
+      "required": ["id", "description", "impact", "mitigation", "confidence", "evidence_refs", "traceability_refs", "source_snippet_refs"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "description": { "type": "string" },
+        "impact": { "type": "string" },
+        "mitigation": { "type": "string" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" },
+        "traceability_refs": { "$ref": "#/$defs/referenceArray" },
+        "source_snippet_refs": { "$ref": "#/$defs/referenceArray" }
+      }
     },
     "assumption": {
-      "type": "object"
+      "type": "object",
+      "required": ["id", "description", "rationale", "validation_suggestion", "confidence", "evidence_refs", "traceability_refs", "source_snippet_refs"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "description": { "type": "string" },
+        "rationale": { "type": "string" },
+        "validation_suggestion": { "type": "string" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" },
+        "traceability_refs": { "$ref": "#/$defs/referenceArray" },
+        "source_snippet_refs": { "$ref": "#/$defs/referenceArray" }
+      }
     },
     "sourceSnippet": {
-      "type": "object"
+      "type": "object",
+      "required": ["id", "path", "line_start", "line_end", "language", "purpose", "content", "confidence"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "path": { "$ref": "#/$defs/nonEmptyString" },
+        "line_start": { "type": "integer", "minimum": 1 },
+        "line_end": { "type": "integer", "minimum": 1 },
+        "language": { "$ref": "#/$defs/nonEmptyString" },
+        "purpose": { "type": "string" },
+        "content": { "type": "string" },
+        "confidence": { "$ref": "#/$defs/confidence" }
+      }
     },
     "safeMarkdownFilename": {
       "type": "string",

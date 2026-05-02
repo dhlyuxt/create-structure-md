@@ -535,6 +535,141 @@ class SchemaChapterFiveThroughNineTests(unittest.TestCase):
             expected_path=["key_flows", "flows", 0, "branches_or_exceptions", 0, "related_runtime_unit_ids", 0],
         )
 
+class SchemaSupportDataTests(unittest.TestCase):
+    def test_fixture_passes_with_support_data_schema(self):
+        validator().validate(valid_example())
+
+    def test_support_data_objects_accept_valid_shapes(self):
+        document = valid_example()
+        document["evidence"] = [
+            {
+                "id": "EV-001",
+                "kind": "source",
+                "title": "入口脚本",
+                "location": "scripts/render_markdown.py",
+                "description": "渲染入口脚本。",
+                "confidence": "observed"
+            }
+        ]
+        document["traceability"] = [
+            {
+                "id": "TR-001",
+                "source_external_id": "REQ-001",
+                "source_type": "requirement",
+                "target_type": "module",
+                "target_id": "MOD-SKILL",
+                "description": "需求映射到技能模块。"
+            }
+        ]
+        document["risks"] = [
+            {
+                "id": "RISK-001",
+                "description": "示例风险。",
+                "impact": "影响文档完整性。",
+                "mitigation": "通过校验发现。",
+                "confidence": "inferred",
+                "evidence_refs": ["EV-001"],
+                "traceability_refs": ["TR-001"],
+                "source_snippet_refs": ["SNIP-001"]
+            }
+        ]
+        document["assumptions"] = [
+            {
+                "id": "ASM-001",
+                "description": "示例假设。",
+                "rationale": "用于验证 support data schema。",
+                "validation_suggestion": "执行语义校验。",
+                "confidence": "unknown",
+                "evidence_refs": ["EV-001"],
+                "traceability_refs": ["TR-001"],
+                "source_snippet_refs": ["SNIP-001"]
+            }
+        ]
+        document["source_snippets"] = [
+            {
+                "id": "SNIP-001",
+                "path": "scripts/render_markdown.py",
+                "line_start": 1,
+                "line_end": 2,
+                "language": "python",
+                "purpose": "说明脚本入口。",
+                "content": "#!/usr/bin/env python3\n",
+                "confidence": "observed"
+            }
+        ]
+        validator().validate(document)
+
+    def test_support_data_objects_reject_unknown_fields(self):
+        cases = [
+            ("evidence", {"id": "EV-001", "kind": "source", "title": "", "location": "", "description": "", "confidence": "observed"}),
+            ("traceability", {"id": "TR-001", "source_external_id": "REQ-001", "source_type": "requirement", "target_type": "module", "target_id": "MOD-001", "description": ""}),
+            ("risks", {"id": "RISK-001", "description": "", "impact": "", "mitigation": "", "confidence": "inferred", "evidence_refs": [], "traceability_refs": [], "source_snippet_refs": []}),
+            ("assumptions", {"id": "ASM-001", "description": "", "rationale": "", "validation_suggestion": "", "confidence": "unknown", "evidence_refs": [], "traceability_refs": [], "source_snippet_refs": []}),
+            ("source_snippets", {"id": "SNIP-001", "path": "src/main.py", "line_start": 1, "line_end": 1, "language": "python", "purpose": "", "content": "print('x')", "confidence": "observed"}),
+        ]
+        for field, item in cases:
+            document = valid_example()
+            item = dict(item)
+            item["unexpected"] = True
+            document[field] = [item]
+            with self.subTest(field=field):
+                assert_invalid(
+                    self,
+                    document,
+                    "Additional properties are not allowed",
+                    expected_validator="additionalProperties",
+                    expected_path=[field, 0],
+                )
+
+    def test_source_snippet_line_numbers_must_be_positive_integers(self):
+        invalid_values = [
+            (0, "minimum"),
+            (-1, "minimum"),
+            ("1", "type"),
+        ]
+        for field_name in ["line_start", "line_end"]:
+            for value, expected_validator in invalid_values:
+                document = valid_example()
+                snippet = {
+                    "id": "SNIP-001",
+                    "path": "src/main.py",
+                    "line_start": 1,
+                    "line_end": 1,
+                    "language": "python",
+                    "purpose": "证明入口",
+                    "content": "print('x')",
+                    "confidence": "observed"
+                }
+                snippet[field_name] = value
+                document["source_snippets"] = [snippet]
+                with self.subTest(field=field_name, value=value):
+                    assert_invalid(
+                        self,
+                        document,
+                        expected_validator=expected_validator,
+                        expected_path=["source_snippets", 0, field_name],
+                    )
+
+    def test_traceability_target_type_enum_is_enforced(self):
+        document = valid_example()
+        document["traceability"] = [
+            {
+                "id": "TR-001",
+                "source_external_id": "REQ-001",
+                "source_type": "requirement",
+                "target_type": "unknown_target",
+                "target_id": "MOD-001",
+                "description": ""
+            }
+        ]
+        assert_invalid(
+            self,
+            document,
+            "is not one of",
+            expected_validator="enum",
+            expected_path=["traceability", 0, "target_type"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
