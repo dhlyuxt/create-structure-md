@@ -638,7 +638,7 @@ def check_all_extra_diagrams(document, context):
 
 def check_extra_tables(document, context):
     for path, value in walk(document):
-        if not is_extra_table_object(value):
+        if not is_extra_table_object(value) or not is_extra_table_registration_path(path):
             continue
         column_keys = [column["key"] for column in value["columns"]]
         seen_column_keys = set()

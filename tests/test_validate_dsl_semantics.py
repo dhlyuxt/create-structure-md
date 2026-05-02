@@ -647,6 +647,29 @@ class ExtraTableAndTraceabilityTests(unittest.TestCase):
         self.assertIn("$.architecture_views.extra_tables[0].columns[1].key", completed.stderr)
         self.assertIn("duplicate extra table column key", completed.stderr)
 
+    def test_extra_table_rows_can_use_object_shape_keys_as_plain_data(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["architecture_views"]["extra_tables"] = [{
+                "id": "TBL-ARCH-SHAPE-KEYS",
+                "title": "补充表",
+                "columns": [
+                    {"key": "id", "title": "ID"},
+                    {"key": "title", "title": "标题"},
+                    {"key": "columns", "title": "列"},
+                    {"key": "rows", "title": "行"},
+                ],
+                "rows": [{
+                    "id": "plain-row",
+                    "title": "普通行",
+                    "columns": "ordinary column data",
+                    "rows": "ordinary row data",
+                }],
+            }]
+            path = write_json(tmpdir, "extra-table-shape-keys.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+
     def test_traceability_target_id_must_resolve_by_target_type(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             document = valid_document()
