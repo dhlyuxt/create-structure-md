@@ -1,5 +1,147 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "create-structure-md Phase 1 Scaffold Schema",
-  "type": "object"
+  "title": "create-structure-md Structure Design DSL Schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "dsl_version",
+    "document",
+    "system_overview",
+    "architecture_views",
+    "module_design",
+    "runtime_view",
+    "configuration_data_dependencies",
+    "cross_module_collaboration",
+    "key_flows",
+    "structure_issues_and_suggestions",
+    "evidence",
+    "traceability",
+    "risks",
+    "assumptions",
+    "source_snippets"
+  ],
+  "properties": {
+    "dsl_version": {
+      "type": "string"
+    },
+    "document": {
+      "$ref": "#/$defs/document"
+    },
+    "system_overview": {
+      "$ref": "#/$defs/systemOverview"
+    },
+    "architecture_views": {
+      "$ref": "#/$defs/architectureViews"
+    },
+    "module_design": {
+      "$ref": "#/$defs/moduleDesign"
+    },
+    "runtime_view": {
+      "$ref": "#/$defs/runtimeView"
+    },
+    "configuration_data_dependencies": {
+      "$ref": "#/$defs/configurationDataDependencies"
+    },
+    "cross_module_collaboration": {
+      "$ref": "#/$defs/crossModuleCollaboration"
+    },
+    "key_flows": {
+      "$ref": "#/$defs/keyFlows"
+    },
+    "structure_issues_and_suggestions": {
+      "type": "string"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evidence"
+      }
+    },
+    "traceability": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/traceability"
+      }
+    },
+    "risks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/risk"
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/assumption"
+      }
+    },
+    "source_snippets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/sourceSnippet"
+      }
+    }
+  },
+  "$defs": {
+    "document": {
+      "type": "object"
+    },
+    "systemOverview": {
+      "type": "object"
+    },
+    "architectureViews": {
+      "type": "object"
+    },
+    "moduleDesign": {
+      "type": "object"
+    },
+    "runtimeView": {
+      "type": "object"
+    },
+    "configurationDataDependencies": {
+      "type": "object"
+    },
+    "crossModuleCollaboration": {
+      "type": "object"
+    },
+    "keyFlows": {
+      "type": "object"
+    },
+    "evidence": {
+      "type": "object"
+    },
+    "traceability": {
+      "type": "object"
+    },
+    "risk": {
+      "type": "object"
+    },
+    "assumption": {
+      "type": "object"
+    },
+    "sourceSnippet": {
+      "type": "object"
+    },
+    "safeMarkdownFilename": {
+      "type": "string"
+    },
+    "diagram": {
+      "type": "object"
+    },
+    "extraTableColumn": {
+      "type": "object"
+    },
+    "extraTableRow": {
+      "type": "object"
+    },
+    "extraTable": {
+      "type": "object"
+    },
+    "extraTables": {
+      "type": "array"
+    },
+    "extraDiagrams": {
+      "type": "array"
+    }
+  }
 }

@@ -2,7 +2,10 @@ import json
 import subprocess
 import sys
 import unittest
+from copy import deepcopy
 from pathlib import Path
+
+from jsonschema import Draft202012Validator
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -56,6 +59,99 @@ SCRIPT_CASES = [
         "Markdown rendering is not implemented in Phase 1",
     ),
 ]
+
+SCHEMA_PATH = ROOT / "schemas/structure-design.schema.json"
+EXAMPLE_PATHS = [
+    ROOT / "examples/minimal-from-code.dsl.json",
+    ROOT / "examples/minimal-from-requirements.dsl.json",
+]
+
+TOP_LEVEL_FIELDS = [
+    "dsl_version",
+    "document",
+    "system_overview",
+    "architecture_views",
+    "module_design",
+    "runtime_view",
+    "configuration_data_dependencies",
+    "cross_module_collaboration",
+    "key_flows",
+    "structure_issues_and_suggestions",
+    "evidence",
+    "traceability",
+    "risks",
+    "assumptions",
+    "source_snippets",
+]
+
+
+def load_json(relative_path):
+    return json.loads((ROOT / relative_path).read_text(encoding="utf-8"))
+
+
+def load_schema():
+    return json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+
+
+def validator():
+    schema = load_schema()
+    Draft202012Validator.check_schema(schema)
+    return Draft202012Validator(schema)
+
+
+def validator_for_def(def_name):
+    schema = load_schema()
+    def_schema = {
+        "$schema": schema["$schema"],
+        "$defs": schema["$defs"],
+        "$ref": f"#/$defs/{def_name}",
+    }
+    Draft202012Validator.check_schema(def_schema)
+    return Draft202012Validator(def_schema)
+
+
+def valid_example():
+    return deepcopy(load_json("tests/fixtures/valid-phase2.dsl.json"))
+
+
+def validation_errors(document):
+    errors = sorted(validator().iter_errors(document), key=lambda error: list(error.path))
+    return errors
+
+
+def matching_errors(errors, expected_fragment=None, expected_validator=None, expected_path=None):
+    matches = []
+    for error in errors:
+        if expected_fragment is not None and expected_fragment not in error.message:
+            continue
+        if expected_validator is not None and error.validator != expected_validator:
+            continue
+        if expected_path is not None and list(error.path) != expected_path:
+            continue
+        matches.append(error)
+    return matches
+
+
+def assert_invalid(testcase, document, expected_fragment=None, *, expected_validator=None, expected_path=None):
+    errors = validation_errors(document)
+    testcase.assertTrue(errors, "Expected schema validation to fail")
+    if expected_fragment is not None or expected_validator is not None or expected_path is not None:
+        testcase.assertTrue(
+            matching_errors(errors, expected_fragment, expected_validator, expected_path),
+            "Expected one error to match all requested criteria; got "
+            f"{[(error.message, error.validator, list(error.path)) for error in errors]}",
+        )
+
+
+def assert_invalid_def(testcase, def_name, value, expected_fragment=None, *, expected_validator=None, expected_path=None):
+    errors = sorted(validator_for_def(def_name).iter_errors(value), key=lambda error: list(error.path))
+    testcase.assertTrue(errors, f"Expected #/$defs/{def_name} validation to fail")
+    if expected_fragment is not None or expected_validator is not None or expected_path is not None:
+        testcase.assertTrue(
+            matching_errors(errors, expected_fragment, expected_validator, expected_path),
+            "Expected one error to match all requested criteria; got "
+            f"{[(error.message, error.validator, list(error.path)) for error in errors]}",
+        )
 
 
 class ScaffoldLayoutTests(unittest.TestCase):
@@ -127,6 +223,44 @@ class ScriptStubTests(unittest.TestCase):
                 combined_output = completed.stdout + completed.stderr
                 for forbidden in forbidden_success_messages:
                     self.assertNotIn(forbidden, combined_output)
+
+
+class SchemaRootContractTests(unittest.TestCase):
+    def test_schema_is_valid_draft_2020_12_schema(self):
+        Draft202012Validator.check_schema(load_schema())
+
+    def test_root_requires_all_top_level_fields(self):
+        schema = load_schema()
+        self.assertEqual("https://json-schema.org/draft/2020-12/schema", schema["$schema"])
+        self.assertCountEqual(TOP_LEVEL_FIELDS, schema["required"])
+        self.assertFalse(schema["additionalProperties"])
+
+    def test_fixture_passes_root_shell_validation(self):
+        validator().validate(valid_example())
+
+    def test_unknown_top_level_field_fails(self):
+        document = valid_example()
+        document["required_tables"] = []
+        assert_invalid(
+            self,
+            document,
+            "Additional properties are not allowed",
+            expected_validator="additionalProperties",
+            expected_path=[],
+        )
+
+    def test_validation_policy_fields_fail_at_top_level(self):
+        for forbidden in ["empty_allowed", "required", "min_rows", "max_rows", "render_when_empty"]:
+            document = valid_example()
+            document[forbidden] = True
+            with self.subTest(field=forbidden):
+                assert_invalid(
+                    self,
+                    document,
+                    "Additional properties are not allowed",
+                    expected_validator="additionalProperties",
+                    expected_path=[],
+                )
 
 
 if __name__ == "__main__":
