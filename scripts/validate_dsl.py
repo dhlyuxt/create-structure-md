@@ -13,6 +13,42 @@ from jsonschema.exceptions import ValidationError
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = ROOT / "schemas/structure-design.schema.json"
 
+GENERIC_OUTPUT_NAMES = {
+    "structure_design.md",
+    "structure-design.md",
+    "structuredesign.md",
+    "design.md",
+    "软件结构设计说明书.md",
+}
+
+GENERIC_OUTPUT_TOKENS = {
+    "software",
+    "structure",
+    "design",
+    "document",
+    "doc",
+    "system",
+    "module",
+    "软件",
+    "结构",
+    "设计",
+    "说明书",
+}
+
+DOCUMENT_REQUIRED_TEXT_FIELDS = [
+    "title",
+    "project_name",
+    "document_version",
+    "status",
+    "language",
+    "source_type",
+    "output_file",
+]
+
+ISO8601_LOCAL_RE = re.compile(
+    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:[+-]\d{2}:\d{2}|Z)?$"
+)
+
 
 @dataclass(frozen=True)
 class ValidationIssue:
@@ -95,8 +131,69 @@ class ValidationContext:
         pass
 
 
+def is_blank(value):
+    return not isinstance(value, str) or value.strip() == ""
+
+
+def normalized_name_tokens(value):
+    normalized = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff]+", " ", value.casefold())
+    return [token for token in normalized.split() if token]
+
+
+def documented_object_tokens(document):
+    doc = document["document"]
+    tokens = set(normalized_name_tokens(doc.get("project_name", "")))
+    for row in document["architecture_views"]["module_intro"]["rows"]:
+        tokens.update(normalized_name_tokens(row["module_id"]))
+        tokens.update(normalized_name_tokens(row["module_name"]))
+    for module in document["module_design"]["modules"]:
+        tokens.update(normalized_name_tokens(module["module_id"]))
+        tokens.update(normalized_name_tokens(module["name"]))
+    return {token for token in tokens if token not in GENERIC_OUTPUT_TOKENS and len(token) >= 2}
+
+
 def validate_document_fields(document, report):
-    pass
+    doc = document.get("document", {})
+    for field_name in DOCUMENT_REQUIRED_TEXT_FIELDS:
+        if is_blank(doc.get(field_name)):
+            report.error(
+                f"$.document.{field_name}",
+                "must be non-empty",
+                "Revise the DSL content instead of fabricating filler",
+            )
+
+    output_file = doc.get("output_file", "")
+    folded = output_file.casefold()
+    output_tokens = normalized_name_tokens(Path(output_file).stem)
+    concrete_tokens = documented_object_tokens(document)
+    contains_concrete_token = any(token in output_tokens for token in concrete_tokens)
+    generic_only = bool(output_tokens) and all(token in GENERIC_OUTPUT_TOKENS for token in output_tokens)
+    if folded in GENERIC_OUTPUT_NAMES or generic_only:
+        report.error(
+            "$.document.output_file",
+            "generic-only output filename is not allowed",
+            "Use a concrete module, subsystem, system, package, or tool name",
+        )
+    elif not contains_concrete_token:
+        report.error(
+            "$.document.output_file",
+            "must include a concrete documented object name",
+            "Use document.project_name, a module ID, a module name, or another documented object name",
+        )
+    if " " in output_file:
+        report.warn(
+            "$.document.output_file",
+            "contains spaces",
+            "Normalize spaces to '_' before writing the final DSL when possible",
+        )
+
+    generated_at = doc.get("generated_at", "")
+    if generated_at and not ISO8601_LOCAL_RE.match(generated_at):
+        report.warn(
+            "$.document.generated_at",
+            "should use ISO-8601 local datetime with timezone when available",
+            "Example: 2026-05-02T10:30:00+08:00",
+        )
 
 
 def check_chapter_rules(document, context):

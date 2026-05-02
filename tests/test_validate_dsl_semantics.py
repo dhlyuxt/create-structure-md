@@ -70,3 +70,85 @@ class CliAndSchemaFirstTests(unittest.TestCase):
         self.assertIn("$.document.status", completed.stderr)
         self.assertIn("schema validation failed", completed.stderr)
         self.assertNotIn("semantic validation failed", completed.stderr)
+
+
+class DocumentValidationTests(unittest.TestCase):
+    def test_generic_output_filename_fails(self):
+        for output_file in [
+            "STRUCTURE_DESIGN.md",
+            "structure_design.md",
+            "design.md",
+            "软件结构设计说明书.md",
+            "software_STRUCTURE_DESIGN.md",
+            "structure_STRUCTURE_DESIGN.md",
+            "design_STRUCTURE_DESIGN.md",
+        ]:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                document = valid_document()
+                document["document"]["output_file"] = output_file
+                path = write_json(tmpdir, "generic.dsl.json", document)
+                completed = run_validator(path)
+            with self.subTest(output_file=output_file):
+                self.assertEqual(1, completed.returncode)
+                self.assertIn("$.document.output_file", completed.stderr)
+                self.assertIn("generic-only output filename", completed.stderr)
+
+    def test_concrete_output_filename_tied_to_documented_object_passes(self):
+        for output_file in [
+            "create-structure-md_STRUCTURE_DESIGN.md",
+            "MOD-SKILL_STRUCTURE_DESIGN.md",
+            "技能文档生成模块_STRUCTURE_DESIGN.md",
+            "system_create-structure-md_STRUCTURE_DESIGN.md",
+            "module_MOD-SKILL_STRUCTURE_DESIGN.md",
+        ]:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                document = valid_document()
+                document["document"]["output_file"] = output_file
+                path = write_json(tmpdir, "concrete.dsl.json", document)
+                completed = run_validator(path)
+            with self.subTest(output_file=output_file):
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                self.assertIn("Validation succeeded", completed.stdout)
+
+    def test_output_filename_without_concrete_documented_object_fails(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["document"]["output_file"] = "unrelated_SCOPE_STRUCTURE_DESIGN.md"
+            path = write_json(tmpdir, "unrelated.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.document.output_file", completed.stderr)
+        self.assertIn("must include a concrete documented object name", completed.stderr)
+
+    def test_output_filename_with_spaces_warns_but_passes(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["document"]["output_file"] = "create structure md_STRUCTURE_DESIGN.md"
+            path = write_json(tmpdir, "spaces.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertIn("WARNING", completed.stdout)
+        self.assertIn("$.document.output_file", completed.stdout)
+        self.assertIn("contains spaces", completed.stdout)
+        self.assertIn("Validation succeeded", completed.stdout)
+
+    def test_generated_at_loose_format_warns(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["document"]["generated_at"] = "May second"
+            path = write_json(tmpdir, "generated-at.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertIn("$.document.generated_at", completed.stdout)
+        self.assertIn("should use ISO-8601", completed.stdout)
+
+    def test_empty_document_title_stops_at_schema_validation(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["document"]["title"] = ""
+            path = write_json(tmpdir, "empty-title.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(2, completed.returncode)
+        self.assertIn("$.document.title", completed.stderr)
+        self.assertIn("schema validation failed", completed.stderr)
+        self.assertNotIn("semantic validation failed", completed.stderr)
