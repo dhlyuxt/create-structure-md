@@ -75,7 +75,7 @@ PROTOTYPE_PATTERNS = [
     re.compile(r"(?m)^\s*class\s*\{"),
 ]
 
-TEXT_LINT_EXEMPT_FIELD_NAMES = {"source", "content", "diagram_type"}
+TEXT_LINT_EXEMPT_FIELD_NAMES = {"content", "diagram_type"}
 
 CODE_LIKE_LINE_RE = re.compile(
     r"^\s*(?:if |else:|elif |for |while |try:|except |return\b|raise\b|[A-Za-z_]\w*\(.*\)|[A-Za-z_]\w*\s*=|[{};])"
@@ -783,7 +783,7 @@ def check_unreferenced_evidence(document, context):
         if isinstance(value, dict):
             referenced.update(value.get("evidence_refs", []))
     for i, evidence in enumerate(document["evidence"]):
-        if evidence["confidence"] != "unknown" and evidence["id"] not in referenced:
+        if evidence["id"] not in referenced:
             context.report.warn(
                 "$.evidence[%d].id" % i,
                 f"unreferenced evidence {evidence['id']}",
@@ -880,8 +880,9 @@ def check_markdown_safety(document, context):
         if not isinstance(value, str):
             continue
         field_name = path.rsplit(".", 1)[-1]
-        if is_mermaid_source_path(path) and "```" in value:
-            context.report.error(path, "Mermaid source must not include Markdown fences", "Store raw Mermaid source only")
+        if is_mermaid_source_path(path):
+            if "```" in value:
+                context.report.error(path, "Mermaid source must not include Markdown fences", "Store raw Mermaid source only")
             continue
         if field_name in TEXT_LINT_EXEMPT_FIELD_NAMES or path.startswith("$.source_snippets["):
             continue

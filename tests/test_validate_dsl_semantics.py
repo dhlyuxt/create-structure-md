@@ -931,6 +931,16 @@ class MarkdownSafetyAndLowConfidenceTests(unittest.TestCase):
         self.assertIn("$.system_overview.summary", completed.stderr)
         self.assertIn("unsafe Markdown structure", completed.stderr)
 
+    def test_plain_text_source_fields_reject_markdown_structure(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["configuration_data_dependencies"]["configuration_items"]["rows"][0]["source"] = "# injected"
+            path = write_json(tmpdir, "plain-source-markdown.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.configuration_data_dependencies.configuration_items.rows[0].source", completed.stderr)
+        self.assertIn("unsafe Markdown structure", completed.stderr)
+
     def test_plain_text_fields_reject_large_code_like_blocks(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             document = valid_document()
@@ -971,6 +981,7 @@ class MarkdownSafetyAndLowConfidenceTests(unittest.TestCase):
                 "description": "support data 不应进入低置信度集合。",
                 "confidence": "unknown",
             }]
+            document["architecture_views"]["module_intro"]["rows"][0]["evidence_refs"] = ["EV-UNKNOWN"]
             path = write_json(tmpdir, "low-confidence.dsl.json", document)
             completed = run_validator(path)
         self.assertEqual(0, completed.returncode, completed.stderr)
@@ -980,3 +991,21 @@ class MarkdownSafetyAndLowConfidenceTests(unittest.TestCase):
         self.assertIn("$.module_design.modules[0].external_capability_details.provided_capabilities.rows[0]", completed.stdout)
         self.assertNotIn("$.evidence[0]", completed.stdout)
         self.assertIn("Summarize in chapter 9", completed.stdout)
+
+    def test_unknown_unreferenced_evidence_still_warns(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["evidence"] = [{
+                "id": "EV-UNKNOWN",
+                "kind": "note",
+                "title": "未知证据",
+                "location": "note",
+                "description": "未知置信度证据仍然需要被引用。",
+                "confidence": "unknown",
+            }]
+            path = write_json(tmpdir, "unknown-unreferenced-evidence.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertIn("WARNING", completed.stdout)
+        self.assertIn("$.evidence[0].id", completed.stdout)
+        self.assertIn("unreferenced evidence", completed.stdout)
