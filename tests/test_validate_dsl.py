@@ -235,6 +235,34 @@ class SchemaRootContractTests(unittest.TestCase):
         self.assertCountEqual(TOP_LEVEL_FIELDS, schema["required"])
         self.assertFalse(schema["additionalProperties"])
 
+    def test_schema_defines_required_base_defs(self):
+        defs = load_schema()["$defs"]
+        expected_defs = {
+            "nonEmptyString": {"type": "string", "minLength": 1},
+            "stringArray": {"type": "array", "items": {"$ref": "#/$defs/nonEmptyString"}},
+            "referenceArray": {"type": "array", "items": {"$ref": "#/$defs/nonEmptyString"}},
+            "confidence": {"type": "string", "enum": ["observed", "inferred", "unknown"]},
+        }
+        self.assertLessEqual(expected_defs.keys(), defs.keys())
+
+        for def_name, expected_schema in expected_defs.items():
+            with self.subTest(def_name=def_name):
+                self.assertEqual(expected_schema, defs[def_name])
+
+        validator_for_def("nonEmptyString").validate("value")
+        assert_invalid_def(self, "nonEmptyString", "", expected_validator="minLength", expected_path=[])
+
+        validator_for_def("stringArray").validate(["alpha", "beta"])
+        assert_invalid_def(self, "stringArray", [""], expected_validator="minLength", expected_path=[0])
+
+        validator_for_def("referenceArray").validate(["REF-001"])
+        assert_invalid_def(self, "referenceArray", [""], expected_validator="minLength", expected_path=[0])
+
+        for value in ["observed", "inferred", "unknown"]:
+            with self.subTest(confidence=value):
+                validator_for_def("confidence").validate(value)
+        assert_invalid_def(self, "confidence", "guessed", expected_validator="enum", expected_path=[])
+
     def test_fixture_passes_root_shell_validation(self):
         validator().validate(valid_example())
 

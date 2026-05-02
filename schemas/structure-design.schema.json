@@ -83,6 +83,26 @@
     }
   },
   "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stringArray": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/nonEmptyString"
+      }
+    },
+    "referenceArray": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/nonEmptyString"
+      }
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["observed", "inferred", "unknown"]
+    },
     "document": {
       "type": "object"
     },
