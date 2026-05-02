@@ -602,3 +602,142 @@ class ChapterSevenAndEightTests(unittest.TestCase):
         self.assertIn("must have at least one participant", completed.stderr)
         self.assertIn("duplicate ID", completed.stderr)
         self.assertIn("step order values must be unique", completed.stderr)
+
+
+class ExtraTableAndTraceabilityTests(unittest.TestCase):
+    def test_extra_table_rows_reject_unknown_keys_but_allow_missing_declared_keys(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["architecture_views"]["extra_tables"] = [{
+                "id": "TBL-ARCH-001",
+                "title": "补充表",
+                "columns": [{"key": "name", "title": "名称"}, {"key": "role", "title": "角色"}],
+                "rows": [{"name": "A", "extra": "B", "evidence_refs": []}],
+            }]
+            path = write_json(tmpdir, "extra-table.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.architecture_views.extra_tables[0].rows[0]", completed.stderr)
+        self.assertIn("row contains keys outside declared columns", completed.stderr)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["architecture_views"]["extra_tables"] = [{
+                "id": "TBL-ARCH-002",
+                "title": "补充表",
+                "columns": [{"key": "name", "title": "名称"}, {"key": "role", "title": "角色"}],
+                "rows": [{"name": "A"}],
+            }]
+            path = write_json(tmpdir, "extra-table-missing-ok.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+
+    def test_extra_table_duplicate_column_keys_fail(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["architecture_views"]["extra_tables"] = [{
+                "id": "TBL-ARCH-DUP",
+                "title": "补充表",
+                "columns": [{"key": "name", "title": "名称"}, {"key": "name", "title": "重复名称"}],
+                "rows": [{"name": "A"}],
+            }]
+            path = write_json(tmpdir, "extra-table-duplicate.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.architecture_views.extra_tables[0].columns[1].key", completed.stderr)
+        self.assertIn("duplicate extra table column key", completed.stderr)
+
+    def test_traceability_target_id_must_resolve_by_target_type(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["traceability"] = [{
+                "id": "TR-MISSING",
+                "source_external_id": "REQ-1",
+                "source_type": "requirement",
+                "target_type": "module",
+                "target_id": "MOD-MISSING",
+                "description": "错误映射",
+            }]
+            path = write_json(tmpdir, "trace-missing.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.traceability[0].target_id", completed.stderr)
+        self.assertIn("does not resolve for target_type module", completed.stderr)
+
+    def test_local_traceability_backlink_must_target_current_node(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["traceability"] = [{
+                "id": "TR-MODULE",
+                "source_external_id": "REQ-1",
+                "source_type": "requirement",
+                "target_type": "module",
+                "target_id": "MOD-SKILL",
+                "description": "模块追踪",
+            }]
+            document["runtime_view"]["runtime_units"]["rows"][0]["traceability_refs"] = ["TR-MODULE"]
+            path = write_json(tmpdir, "trace-backlink.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.runtime_view.runtime_units.rows[0].traceability_refs[0]", completed.stderr)
+        self.assertIn("targets module MOD-SKILL instead of runtime_unit", completed.stderr)
+
+    def test_valid_local_traceability_backlink_passes(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["traceability"] = [{
+                "id": "TR-RUNTIME",
+                "source_external_id": "REQ-2",
+                "source_type": "requirement",
+                "target_type": "runtime_unit",
+                "target_id": "RUN-GENERATE",
+                "description": "运行单元追踪",
+            }]
+            document["runtime_view"]["runtime_units"]["rows"][0]["traceability_refs"] = ["TR-RUNTIME"]
+            path = write_json(tmpdir, "trace-valid-backlink.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+
+    def test_traceability_flow_branch_target_resolves(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["key_flows"]["flows"][0]["branches_or_exceptions"] = [{
+                "branch_id": "BR-GENERATE-001",
+                "condition": "DSL 校验失败",
+                "handling": "停止渲染并报告结构问题。",
+                "related_module_ids": ["MOD-SKILL"],
+                "related_runtime_unit_ids": ["RUN-GENERATE"],
+                "confidence": "observed",
+                "evidence_refs": [],
+                "traceability_refs": ["TR-BRANCH"],
+                "source_snippet_refs": [],
+            }]
+            document["traceability"] = [{
+                "id": "TR-BRANCH",
+                "source_external_id": "REQ-BRANCH",
+                "source_type": "requirement",
+                "target_type": "flow_branch",
+                "target_id": "BR-GENERATE-001",
+                "description": "分支追踪",
+            }]
+            path = write_json(tmpdir, "trace-flow-branch.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+
+    def test_unreferenced_evidence_warns(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["evidence"] = [{
+                "id": "EV-UNUSED",
+                "kind": "note",
+                "title": "未使用证据",
+                "location": "notes",
+                "description": "没有被引用。",
+                "confidence": "observed",
+            }]
+            path = write_json(tmpdir, "unused-evidence.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertIn("WARNING", completed.stdout)
+        self.assertIn("$.evidence[0].id", completed.stdout)
+        self.assertIn("unreferenced evidence", completed.stdout)

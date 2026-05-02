@@ -184,6 +184,23 @@ REFERENCE_FIELD_RULES = [
     (re.compile(r"^\$\.key_flows\.flows\[\d+\]\.branches_or_exceptions\[\d+\]\.related_runtime_unit_ids$"), "runtime_unit", True, "runtime unit"),
 ]
 
+TRACEABILITY_TARGET_KIND = {
+    "module": "module",
+    "core_capability": "core_capability",
+    "provided_capability": "provided_capability",
+    "runtime_unit": "runtime_unit",
+    "flow": "flow",
+    "flow_step": "flow_step",
+    "flow_branch": "flow_branch",
+    "collaboration": "collaboration",
+    "configuration_item": "configuration_item",
+    "data_artifact": "data_artifact",
+    "dependency": "dependency",
+    "risk": "risk",
+    "assumption": "assumption",
+    "source_snippet": "source_snippet",
+}
+
 
 def is_registered_reference_field(path, field_name):
     if field_name in SUPPORT_REF_FIELDS:
@@ -619,6 +636,110 @@ def check_all_extra_diagrams(document, context):
                 diagram_source_required(context.report, f"{path}[{i}]", diagram, "extra diagram")
 
 
+def check_extra_tables(document, context):
+    for path, value in walk(document):
+        if not is_extra_table_object(value):
+            continue
+        column_keys = [column["key"] for column in value["columns"]]
+        seen_column_keys = set()
+        for i, key in enumerate(column_keys):
+            if key in seen_column_keys:
+                context.report.error(
+                    f"{path}.columns[{i}].key",
+                    f"duplicate extra table column key {key}",
+                    "Each extra table column key must be unique",
+                )
+            seen_column_keys.add(key)
+        allowed_keys = set(column_keys) | {"evidence_refs"}
+        for i, row in enumerate(value["rows"]):
+            row_keys = set(row)
+            unknown_keys = row_keys - allowed_keys
+            if unknown_keys:
+                context.report.error(
+                    f"{path}.rows[{i}]",
+                    "row contains keys outside declared columns",
+                    f"Remove unknown keys: {', '.join(sorted(unknown_keys))}",
+                )
+
+
+def check_traceability(document, context):
+    for i, trace in enumerate(document["traceability"]):
+        target_type = trace["target_type"]
+        target_id = trace["target_id"]
+        kind = TRACEABILITY_TARGET_KIND[target_type]
+        if target_id not in context.ids_by_kind[kind]:
+            context.report.error(
+                f"$.traceability[{i}].target_id",
+                f"does not resolve for target_type {target_type}",
+                "Use an ID defined by the target mapping in the Phase 3 spec",
+            )
+        context.traceability_targets[trace["id"]] = (target_type, target_id)
+    check_traceability_backlinks(document, context)
+
+
+def current_traceability_target(path, value):
+    if not isinstance(value, dict):
+        return None
+    if "module_id" in value:
+        return ("module", value["module_id"])
+    if "capability_id" in value and ".system_overview.core_capabilities" in path:
+        return ("core_capability", value["capability_id"])
+    if "capability_id" in value and ".provided_capabilities.rows" in path:
+        return ("provided_capability", value["capability_id"])
+    if "unit_id" in value:
+        return ("runtime_unit", value["unit_id"])
+    if "collaboration_id" in value:
+        return ("collaboration", value["collaboration_id"])
+    if "config_id" in value:
+        return ("configuration_item", value["config_id"])
+    if "artifact_id" in value:
+        return ("data_artifact", value["artifact_id"])
+    if "dependency_id" in value:
+        return ("dependency", value["dependency_id"])
+    if "flow_id" in value and ".key_flows.flows" in path:
+        return ("flow", value["flow_id"])
+    if "step_id" in value:
+        return ("flow_step", value["step_id"])
+    if "branch_id" in value:
+        return ("flow_branch", value["branch_id"])
+    if path.startswith("$.risks["):
+        return ("risk", value.get("id"))
+    if path.startswith("$.assumptions["):
+        return ("assumption", value.get("id"))
+    return None
+
+
+def check_traceability_backlinks(document, context):
+    for path, value in walk(document):
+        if not isinstance(value, dict) or "traceability_refs" not in value:
+            continue
+        current = current_traceability_target(path, value)
+        if current is None:
+            continue
+        for i, trace_id in enumerate(value["traceability_refs"]):
+            target = context.traceability_targets.get(trace_id)
+            if target and target != current:
+                context.report.error(
+                    f"{path}.traceability_refs[{i}]",
+                    f"traceability {trace_id} targets {target[0]} {target[1]} instead of {current[0]} {current[1]}",
+                    "Local backlinks must point to traceability items for the current node",
+                )
+
+
+def check_unreferenced_evidence(document, context):
+    referenced = set()
+    for _path, value in walk(document):
+        if isinstance(value, dict):
+            referenced.update(value.get("evidence_refs", []))
+    for i, evidence in enumerate(document["evidence"]):
+        if evidence["id"] not in referenced:
+            context.report.warn(
+                "$.evidence[%d].id" % i,
+                f"unreferenced evidence {evidence['id']}",
+                "Remove it from the DSL or cite it from an evidence_refs field",
+            )
+
+
 def check_source_snippets(document, context, *, allow_long_snippets):
     pass
 
@@ -642,6 +763,9 @@ def validate_semantics(document, *, allow_long_snippets=False):
 
 def run_semantic_checks(document, context, *, allow_long_snippets):
     check_chapter_rules(document, context)
+    check_extra_tables(document, context)
+    check_traceability(document, context)
+    check_unreferenced_evidence(document, context)
     check_source_snippets(document, context, allow_long_snippets=allow_long_snippets)
     check_markdown_safety(document, context)
     collect_low_confidence(document, context)
