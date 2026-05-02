@@ -39,6 +39,18 @@ WORKFLOW_ORDER = [
 ]
 
 
+def front_matter_value(front_matter, key):
+    prefix = f"{key}: "
+    values = [
+        line[len(prefix):]
+        for line in front_matter.splitlines()
+        if line.startswith(prefix)
+    ]
+    if len(values) != 1:
+        raise AssertionError(f"Expected exactly one {key!r} front matter value")
+    return values[0]
+
+
 class SkillMetadataTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -48,7 +60,10 @@ class SkillMetadataTests(unittest.TestCase):
     def test_yaml_front_matter_matches_contract(self):
         self.assertTrue(self.text.startswith("---\n"))
         self.assertIn("name: create-structure-md", self.front_matter)
-        self.assertIn(f"description: {EXPECTED_DESCRIPTION}", self.front_matter)
+        self.assertEqual(
+            EXPECTED_DESCRIPTION,
+            front_matter_value(self.front_matter, "description"),
+        )
 
     def test_description_contains_required_trigger_terms(self):
         for term in [
