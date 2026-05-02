@@ -67,7 +67,7 @@ MARKDOWN_UNSAFE_PATTERNS = [
 ]
 
 PROTOTYPE_PATTERNS = [
-    re.compile(r"(?m)^\s*[A-Za-z_][\w\s\*]+?\s+[A-Za-z_]\w*\s*\([^;{}]*\)\s*;?\s*$"),
+    re.compile(r"(?m)^\s*(?:(?:static|extern|inline|const|unsigned|signed|long|short)\s+)*(?:void|char|int|float|double|bool|size_t|ssize_t|[A-Za-z_]\w+_t|struct\s+[A-Za-z_]\w+|enum\s+[A-Za-z_]\w+)\s+\*?\s*[A-Za-z_]\w*\s*\([^;{}]*\)\s*;?\s*$"),
     re.compile(r"(?m)^\s*def\s+[A-Za-z_]\w*\s*\("),
     re.compile(r"(?m)^\s*class\s+[A-Za-z_]\w*(?:\(|:|\s*$)"),
     re.compile(r"(?m)^\s*typedef\s+(?:struct|enum)\b"),
@@ -676,10 +676,6 @@ def check_chapter_8(document, context):
                 context.require_ref("runtime_unit", runtime_unit_id, f"{branch_base}.related_runtime_unit_ids[{ref_i}]", "runtime unit")
 
 
-def check_chapter_9(document, context):
-    pass
-
-
 def check_all_extra_diagrams(document, context):
     for path, value in walk(document):
         if path.endswith(".extra_diagrams") and isinstance(value, list):
@@ -872,7 +868,22 @@ def check_chapter_9(document, context):
 
 
 def is_mermaid_source_path(path):
-    return path.endswith(".source") and any(marker in path for marker in ["diagram", "extra_diagrams"])
+    diagram_source_patterns = [
+        r"^\$\.architecture_views\.module_relationship_diagram\.source$",
+        r"^\$\.module_design\.modules\[\d+\]\.internal_structure\.diagram\.source$",
+        r"^\$\.runtime_view\.runtime_flow_diagram\.source$",
+        r"^\$\.runtime_view\.runtime_sequence_diagram\.source$",
+        r"^\$\.cross_module_collaboration\.collaboration_relationship_diagram\.source$",
+        r"^\$\.key_flows\.flows\[\d+\]\.diagram\.source$",
+        r"^\$\.architecture_views\.extra_diagrams\[\d+\]\.source$",
+        r"^\$\.module_design\.modules\[\d+\]\.external_capability_details\.extra_diagrams\[\d+\]\.source$",
+        r"^\$\.module_design\.modules\[\d+\]\.extra_diagrams\[\d+\]\.source$",
+        r"^\$\.runtime_view\.extra_diagrams\[\d+\]\.source$",
+        r"^\$\.configuration_data_dependencies\.extra_diagrams\[\d+\]\.source$",
+        r"^\$\.cross_module_collaboration\.extra_diagrams\[\d+\]\.source$",
+        r"^\$\.key_flows\.extra_diagrams\[\d+\]\.source$",
+    ]
+    return any(re.match(pattern, path) for pattern in diagram_source_patterns)
 
 
 def check_markdown_safety(document, context):
@@ -937,7 +948,6 @@ def run_semantic_checks(document, context, *, allow_long_snippets):
     check_traceability(document, context)
     check_unreferenced_evidence(document, context)
     check_source_snippets(document, context, allow_long_snippets=allow_long_snippets)
-    check_chapter_9(document, context)
     check_markdown_safety(document, context)
     collect_low_confidence(document, context)
 

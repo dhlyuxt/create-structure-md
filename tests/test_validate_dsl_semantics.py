@@ -903,6 +903,16 @@ class MarkdownSafetyAndLowConfidenceTests(unittest.TestCase):
                 self.assertIn("$.structure_issues_and_suggestions", completed.stderr)
                 self.assertIn("unsafe Markdown structure", completed.stderr)
 
+    def test_chapter_nine_unsafe_content_reports_once(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["structure_issues_and_suggestions"] = "# 标题"
+            path = write_json(tmpdir, "chapter9-once.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertEqual(1, completed.stderr.count("$.structure_issues_and_suggestions"))
+        self.assertEqual(1, completed.stderr.count("unsafe Markdown structure"))
+
     def test_design_text_rejects_prototypes_and_definition_like_lines_outside_snippets(self):
         cases = [
             ("system_overview", "summary", "int main(void);"),
@@ -920,6 +930,20 @@ class MarkdownSafetyAndLowConfidenceTests(unittest.TestCase):
                 self.assertEqual(1, completed.returncode)
                 self.assertIn(f"$.{section}.{field}", completed.stderr)
                 self.assertIn("prototype/detail-design content", completed.stderr)
+
+    def test_design_text_allows_normal_prose_with_parentheticals(self):
+        cases = [
+            "Use standard input (stdin)",
+            "Returns rendered output (Markdown)",
+        ]
+        for value in cases:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                document = valid_document()
+                document["system_overview"]["summary"] = value
+                path = write_json(tmpdir, "parenthetical-prose.dsl.json", document)
+                completed = run_validator(path)
+            with self.subTest(value=value):
+                self.assertEqual(0, completed.returncode, completed.stderr)
 
     def test_plain_text_fields_reject_markdown_structure_outside_chapter_nine(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -939,6 +963,21 @@ class MarkdownSafetyAndLowConfidenceTests(unittest.TestCase):
             completed = run_validator(path)
         self.assertEqual(1, completed.returncode)
         self.assertIn("$.configuration_data_dependencies.configuration_items.rows[0].source", completed.stderr)
+        self.assertIn("unsafe Markdown structure", completed.stderr)
+
+    def test_extra_table_nested_diagram_source_is_plain_text_linted(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["architecture_views"]["extra_tables"] = [{
+                "id": "TBL-ARCH-DIAGRAM-SOURCE",
+                "title": "嵌套图字段",
+                "columns": [{"key": "diagram", "title": "图"}],
+                "rows": [{"diagram": {"source": "# injected heading"}}],
+            }]
+            path = write_json(tmpdir, "extra-table-nested-diagram-source.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.architecture_views.extra_tables[0].rows[0].diagram.source", completed.stderr)
         self.assertIn("unsafe Markdown structure", completed.stderr)
 
     def test_plain_text_fields_reject_large_code_like_blocks(self):
