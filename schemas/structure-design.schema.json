@@ -104,7 +104,36 @@
       "enum": ["observed", "inferred", "unknown"]
     },
     "document": {
-      "type": "object"
+      "type": "object",
+      "required": [
+        "title",
+        "project_name",
+        "project_version",
+        "document_version",
+        "status",
+        "generated_at",
+        "generated_by",
+        "language",
+        "source_type",
+        "scope_summary",
+        "not_applicable_policy",
+        "output_file"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "project_name": { "$ref": "#/$defs/nonEmptyString" },
+        "project_version": { "type": "string" },
+        "document_version": { "$ref": "#/$defs/nonEmptyString" },
+        "status": { "type": "string", "enum": ["draft", "reviewed", "final"] },
+        "generated_at": { "type": "string" },
+        "generated_by": { "type": "string" },
+        "language": { "$ref": "#/$defs/nonEmptyString" },
+        "source_type": { "type": "string", "enum": ["code", "requirements", "mixed", "notes"] },
+        "scope_summary": { "type": "string" },
+        "not_applicable_policy": { "type": "string" },
+        "output_file": { "$ref": "#/$defs/safeMarkdownFilename" }
+      }
     },
     "systemOverview": {
       "type": "object"
@@ -143,25 +172,81 @@
       "type": "object"
     },
     "safeMarkdownFilename": {
-      "type": "string"
+      "type": "string",
+      "minLength": 4,
+      "allOf": [
+        { "pattern": "^[^/\\\\\\u0000-\\u001f]+\\.md$" },
+        { "not": { "pattern": "\\.\\." } }
+      ]
     },
     "diagram": {
-      "type": "object"
+      "type": "object",
+      "required": ["id", "kind", "title", "diagram_type", "description", "source", "confidence"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "kind": { "$ref": "#/$defs/nonEmptyString" },
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "diagram_type": {
+          "type": "string",
+          "enum": ["flowchart", "graph", "sequenceDiagram", "classDiagram", "stateDiagram-v2"]
+        },
+        "description": { "type": "string" },
+        "source": { "type": "string" },
+        "confidence": { "$ref": "#/$defs/confidence" }
+      }
     },
     "extraTableColumn": {
-      "type": "object"
+      "type": "object",
+      "required": ["key", "title"],
+      "additionalProperties": false,
+      "properties": {
+        "key": { "$ref": "#/$defs/nonEmptyString" },
+        "title": { "$ref": "#/$defs/nonEmptyString" }
+      }
     },
     "extraTableRow": {
-      "type": "object"
+      "type": "object",
+      "not": {
+        "anyOf": [
+          { "required": ["traceability_refs"] },
+          { "required": ["source_snippet_refs"] },
+          { "required": ["required"] },
+          { "required": ["min_rows"] },
+          { "required": ["max_rows"] },
+          { "required": ["empty_allowed"] },
+          { "required": ["render_when_empty"] }
+        ]
+      },
+      "properties": {
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" }
+      },
+      "additionalProperties": true
     },
     "extraTable": {
-      "type": "object"
+      "type": "object",
+      "required": ["id", "title", "columns", "rows"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "columns": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/extraTableColumn" }
+        },
+        "rows": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/extraTableRow" }
+        }
+      }
     },
     "extraTables": {
-      "type": "array"
+      "type": "array",
+      "items": { "$ref": "#/$defs/extraTable" }
     },
     "extraDiagrams": {
-      "type": "array"
+      "type": "array",
+      "items": { "$ref": "#/$defs/diagram" }
     }
   }
 }

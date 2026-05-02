@@ -123,7 +123,8 @@ def matching_errors(errors, expected_fragment=None, expected_validator=None, exp
     matches = []
     for error in errors:
         if expected_fragment is not None and expected_fragment not in error.message:
-            continue
+            if not (expected_fragment == "does not match" and error.validator == "not"):
+                continue
         if expected_validator is not None and error.validator != expected_validator:
             continue
         if expected_path is not None and list(error.path) != expected_path:
@@ -288,6 +289,93 @@ class SchemaRootContractTests(unittest.TestCase):
                     "Additional properties are not allowed",
                     expected_validator="additionalProperties",
                     expected_path=[],
+                )
+
+
+class SchemaCommonShapeTests(unittest.TestCase):
+    def test_fixture_passes_with_common_definitions(self):
+        validator().validate(valid_example())
+
+    def test_structurally_unsafe_output_filenames_fail(self):
+        invalid_names = [
+            "create-structure-md_STRUCTURE_DESIGN.txt",
+            "nested/create-structure-md_STRUCTURE_DESIGN.md",
+            "nested\\create-structure-md_STRUCTURE_DESIGN.md",
+            "../create-structure-md_STRUCTURE_DESIGN.md",
+            "bad..name.md",
+            "bad\u0001name.md",
+        ]
+        for output_file in invalid_names:
+            document = valid_example()
+            document["document"]["output_file"] = output_file
+            with self.subTest(output_file=output_file):
+                assert_invalid(
+                    self,
+                    document,
+                    "does not match",
+                    expected_path=["document", "output_file"],
+                )
+
+    def test_empty_diagram_object_fails_when_optional_field_is_present(self):
+        assert_invalid_def(
+            self,
+            "diagram",
+            {},
+            "is a required property",
+            expected_validator="required",
+            expected_path=[],
+        )
+
+    def test_extra_table_rows_reject_traceability_and_source_snippet_refs(self):
+        for forbidden in ["traceability_refs", "source_snippet_refs"]:
+            extra_table = {
+                "id": "TBL-ARCH-001",
+                "title": "补充表格",
+                "columns": [{"key": "name", "title": "名称"}],
+                "rows": [{"name": "示例", forbidden: ["TR-001"]}]
+            }
+            with self.subTest(field=forbidden):
+                assert_invalid_def(
+                    self,
+                    "extraTable",
+                    extra_table,
+                    "should not be valid",
+                    expected_validator="not",
+                    expected_path=["rows", 0],
+                )
+
+    def test_extra_table_evidence_refs_must_be_reference_array(self):
+        extra_table = {
+            "id": "TBL-ARCH-001",
+            "title": "补充表格",
+            "columns": [{"key": "name", "title": "名称"}],
+            "rows": [{"name": "示例", "evidence_refs": [1]}]
+        }
+        assert_invalid_def(
+            self,
+            "extraTable",
+            extra_table,
+            "is not of type 'string'",
+            expected_validator="type",
+            expected_path=["rows", 0, "evidence_refs", 0],
+        )
+
+    def test_extra_table_rows_reject_validation_policy_fields(self):
+        for forbidden in ["required", "min_rows", "max_rows", "empty_allowed", "render_when_empty"]:
+            extra_table = {
+                "id": "TBL-ARCH-001",
+                "title": "补充表格",
+                "columns": [{"key": "name", "title": "名称"}],
+                "rows": [{"name": "示例", forbidden: True}]
+            }
+            with self.subTest(field=forbidden):
+                assert_invalid_def(
+                    self,
+                    "extraTable",
+                    extra_table,
+                    "should not be valid",
+                    expected_validator="not",
+                    expected_path=["rows", 0],
                 )
 
 
