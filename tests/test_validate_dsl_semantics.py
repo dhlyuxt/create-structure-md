@@ -878,3 +878,105 @@ class SourceSnippetValidationTests(unittest.TestCase):
                 self.assertEqual(1, completed.returncode)
                 self.assertIn("$.source_snippets[0].content", completed.stderr)
                 self.assertIn("high-risk secret or personal data pattern", completed.stderr)
+
+
+class MarkdownSafetyAndLowConfidenceTests(unittest.TestCase):
+    def test_chapter_nine_rejects_headings_tables_fences_html_and_graphs(self):
+        cases = [
+            "# 标题",
+            "| A | B |\n|---|---|",
+            "```mermaid\nflowchart TD\n```",
+            "```python\nprint('x')",
+            "<div>raw</div>",
+            "<p>raw</p>",
+            "<!-- raw comment -->",
+            "graph TD\n  A-->B",
+        ]
+        for content in cases:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                document = valid_document()
+                document["structure_issues_and_suggestions"] = content
+                path = write_json(tmpdir, "chapter9.dsl.json", document)
+                completed = run_validator(path)
+            with self.subTest(content=content):
+                self.assertEqual(1, completed.returncode)
+                self.assertIn("$.structure_issues_and_suggestions", completed.stderr)
+                self.assertIn("unsafe Markdown structure", completed.stderr)
+
+    def test_design_text_rejects_prototypes_and_definition_like_lines_outside_snippets(self):
+        cases = [
+            ("system_overview", "summary", "int main(void);"),
+            ("system_overview", "summary", "def build_plan():"),
+            ("system_overview", "summary", "class Renderer:"),
+            ("system_overview", "summary", "typedef struct Config Config;"),
+        ]
+        for section, field, value in cases:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                document = valid_document()
+                document[section][field] = value
+                path = write_json(tmpdir, "prototype.dsl.json", document)
+                completed = run_validator(path)
+            with self.subTest(value=value):
+                self.assertEqual(1, completed.returncode)
+                self.assertIn(f"$.{section}.{field}", completed.stderr)
+                self.assertIn("prototype/detail-design content", completed.stderr)
+
+    def test_plain_text_fields_reject_markdown_structure_outside_chapter_nine(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["system_overview"]["summary"] = "# 注入标题"
+            path = write_json(tmpdir, "plain-markdown.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.system_overview.summary", completed.stderr)
+        self.assertIn("unsafe Markdown structure", completed.stderr)
+
+    def test_plain_text_fields_reject_large_code_like_blocks(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["system_overview"]["summary"] = "\n".join([
+                "if ready:",
+                "    validate()",
+                "    render()",
+                "    report()",
+                "else:",
+                "    raise RuntimeError('not ready')",
+            ])
+            path = write_json(tmpdir, "plain-code-block.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.system_overview.summary", completed.stderr)
+        self.assertIn("large code-like block", completed.stderr)
+
+    def test_mermaid_source_rejects_fenced_markdown(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["architecture_views"]["module_relationship_diagram"]["source"] = "```mermaid\nflowchart TD\n  A --> B\n```"
+            path = write_json(tmpdir, "fenced-mermaid.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.architecture_views.module_relationship_diagram.source", completed.stderr)
+        self.assertIn("must not include Markdown fences", completed.stderr)
+
+    def test_low_confidence_whitelist_warns_and_suggests_chapter_nine_coverage(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["architecture_views"]["module_intro"]["rows"][0]["confidence"] = "unknown"
+            document["module_design"]["modules"][0]["external_capability_details"]["provided_capabilities"]["rows"][0]["confidence"] = "unknown"
+            document["evidence"] = [{
+                "id": "EV-UNKNOWN",
+                "kind": "note",
+                "title": "未知证据",
+                "location": "note",
+                "description": "support data 不应进入低置信度集合。",
+                "confidence": "unknown",
+            }]
+            path = write_json(tmpdir, "low-confidence.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertIn("WARNING", completed.stdout)
+        self.assertIn("low-confidence item", completed.stdout)
+        self.assertIn("$.architecture_views.module_intro.rows[0]", completed.stdout)
+        self.assertIn("$.module_design.modules[0].external_capability_details.provided_capabilities.rows[0]", completed.stdout)
+        self.assertNotIn("$.evidence[0]", completed.stdout)
+        self.assertIn("Summarize in chapter 9", completed.stdout)

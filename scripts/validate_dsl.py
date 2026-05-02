@@ -57,6 +57,49 @@ HIGH_RISK_SNIPPET_PATTERNS = [
     re.compile(r"\b1[3-9]\d{9}\b"),
 ]
 
+MARKDOWN_UNSAFE_PATTERNS = [
+    re.compile(r"(?m)^\s{0,3}#{1,6}\s+"),
+    re.compile(r"(?m)^\s*\|.+\|\s*$"),
+    re.compile(r"```"),
+    re.compile(r"(?s)<!--.*?-->"),
+    re.compile(r"(?is)</?[A-Za-z][A-Za-z0-9:-]*(?:\s+[^<>]*)?>"),
+    re.compile(r"(?m)^\s*(?:graph|flowchart|sequenceDiagram|classDiagram|stateDiagram-v2)\b"),
+]
+
+PROTOTYPE_PATTERNS = [
+    re.compile(r"(?m)^\s*[A-Za-z_][\w\s\*]+?\s+[A-Za-z_]\w*\s*\([^;{}]*\)\s*;?\s*$"),
+    re.compile(r"(?m)^\s*def\s+[A-Za-z_]\w*\s*\("),
+    re.compile(r"(?m)^\s*class\s+[A-Za-z_]\w*(?:\(|:|\s*$)"),
+    re.compile(r"(?m)^\s*typedef\s+(?:struct|enum)\b"),
+    re.compile(r"(?m)^\s*enum\s*\{"),
+    re.compile(r"(?m)^\s*class\s*\{"),
+]
+
+TEXT_LINT_EXEMPT_FIELD_NAMES = {"source", "content", "diagram_type"}
+
+CODE_LIKE_LINE_RE = re.compile(
+    r"^\s*(?:if |else:|elif |for |while |try:|except |return\b|raise\b|[A-Za-z_]\w*\(.*\)|[A-Za-z_]\w*\s*=|[{};])"
+)
+
+LOW_CONFIDENCE_COLLECTIONS = [
+    ("$.architecture_views.module_intro.rows", lambda doc: doc["architecture_views"]["module_intro"]["rows"]),
+    ("$.module_design.modules", lambda doc: doc["module_design"]["modules"]),
+    (
+        "$.module_design.modules[{module_index}].external_capability_details.provided_capabilities.rows",
+        lambda doc: [
+            (module_index, row_index, row)
+            for module_index, module in enumerate(doc["module_design"]["modules"])
+            for row_index, row in enumerate(module["external_capability_details"]["provided_capabilities"]["rows"])
+        ],
+    ),
+    ("$.runtime_view.runtime_units.rows", lambda doc: doc["runtime_view"]["runtime_units"]["rows"]),
+    ("$.configuration_data_dependencies.configuration_items.rows", lambda doc: doc["configuration_data_dependencies"]["configuration_items"]["rows"]),
+    ("$.configuration_data_dependencies.structural_data_artifacts.rows", lambda doc: doc["configuration_data_dependencies"]["structural_data_artifacts"]["rows"]),
+    ("$.configuration_data_dependencies.dependencies.rows", lambda doc: doc["configuration_data_dependencies"]["dependencies"]["rows"]),
+    ("$.cross_module_collaboration.collaboration_scenarios.rows", lambda doc: doc["cross_module_collaboration"]["collaboration_scenarios"]["rows"]),
+    ("$.key_flows.flows", lambda doc: doc["key_flows"]["flows"]),
+]
+
 
 @dataclass(frozen=True)
 class ValidationIssue:
@@ -740,7 +783,7 @@ def check_unreferenced_evidence(document, context):
         if isinstance(value, dict):
             referenced.update(value.get("evidence_refs", []))
     for i, evidence in enumerate(document["evidence"]):
-        if evidence["id"] not in referenced:
+        if evidence["confidence"] != "unknown" and evidence["id"] not in referenced:
             context.report.warn(
                 "$.evidence[%d].id" % i,
                 f"unreferenced evidence {evidence['id']}",
@@ -804,12 +847,78 @@ def check_source_snippets(document, context, *, allow_long_snippets):
                 break
 
 
+def has_large_code_like_block(value):
+    run_length = 0
+    for line in value.splitlines():
+        if CODE_LIKE_LINE_RE.search(line):
+            run_length += 1
+            if run_length >= 5:
+                return True
+        elif line.strip():
+            run_length = 0
+    return False
+
+
+def check_chapter_9(document, context):
+    value = document["structure_issues_and_suggestions"]
+    for pattern in MARKDOWN_UNSAFE_PATTERNS:
+        if pattern.search(value):
+            context.report.error(
+                "$.structure_issues_and_suggestions",
+                "unsafe Markdown structure is not allowed in chapter 9",
+                "Use paragraphs, simple lists, emphasis, and inline code only",
+            )
+            return
+
+
+def is_mermaid_source_path(path):
+    return path.endswith(".source") and any(marker in path for marker in ["diagram", "extra_diagrams"])
+
+
 def check_markdown_safety(document, context):
-    pass
+    for path, value in walk(document):
+        if not isinstance(value, str):
+            continue
+        field_name = path.rsplit(".", 1)[-1]
+        if is_mermaid_source_path(path) and "```" in value:
+            context.report.error(path, "Mermaid source must not include Markdown fences", "Store raw Mermaid source only")
+            continue
+        if field_name in TEXT_LINT_EXEMPT_FIELD_NAMES or path.startswith("$.source_snippets["):
+            continue
+        if path == "$.structure_issues_and_suggestions":
+            continue
+        for pattern in MARKDOWN_UNSAFE_PATTERNS:
+            if pattern.search(value):
+                context.report.error(path, "unsafe Markdown structure is not allowed in plain text fields", "Keep document structure controlled by the renderer")
+                break
+        for pattern in PROTOTYPE_PATTERNS:
+            if pattern.search(value):
+                context.report.error(path, "prototype/detail-design content is outside this DSL field", "Move code evidence into source_snippets or summarize structurally")
+                break
+        if has_large_code_like_block(value):
+            context.report.error(path, "large code-like block is outside this DSL field", "Move code evidence into source_snippets or summarize structurally")
 
 
 def collect_low_confidence(document, context):
-    pass
+    for base_path, getter in LOW_CONFIDENCE_COLLECTIONS:
+        values = getter(document)
+        for i, item in enumerate(values):
+            if isinstance(item, tuple):
+                module_index, row_index, row = item
+                path = base_path.format(module_index=module_index) + f"[{row_index}]"
+                candidate = row
+            else:
+                path = f"{base_path}[{i}]"
+                candidate = item
+            if candidate.get("confidence") == "unknown":
+                context.report.warn(path, "low-confidence item", "Summarize in chapter 9 when useful")
+    for f_i, flow in enumerate(document["key_flows"]["flows"]):
+        for s_i, step in enumerate(flow["steps"]):
+            if step.get("confidence") == "unknown":
+                context.report.warn(f"$.key_flows.flows[{f_i}].steps[{s_i}]", "low-confidence item", "Summarize in chapter 9 when useful")
+        for b_i, branch in enumerate(flow["branches_or_exceptions"]):
+            if branch.get("confidence") == "unknown":
+                context.report.warn(f"$.key_flows.flows[{f_i}].branches_or_exceptions[{b_i}]", "low-confidence item", "Summarize in chapter 9 when useful")
 
 
 def validate_semantics(document, *, allow_long_snippets=False):
@@ -827,6 +936,7 @@ def run_semantic_checks(document, context, *, allow_long_snippets):
     check_traceability(document, context)
     check_unreferenced_evidence(document, context)
     check_source_snippets(document, context, allow_long_snippets=allow_long_snippets)
+    check_chapter_9(document, context)
     check_markdown_safety(document, context)
     collect_low_confidence(document, context)
 
