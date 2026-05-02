@@ -122,13 +122,180 @@ def format_schema_error(error):
     )
 
 
+PREFIX_BY_KIND = {
+    "module": "MOD-",
+    "core_capability": "CAP-",
+    "provided_capability": "CAP-",
+    "runtime_unit": "RUN-",
+    "configuration_item": "CFG-",
+    "data_artifact": "DATA-",
+    "dependency": "DEP-",
+    "collaboration": "COL-",
+    "flow": "FLOW-",
+    "flow_step": "STEP-",
+    "flow_branch": "BR-",
+    "diagram": "MER-",
+    "extra_table": "TBL-",
+    "evidence": "EV-",
+    "traceability": "TR-",
+    "risk": "RISK-",
+    "assumption": "ASM-",
+    "source_snippet": "SNIP-",
+}
+
+SUPPORT_REF_FIELDS = {
+    "evidence_refs": "evidence",
+    "traceability_refs": "traceability",
+    "source_snippet_refs": "source_snippet",
+}
+
+REGISTERED_REFERENCE_PATHS = [
+    re.compile(r"^\$\.architecture_views\.module_intro\.rows\[\d+\]\.module_id$"),
+    re.compile(r"^\$\.system_overview\.core_capabilities\[\d+\]\.capability_id$"),
+    re.compile(r"^\$\.module_design\.modules\[\d+\]\.module_id$"),
+    re.compile(r"^\$\.module_design\.modules\[\d+\]\.external_capability_details\.provided_capabilities\.rows\[\d+\]\.capability_id$"),
+    re.compile(r"^\$\.runtime_view\.runtime_units\.rows\[\d+\]\.(unit_id|related_module_ids)$"),
+    re.compile(r"^\$\.configuration_data_dependencies\.configuration_items\.rows\[\d+\]\.config_id$"),
+    re.compile(r"^\$\.configuration_data_dependencies\.structural_data_artifacts\.rows\[\d+\]\.artifact_id$"),
+    re.compile(r"^\$\.configuration_data_dependencies\.dependencies\.rows\[\d+\]\.dependency_id$"),
+    re.compile(r"^\$\.cross_module_collaboration\.collaboration_scenarios\.rows\[\d+\]\.(collaboration_id|initiator_module_id|participant_module_ids)$"),
+    re.compile(r"^\$\.key_flows\.flow_index\.rows\[\d+\]\.(flow_id|participant_module_ids|participant_runtime_unit_ids)$"),
+    re.compile(r"^\$\.key_flows\.flows\[\d+\]\.(flow_id|related_module_ids|related_runtime_unit_ids)$"),
+    re.compile(r"^\$\.key_flows\.flows\[\d+\]\.steps\[\d+\]\.(step_id|related_module_ids|related_runtime_unit_ids)$"),
+    re.compile(r"^\$\.key_flows\.flows\[\d+\]\.branches_or_exceptions\[\d+\]\.(branch_id|related_module_ids|related_runtime_unit_ids)$"),
+    re.compile(r"^\$\.traceability\[\d+\]\.(id|source_external_id|target_id)$"),
+    re.compile(r"^\$\.(evidence|risks|assumptions|source_snippets)\[\d+\]\.id$"),
+    re.compile(r"^\$.*\.(?:extra_tables\[\d+\]|extra_diagrams\[\d+\]|.*diagram)\.id$"),
+]
+
+
+def is_registered_reference_field(path, field_name):
+    if field_name in SUPPORT_REF_FIELDS:
+        return True
+    return any(pattern.match(path) for pattern in REGISTERED_REFERENCE_PATHS)
+
+
+def walk(value, path="$"):
+    yield path, value
+    if isinstance(value, dict):
+        for key, child in value.items():
+            yield from walk(child, f"{path}.{key}")
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            yield from walk(child, f"{path}[{index}]")
+
+
+def is_diagram_object(value):
+    return isinstance(value, dict) and {"id", "kind", "diagram_type", "source"}.issubset(value)
+
+
+def is_extra_table_object(value):
+    return isinstance(value, dict) and {"id", "title", "columns", "rows"}.issubset(value)
+
+
 class ValidationContext:
     def __init__(self, document, report):
         self.document = document
         self.report = report
+        self.ids_by_kind = {kind: {} for kind in PREFIX_BY_KIND}
+        self.id_owner = {}
+        self.flow_index_ids = []
+        self.flow_index_paths = {}
+        self.traceability_targets = {}
 
     def build(self):
         pass
+        self._register_all_ids()
+        self._check_support_refs(self.document)
+        self._check_unregistered_id_fields(self.document)
+
+    def register(self, kind, value, path):
+        prefix = PREFIX_BY_KIND[kind]
+        if not isinstance(value, str) or not value.startswith(prefix):
+            self.report.error(path, f"ID must start with {prefix}", "Use the documented prefix; numeric suffixes are optional")
+            return
+        if value in self.id_owner:
+            first_kind, first_path = self.id_owner[value]
+            self.report.error(path, f"duplicate ID {value}", f"First defined as {first_kind} at {first_path}")
+            return
+        self.ids_by_kind[kind][value] = path
+        self.id_owner[value] = (kind, path)
+
+    def require_ref(self, kind, value, path, label=None):
+        if value not in self.ids_by_kind[kind]:
+            name = label or kind.replace("_", " ")
+            self.report.error(path, f"references unknown {name} ID {value}", "Define the target ID or correct the reference")
+
+    def register_flow_index_id(self, value, path):
+        prefix = PREFIX_BY_KIND["flow"]
+        if not isinstance(value, str) or not value.startswith(prefix):
+            self.report.error(path, f"ID must start with {prefix}", "Use the documented prefix; numeric suffixes are optional")
+            return
+        if value in self.flow_index_paths:
+            self.report.error(path, f"duplicate flow index ID {value}", f"First defined at {self.flow_index_paths[value]}")
+            return
+        self.flow_index_ids.append(value)
+        self.flow_index_paths[value] = path
+
+    def _register_all_ids(self):
+        doc = self.document
+        for i, row in enumerate(doc["architecture_views"]["module_intro"]["rows"]):
+            self.register("module", row["module_id"], f"$.architecture_views.module_intro.rows[{i}].module_id")
+        for i, item in enumerate(doc["system_overview"]["core_capabilities"]):
+            self.register("core_capability", item["capability_id"], f"$.system_overview.core_capabilities[{i}].capability_id")
+        for m_i, module in enumerate(doc["module_design"]["modules"]):
+            for c_i, row in enumerate(module["external_capability_details"]["provided_capabilities"]["rows"]):
+                self.register("provided_capability", row["capability_id"], f"$.module_design.modules[{m_i}].external_capability_details.provided_capabilities.rows[{c_i}].capability_id")
+        for i, row in enumerate(doc["runtime_view"]["runtime_units"]["rows"]):
+            self.register("runtime_unit", row["unit_id"], f"$.runtime_view.runtime_units.rows[{i}].unit_id")
+        for i, row in enumerate(doc["configuration_data_dependencies"]["configuration_items"]["rows"]):
+            self.register("configuration_item", row["config_id"], f"$.configuration_data_dependencies.configuration_items.rows[{i}].config_id")
+        for i, row in enumerate(doc["configuration_data_dependencies"]["structural_data_artifacts"]["rows"]):
+            self.register("data_artifact", row["artifact_id"], f"$.configuration_data_dependencies.structural_data_artifacts.rows[{i}].artifact_id")
+        for i, row in enumerate(doc["configuration_data_dependencies"]["dependencies"]["rows"]):
+            self.register("dependency", row["dependency_id"], f"$.configuration_data_dependencies.dependencies.rows[{i}].dependency_id")
+        for i, row in enumerate(doc["cross_module_collaboration"]["collaboration_scenarios"]["rows"]):
+            self.register("collaboration", row["collaboration_id"], f"$.cross_module_collaboration.collaboration_scenarios.rows[{i}].collaboration_id")
+        for i, row in enumerate(doc["key_flows"]["flow_index"]["rows"]):
+            self.register_flow_index_id(row["flow_id"], f"$.key_flows.flow_index.rows[{i}].flow_id")
+        for f_i, flow in enumerate(doc["key_flows"]["flows"]):
+            self.register("flow", flow["flow_id"], f"$.key_flows.flows[{f_i}].flow_id")
+            for s_i, step in enumerate(flow["steps"]):
+                self.register("flow_step", step["step_id"], f"$.key_flows.flows[{f_i}].steps[{s_i}].step_id")
+            for b_i, branch in enumerate(flow["branches_or_exceptions"]):
+                self.register("flow_branch", branch["branch_id"], f"$.key_flows.flows[{f_i}].branches_or_exceptions[{b_i}].branch_id")
+        for kind, collection_name in [("evidence", "evidence"), ("traceability", "traceability"), ("risk", "risks"), ("assumption", "assumptions"), ("source_snippet", "source_snippets")]:
+            for i, item in enumerate(doc[collection_name]):
+                self.register(kind, item["id"], f"$.{collection_name}[{i}].id")
+        for path, value in walk(doc):
+            if is_diagram_object(value):
+                self.register("diagram", value["id"], f"{path}.id")
+            elif is_extra_table_object(value):
+                self.register("extra_table", value["id"], f"{path}.id")
+
+    def _check_support_refs(self, value, path="$"):
+        if isinstance(value, dict):
+            for field_name, target_kind in SUPPORT_REF_FIELDS.items():
+                refs = value.get(field_name)
+                if isinstance(refs, list):
+                    for i, ref in enumerate(refs):
+                        self.require_ref(target_kind, ref, f"{path}.{field_name}[{i}]", target_kind.replace("_", " "))
+            for key, child in value.items():
+                self._check_support_refs(child, f"{path}.{key}")
+        elif isinstance(value, list):
+            for i, child in enumerate(value):
+                self._check_support_refs(child, f"{path}[{i}]")
+
+    def _check_unregistered_id_fields(self, value, path="$"):
+        if isinstance(value, dict):
+            for key, child in value.items():
+                child_path = f"{path}.{key}"
+                if (key.endswith("_id") or key.endswith("_ids")) and not is_registered_reference_field(child_path, key):
+                    self.report.error(f"{path}.{key}", "unregistered reference-like field", "Add the field to the schema and validator registry before using it")
+                self._check_unregistered_id_fields(child, child_path)
+        elif isinstance(value, list):
+            for i, child in enumerate(value):
+                self._check_unregistered_id_fields(child, f"{path}[{i}]")
 
 
 def is_blank(value):

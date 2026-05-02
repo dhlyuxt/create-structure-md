@@ -152,3 +152,129 @@ class DocumentValidationTests(unittest.TestCase):
         self.assertIn("$.document.title", completed.stderr)
         self.assertIn("schema validation failed", completed.stderr)
         self.assertNotIn("semantic validation failed", completed.stderr)
+
+
+class IdAndReferenceValidationTests(unittest.TestCase):
+    def test_semantic_failure_exits_one_after_schema_success(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["architecture_views"]["module_intro"]["rows"][0]["module_id"] = "BAD-MODULE"
+            path = write_json(tmpdir, "semantic-fail.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertEqual("", completed.stdout)
+        self.assertIn("ERROR", completed.stderr)
+        self.assertIn("$.architecture_views.module_intro.rows[0].module_id", completed.stderr)
+        self.assertIn("must start with MOD-", completed.stderr)
+
+    def test_invalid_id_prefix_fails_without_requiring_numeric_suffix(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["architecture_views"]["module_intro"]["rows"][0]["module_id"] = "MODULE-SKILL"
+            document["module_design"]["modules"][0]["module_id"] = "MODULE-SKILL"
+            document["runtime_view"]["runtime_units"]["rows"][0]["related_module_ids"] = ["MODULE-SKILL"]
+            document["key_flows"]["flow_index"]["rows"][0]["participant_module_ids"] = ["MODULE-SKILL"]
+            document["key_flows"]["flows"][0]["related_module_ids"] = ["MODULE-SKILL"]
+            document["key_flows"]["flows"][0]["steps"][0]["related_module_ids"] = ["MODULE-SKILL"]
+            path = write_json(tmpdir, "bad-prefix.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.architecture_views.module_intro.rows[0].module_id", completed.stderr)
+        self.assertIn("must start with MOD-", completed.stderr)
+
+    def test_duplicate_defining_ids_fail(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["evidence"] = [
+                {"id": "EV-DUP", "kind": "source", "title": "A", "location": "a", "description": "a", "confidence": "observed"},
+                {"id": "EV-DUP", "kind": "note", "title": "B", "location": "b", "description": "b", "confidence": "observed"},
+            ]
+            path = write_json(tmpdir, "duplicate.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.evidence[1].id", completed.stderr)
+        self.assertIn("duplicate ID", completed.stderr)
+
+    def test_non_numeric_suffix_id_passes_when_unique(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["architecture_views"]["module_intro"]["rows"][0]["module_id"] = "MOD-RENDER-ALPHA"
+            document["module_design"]["modules"][0]["module_id"] = "MOD-RENDER-ALPHA"
+            document["runtime_view"]["runtime_units"]["rows"][0]["related_module_ids"] = ["MOD-RENDER-ALPHA"]
+            document["key_flows"]["flow_index"]["rows"][0]["participant_module_ids"] = ["MOD-RENDER-ALPHA"]
+            document["key_flows"]["flows"][0]["related_module_ids"] = ["MOD-RENDER-ALPHA"]
+            document["key_flows"]["flows"][0]["steps"][0]["related_module_ids"] = ["MOD-RENDER-ALPHA"]
+            path = write_json(tmpdir, "non-numeric.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+
+    def test_matching_flow_index_and_detail_ids_are_not_duplicate_ids(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["key_flows"]["flow_index"]["rows"][0]["flow_id"] = "FLOW-GENERATE"
+            document["key_flows"]["flows"][0]["flow_id"] = "FLOW-GENERATE"
+            path = write_json(tmpdir, "paired-flow.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertNotIn("duplicate ID FLOW-GENERATE", completed.stderr)
+
+    def test_invalid_support_references_fail(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["architecture_views"]["module_intro"]["rows"][0]["evidence_refs"] = ["EV-MISSING"]
+            path = write_json(tmpdir, "bad-ref.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.architecture_views.module_intro.rows[0].evidence_refs[0]", completed.stderr)
+        self.assertIn("references unknown evidence ID EV-MISSING", completed.stderr)
+
+    def test_unregistered_id_field_fails(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["architecture_views"]["extra_tables"] = [
+                {
+                    "id": "TBL-ARCH-EXTRA",
+                    "title": "补充表",
+                    "columns": [{"key": "owner_module_id", "title": "归属模块"}],
+                    "rows": [{"owner_module_id": "MOD-SKILL"}],
+                }
+            ]
+            path = write_json(tmpdir, "unregistered-id.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.architecture_views.extra_tables[0].rows[0].owner_module_id", completed.stderr)
+        self.assertIn("unregistered reference-like field", completed.stderr)
+
+    def test_registered_reference_names_fail_when_used_at_unregistered_paths(self):
+        for field_name in ["module_id", "target_id", "related_module_ids"]:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                document = valid_document()
+                document["architecture_views"]["extra_tables"] = [
+                    {
+                        "id": "TBL-ARCH-EXTRA",
+                        "title": "补充表",
+                        "columns": [{"key": field_name, "title": "非法引用字段"}],
+                        "rows": [{field_name: "MOD-SKILL"}],
+                    }
+                ]
+                path = write_json(tmpdir, "path-sensitive-id.dsl.json", document)
+                completed = run_validator(path)
+            with self.subTest(field_name=field_name):
+                self.assertEqual(1, completed.returncode)
+                self.assertIn(f"$.architecture_views.extra_tables[0].rows[0].{field_name}", completed.stderr)
+                self.assertIn("unregistered reference-like field", completed.stderr)
+
+    def test_traceability_source_external_id_is_allowed_at_traceability_path(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["traceability"] = [{
+                "id": "TR-MODULE",
+                "source_external_id": "REQ-1",
+                "source_type": "requirement",
+                "target_type": "module",
+                "target_id": "MOD-SKILL",
+                "description": "需求映射到模块。",
+            }]
+            path = write_json(tmpdir, "source-external.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(0, completed.returncode, completed.stderr)
