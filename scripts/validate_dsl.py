@@ -49,6 +49,14 @@ ISO8601_LOCAL_RE = re.compile(
     r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:[+-]\d{2}:\d{2}|Z)?$"
 )
 
+HIGH_RISK_SNIPPET_PATTERNS = [
+    re.compile(r"AKIA[0-9A-Z]{16}"),
+    re.compile(r"(?i)(password|passwd|secret|token|api[_-]?key)\s*[:=]\s*['\"]?[^'\"\s]+"),
+    re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |)?PRIVATE KEY-----"),
+    re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),
+    re.compile(r"\b1[3-9]\d{9}\b"),
+]
+
 
 @dataclass(frozen=True)
 class ValidationIssue:
@@ -740,8 +748,60 @@ def check_unreferenced_evidence(document, context):
             )
 
 
+def content_line_count(content):
+    if content == "":
+        return 0
+    return len(content.splitlines())
+
+
 def check_source_snippets(document, context, *, allow_long_snippets):
-    pass
+    referenced = set()
+    for _path, value in walk(document):
+        if isinstance(value, dict):
+            referenced.update(value.get("source_snippet_refs", []))
+
+    for i, snippet in enumerate(document["source_snippets"]):
+        base = f"$.source_snippets[{i}]"
+        if snippet["line_end"] < snippet["line_start"]:
+            context.report.error(
+                f"{base}.line_end",
+                "must be greater than or equal to line_start",
+                "Use a positive inclusive line range",
+            )
+        line_count = content_line_count(snippet["content"])
+        if line_count > 50:
+            if allow_long_snippets:
+                context.report.warn(
+                    f"{base}.content",
+                    "source snippet is longer than 50 lines",
+                    "Keep only necessary evidence when possible",
+                )
+            else:
+                context.report.error(
+                    f"{base}.content",
+                    "source snippet is longer than 50 lines",
+                    "Pass --allow-long-snippets only when the long evidence is intentional",
+                )
+        elif line_count > 20:
+            context.report.warn(
+                f"{base}.content",
+                "source snippet is longer than 20 lines",
+                "Shorter snippets are easier to review",
+            )
+        if snippet["id"] not in referenced:
+            context.report.error(
+                f"{base}.id",
+                f"unreferenced source snippet {snippet['id']}",
+                "Reference it from source_snippet_refs or remove it from the DSL",
+            )
+        for pattern in HIGH_RISK_SNIPPET_PATTERNS:
+            if pattern.search(snippet["content"]):
+                context.report.error(
+                    f"{base}.content",
+                    "contains high-risk secret or personal data pattern",
+                    "Redact the snippet before validation",
+                )
+                break
 
 
 def check_markdown_safety(document, context):

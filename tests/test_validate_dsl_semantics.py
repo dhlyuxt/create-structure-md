@@ -764,3 +764,117 @@ class ExtraTableAndTraceabilityTests(unittest.TestCase):
         self.assertIn("WARNING", completed.stdout)
         self.assertIn("$.evidence[0].id", completed.stdout)
         self.assertIn("unreferenced evidence", completed.stdout)
+
+
+class SourceSnippetValidationTests(unittest.TestCase):
+    def test_line_range_must_be_valid(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["source_snippets"] = [{
+                "id": "SNIP-BAD-RANGE",
+                "path": "scripts/validate_dsl.py",
+                "line_start": 10,
+                "line_end": 5,
+                "language": "python",
+                "purpose": "错误范围",
+                "content": "line\n",
+                "confidence": "observed",
+            }]
+            document["module_design"]["modules"][0]["source_snippet_refs"] = ["SNIP-BAD-RANGE"]
+            path = write_json(tmpdir, "snippet-range.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.source_snippets[0].line_end", completed.stderr)
+        self.assertIn("must be greater than or equal to line_start", completed.stderr)
+
+    def test_unreferenced_source_snippet_fails(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["source_snippets"] = [{
+                "id": "SNIP-UNUSED",
+                "path": "scripts/validate_dsl.py",
+                "line_start": 1,
+                "line_end": 1,
+                "language": "python",
+                "purpose": "未引用",
+                "content": "print('x')\n",
+                "confidence": "observed",
+            }]
+            path = write_json(tmpdir, "snippet-unused.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.source_snippets[0].id", completed.stderr)
+        self.assertIn("unreferenced source snippet", completed.stderr)
+
+    def test_snippet_longer_than_twenty_warns_and_longer_than_fifty_fails_by_default(self):
+        content_25 = "\n".join(f"line {i}" for i in range(25))
+        content_55 = "\n".join(f"line {i}" for i in range(55))
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["source_snippets"] = [{
+                "id": "SNIP-LONG-WARN",
+                "path": "a.py",
+                "line_start": 1,
+                "line_end": 25,
+                "language": "python",
+                "purpose": "稍长片段",
+                "content": content_25,
+                "confidence": "observed",
+            }]
+            document["module_design"]["modules"][0]["source_snippet_refs"] = ["SNIP-LONG-WARN"]
+            path = write_json(tmpdir, "snippet-25.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertIn("WARNING", completed.stdout)
+        self.assertIn("longer than 20 lines", completed.stdout)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["source_snippets"] = [{
+                "id": "SNIP-LONG-FAIL",
+                "path": "a.py",
+                "line_start": 1,
+                "line_end": 55,
+                "language": "python",
+                "purpose": "过长片段",
+                "content": content_55,
+                "confidence": "observed",
+            }]
+            document["module_design"]["modules"][0]["source_snippet_refs"] = ["SNIP-LONG-FAIL"]
+            path = write_json(tmpdir, "snippet-55.dsl.json", document)
+            completed = run_validator(path)
+            allowed_completed = run_validator(path, "--allow-long-snippets")
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("longer than 50 lines", completed.stderr)
+
+        self.assertEqual(0, allowed_completed.returncode, allowed_completed.stderr)
+        self.assertIn("longer than 50 lines", allowed_completed.stdout)
+
+    def test_secret_and_personal_data_patterns_fail(self):
+        cases = [
+            "AWS_SECRET_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE",
+            "password = \"super-secret\"",
+            "-----BEGIN PRIVATE KEY-----",
+            "email: person@example.com",
+            "phone: 13800138000",
+        ]
+        for content in cases:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                document = valid_document()
+                document["source_snippets"] = [{
+                    "id": "SNIP-SECRET",
+                    "path": "secret.txt",
+                    "line_start": 1,
+                    "line_end": 1,
+                    "language": "text",
+                    "purpose": "敏感内容",
+                    "content": content,
+                    "confidence": "observed",
+                }]
+                document["module_design"]["modules"][0]["source_snippet_refs"] = ["SNIP-SECRET"]
+                path = write_json(tmpdir, "snippet-secret.dsl.json", document)
+                completed = run_validator(path)
+            with self.subTest(content=content):
+                self.assertEqual(1, completed.returncode)
+                self.assertIn("$.source_snippets[0].content", completed.stderr)
+                self.assertIn("high-risk secret or personal data pattern", completed.stderr)
