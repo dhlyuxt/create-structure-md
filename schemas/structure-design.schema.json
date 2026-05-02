@@ -22,7 +22,7 @@
   ],
   "properties": {
     "dsl_version": {
-      "type": "string"
+      "$ref": "#/$defs/nonEmptyString"
     },
     "document": {
       "$ref": "#/$defs/document"

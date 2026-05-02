@@ -267,6 +267,17 @@ class SchemaRootContractTests(unittest.TestCase):
     def test_fixture_passes_root_shell_validation(self):
         validator().validate(valid_example())
 
+    def test_dsl_version_must_be_non_empty(self):
+        document = valid_example()
+        document["dsl_version"] = ""
+        assert_invalid(
+            self,
+            document,
+            "should be non-empty",
+            expected_validator="minLength",
+            expected_path=["dsl_version"],
+        )
+
     def test_unknown_top_level_field_fails(self):
         document = valid_example()
         document["required_tables"] = []
