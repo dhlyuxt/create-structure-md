@@ -508,11 +508,104 @@ def check_chapter_6(document, context):
 
 
 def check_chapter_7(document, context):
-    pass
+    collaboration = document["cross_module_collaboration"]
+    module_count = len(document["architecture_views"]["module_intro"]["rows"])
+    is_multi_module = module_count > 1
+    rows = collaboration["collaboration_scenarios"]["rows"]
+    diagram = collaboration.get("collaboration_relationship_diagram")
+
+    if is_multi_module:
+        require_non_empty(context.report, "$.cross_module_collaboration.summary", collaboration["summary"], "chapter 7 summary")
+        require_non_empty_list(context.report, "$.cross_module_collaboration.collaboration_scenarios.rows", rows, "collaboration scenarios")
+        if not isinstance(diagram, dict):
+            context.report.error(
+                "$.cross_module_collaboration.collaboration_relationship_diagram",
+                "collaboration relationship diagram must be present for multi-module documents",
+                "Show how the documented modules collaborate",
+            )
+        else:
+            diagram_source_required(context.report, "$.cross_module_collaboration.collaboration_relationship_diagram", diagram, "collaboration relationship diagram")
+
+    for i, row in enumerate(rows):
+        base = f"$.cross_module_collaboration.collaboration_scenarios.rows[{i}]"
+        context.require_ref("module", row["initiator_module_id"], f"{base}.initiator_module_id", "module")
+        for ref_i, module_id in enumerate(row["participant_module_ids"]):
+            context.require_ref("module", module_id, f"{base}.participant_module_ids[{ref_i}]", "module")
+        if is_multi_module:
+            involved_module_ids = {row["initiator_module_id"], *row["participant_module_ids"]}
+            if len(involved_module_ids) < 2:
+                context.report.error(
+                    base,
+                    "collaboration scenario must involve at least two distinct modules",
+                    "Use chapter 7 for cross-module collaboration, or keep it empty for a single-module document",
+                )
 
 
 def check_chapter_8(document, context):
-    pass
+    key_flows = document["key_flows"]
+    require_non_empty(context.report, "$.key_flows.summary", key_flows["summary"], "chapter 8 summary")
+
+    flow_index_rows = key_flows["flow_index"]["rows"]
+    flows = key_flows["flows"]
+    require_non_empty_list(context.report, "$.key_flows.flow_index.rows", flow_index_rows, "flow index rows")
+
+    index_ids = [row["flow_id"] for row in flow_index_rows]
+    detail_ids = [flow["flow_id"] for flow in flows]
+    if sorted(index_ids) != sorted(detail_ids) or len(index_ids) != len(detail_ids):
+        context.report.error(
+            "$.key_flows",
+            "flow_index rows and flow details must match one-to-one",
+            "Create exactly one flow detail for each flow_index row using the same flow_id",
+        )
+
+    for i, row in enumerate(flow_index_rows):
+        base = f"$.key_flows.flow_index.rows[{i}]"
+        participant_module_ids = row["participant_module_ids"]
+        participant_runtime_unit_ids = row["participant_runtime_unit_ids"]
+        if not participant_module_ids and not participant_runtime_unit_ids:
+            context.report.error(
+                base,
+                "flow index row must have at least one participant",
+                "Add a participant_module_ids or participant_runtime_unit_ids reference",
+            )
+        for ref_i, module_id in enumerate(participant_module_ids):
+            context.require_ref("module", module_id, f"{base}.participant_module_ids[{ref_i}]", "module")
+        for ref_i, runtime_unit_id in enumerate(participant_runtime_unit_ids):
+            context.require_ref("runtime_unit", runtime_unit_id, f"{base}.participant_runtime_unit_ids[{ref_i}]", "runtime unit")
+
+    for f_i, flow in enumerate(flows):
+        base = f"$.key_flows.flows[{f_i}]"
+        require_non_empty_list(context.report, f"{base}.steps", flow["steps"], "flow steps")
+        diagram_source_required(context.report, f"{base}.diagram", flow["diagram"], "key flow diagram")
+
+        for ref_i, module_id in enumerate(flow["related_module_ids"]):
+            context.require_ref("module", module_id, f"{base}.related_module_ids[{ref_i}]", "module")
+        for ref_i, runtime_unit_id in enumerate(flow["related_runtime_unit_ids"]):
+            context.require_ref("runtime_unit", runtime_unit_id, f"{base}.related_runtime_unit_ids[{ref_i}]", "runtime unit")
+
+        seen_orders = set()
+        for s_i, step in enumerate(flow["steps"]):
+            step_base = f"{base}.steps[{s_i}]"
+            order = step["order"]
+            if order in seen_orders:
+                context.report.error(
+                    base,
+                    "step order values must be unique",
+                    "Give each step in this flow a distinct order value",
+                )
+                break
+            seen_orders.add(order)
+            for ref_i, module_id in enumerate(step["related_module_ids"]):
+                context.require_ref("module", module_id, f"{step_base}.related_module_ids[{ref_i}]", "module")
+            for ref_i, runtime_unit_id in enumerate(step["related_runtime_unit_ids"]):
+                context.require_ref("runtime_unit", runtime_unit_id, f"{step_base}.related_runtime_unit_ids[{ref_i}]", "runtime unit")
+
+        for b_i, branch in enumerate(flow["branches_or_exceptions"]):
+            branch_base = f"{base}.branches_or_exceptions[{b_i}]"
+            for ref_i, module_id in enumerate(branch["related_module_ids"]):
+                context.require_ref("module", module_id, f"{branch_base}.related_module_ids[{ref_i}]", "module")
+            for ref_i, runtime_unit_id in enumerate(branch["related_runtime_unit_ids"]):
+                context.require_ref("runtime_unit", runtime_unit_id, f"{branch_base}.related_runtime_unit_ids[{ref_i}]", "runtime unit")
 
 
 def check_chapter_9(document, context):

@@ -435,3 +435,170 @@ class ChapterTwoThroughSixTests(unittest.TestCase):
         self.assertEqual(1, completed.returncode)
         self.assertIn("$.runtime_view.runtime_sequence_diagram.source", completed.stderr)
         self.assertIn("must use sequenceDiagram", completed.stderr)
+
+
+class ChapterSevenAndEightTests(unittest.TestCase):
+    def make_two_module_document(self):
+        document = valid_document()
+        document["architecture_views"]["module_intro"]["rows"].append({
+            "module_id": "MOD-RENDER",
+            "module_name": "渲染模块",
+            "responsibility": "生成 Markdown。",
+            "inputs": "DSL",
+            "outputs": "Markdown",
+            "notes": "",
+            "confidence": "observed",
+            "evidence_refs": [],
+            "traceability_refs": [],
+            "source_snippet_refs": [],
+        })
+        second = deepcopy(document["module_design"]["modules"][0])
+        second["module_id"] = "MOD-RENDER"
+        second["name"] = "渲染模块"
+        second["external_capability_details"]["provided_capabilities"]["rows"][0]["capability_id"] = "CAP-RENDER"
+        second["internal_structure"]["diagram"]["id"] = "MER-MOD-RENDER-STRUCT"
+        document["module_design"]["modules"].append(second)
+        document["architecture_views"]["module_relationship_diagram"]["source"] += "\n  MOD-SKILL --> MOD-RENDER"
+        return document
+
+    def test_single_module_chapter_7_allows_empty_collaboration(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["cross_module_collaboration"]["summary"] = ""
+            document["cross_module_collaboration"]["collaboration_scenarios"]["rows"] = []
+            document["cross_module_collaboration"].pop("collaboration_relationship_diagram", None)
+            path = write_json(tmpdir, "single-module.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+
+    def test_single_module_chapter_7_allows_empty_full_diagram_object(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["cross_module_collaboration"]["summary"] = ""
+            document["cross_module_collaboration"]["collaboration_scenarios"]["rows"] = []
+            document["cross_module_collaboration"]["collaboration_relationship_diagram"] = {
+                "id": "MER-COLLAB-EMPTY",
+                "kind": "collaboration_relationship",
+                "title": "空协作图",
+                "diagram_type": "flowchart",
+                "description": "单模块模式允许协作图为空。",
+                "source": "",
+                "confidence": "observed",
+            }
+            path = write_json(tmpdir, "single-empty-diagram.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+
+    def test_multi_module_chapter_7_requires_summary_rows_and_diagram(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = self.make_two_module_document()
+            document["cross_module_collaboration"]["summary"] = ""
+            document["cross_module_collaboration"]["collaboration_scenarios"]["rows"] = []
+            document["cross_module_collaboration"].pop("collaboration_relationship_diagram", None)
+            path = write_json(tmpdir, "multi-empty.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.cross_module_collaboration.summary", completed.stderr)
+        self.assertIn("$.cross_module_collaboration.collaboration_scenarios.rows", completed.stderr)
+        self.assertIn("$.cross_module_collaboration.collaboration_relationship_diagram", completed.stderr)
+
+    def test_single_module_chapter_7_validates_provided_content(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["cross_module_collaboration"]["collaboration_scenarios"]["rows"] = [{
+                "collaboration_id": "COL-BAD-REF",
+                "scenario": "可选协作内容",
+                "initiator_module_id": "MOD-MISSING",
+                "participant_module_ids": ["MOD-SKILL"],
+                "collaboration_method": "调用",
+                "description": "单模块模式中提供的内容仍需校验引用。",
+                "confidence": "observed",
+                "evidence_refs": [],
+                "traceability_refs": [],
+                "source_snippet_refs": [],
+            }]
+            path = write_json(tmpdir, "single-invalid-collab.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.cross_module_collaboration.collaboration_scenarios.rows[0].initiator_module_id", completed.stderr)
+        self.assertNotIn("$.cross_module_collaboration.collaboration_relationship_diagram.source", completed.stderr)
+
+    def test_multi_module_collaboration_must_involve_two_distinct_modules(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = self.make_two_module_document()
+            document["cross_module_collaboration"]["summary"] = "模块协作。"
+            document["cross_module_collaboration"]["collaboration_scenarios"]["rows"] = [{
+                "collaboration_id": "COL-ONE",
+                "scenario": "单模块自调用",
+                "initiator_module_id": "MOD-SKILL",
+                "participant_module_ids": ["MOD-SKILL"],
+                "collaboration_method": "调用",
+                "description": "只有一个模块。",
+                "confidence": "observed",
+                "evidence_refs": [],
+                "traceability_refs": [],
+                "source_snippet_refs": [],
+            }]
+            document["cross_module_collaboration"]["collaboration_relationship_diagram"] = {
+                "id": "MER-COLLAB-TWO",
+                "kind": "collaboration_relationship",
+                "title": "协作图",
+                "diagram_type": "flowchart",
+                "description": "协作",
+                "source": "flowchart TD\n  MOD-SKILL --> MOD-RENDER",
+                "confidence": "observed",
+            }
+            path = write_json(tmpdir, "collab-one.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.cross_module_collaboration.collaboration_scenarios.rows[0]", completed.stderr)
+        self.assertIn("at least two distinct modules", completed.stderr)
+
+    def test_flow_index_and_detail_must_match_one_to_one(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["key_flows"]["flows"][0]["flow_id"] = "FLOW-DETAIL-ONLY"
+            path = write_json(tmpdir, "flow-mismatch.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.key_flows", completed.stderr)
+        self.assertIn("flow_index rows and flow details must match one-to-one", completed.stderr)
+
+    def test_flow_participants_and_steps_have_reference_and_uniqueness_rules(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["key_flows"]["flow_index"]["rows"][0]["participant_module_ids"] = []
+            document["key_flows"]["flow_index"]["rows"][0]["participant_runtime_unit_ids"] = []
+            document["key_flows"]["flows"][0]["steps"].append(deepcopy(document["key_flows"]["flows"][0]["steps"][0]))
+            document["key_flows"]["flows"][0]["steps"][1]["order"] = 1
+            document["key_flows"]["flows"][0]["branches_or_exceptions"] = [
+                {
+                    "branch_id": "BR-DUP",
+                    "condition": "条件 A",
+                    "handling": "处理 A",
+                    "related_module_ids": ["MOD-SKILL"],
+                    "related_runtime_unit_ids": ["RUN-GENERATE"],
+                    "confidence": "observed",
+                    "evidence_refs": [],
+                    "traceability_refs": [],
+                    "source_snippet_refs": [],
+                },
+                {
+                    "branch_id": "BR-DUP",
+                    "condition": "条件 B",
+                    "handling": "处理 B",
+                    "related_module_ids": ["MOD-SKILL"],
+                    "related_runtime_unit_ids": ["RUN-GENERATE"],
+                    "confidence": "observed",
+                    "evidence_refs": [],
+                    "traceability_refs": [],
+                    "source_snippet_refs": [],
+                },
+            ]
+            path = write_json(tmpdir, "flow-rules.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.key_flows.flow_index.rows[0]", completed.stderr)
+        self.assertIn("must have at least one participant", completed.stderr)
+        self.assertIn("duplicate ID", completed.stderr)
+        self.assertIn("step order values must be unique", completed.stderr)
