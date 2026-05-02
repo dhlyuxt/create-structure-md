@@ -44,11 +44,6 @@ JSON_SCAFFOLD_FILES = [
 
 SCRIPT_CASES = [
     (
-        "scripts/validate_dsl.py",
-        ["structure.dsl.json"],
-        "DSL validation is not implemented in Phase 1",
-    ),
-    (
         "scripts/validate_mermaid.py",
         ["--from-dsl", "structure.dsl.json", "--strict"],
         "Mermaid validation is not implemented in Phase 1",
@@ -224,6 +219,20 @@ class ScriptStubTests(unittest.TestCase):
                 combined_output = completed.stdout + completed.stderr
                 for forbidden in forbidden_success_messages:
                     self.assertNotIn(forbidden, combined_output)
+
+
+class ValidateDslCliTests(unittest.TestCase):
+    def test_validate_dsl_cli_accepts_valid_fixture(self):
+        completed = subprocess.run(
+            [sys.executable, str(ROOT / "scripts/validate_dsl.py"), str(ROOT / "tests/fixtures/valid-phase2.dsl.json")],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertIn("Validation succeeded", completed.stdout)
+        self.assertEqual("", completed.stderr)
 
 
 class SchemaRootContractTests(unittest.TestCase):
