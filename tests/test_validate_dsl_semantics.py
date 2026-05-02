@@ -338,3 +338,100 @@ class IdAndReferenceValidationTests(unittest.TestCase):
             path = write_json(tmpdir, "source-external.dsl.json", document)
             completed = run_validator(path)
         self.assertEqual(0, completed.returncode, completed.stderr)
+
+
+class ChapterTwoThroughSixTests(unittest.TestCase):
+    def test_chapter_three_module_rows_must_be_non_empty_and_diagram_mentions_warn(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["architecture_views"]["module_intro"]["rows"] = []
+            path = write_json(tmpdir, "no-modules.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.architecture_views.module_intro.rows", completed.stderr)
+        self.assertIn("must contain at least one module", completed.stderr)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["architecture_views"]["module_relationship_diagram"]["source"] = "flowchart TD\n  A --> B"
+            path = write_json(tmpdir, "diagram-warn.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertIn("WARNING", completed.stdout)
+        self.assertIn("does not mention module MOD-SKILL", completed.stdout)
+
+    def test_chapter_four_modules_match_chapter_three_one_to_one(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["module_design"]["modules"][0]["module_id"] = "MOD-OTHER"
+            path = write_json(tmpdir, "module-mismatch.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.module_design.modules", completed.stderr)
+        self.assertIn("must match chapter 3 modules one-to-one", completed.stderr)
+
+    def test_internal_structure_requires_diagram_source_or_text(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            internal = document["module_design"]["modules"][0]["internal_structure"]
+            internal["diagram"]["source"] = ""
+            internal["textual_structure"] = ""
+            internal["not_applicable_reason"] = "使用文字说明"
+            path = write_json(tmpdir, "internal-empty.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.module_design.modules[0].internal_structure", completed.stderr)
+        self.assertIn("requires diagram source or textual_structure", completed.stderr)
+
+    def test_runtime_entrypoint_and_related_modules_empty_reasons(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            unit = document["runtime_view"]["runtime_units"]["rows"][0]
+            unit["entrypoint"] = ""
+            unit["entrypoint_not_applicable_reason"] = ""
+            unit["related_module_ids"] = []
+            unit["external_environment_reason"] = ""
+            path = write_json(tmpdir, "runtime-reasons.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.runtime_view.runtime_units.rows[0].entrypoint_not_applicable_reason", completed.stderr)
+        self.assertIn("$.runtime_view.runtime_units.rows[0].external_environment_reason", completed.stderr)
+
+    def test_required_diagrams_and_optional_extra_diagrams_need_source(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["runtime_view"]["runtime_flow_diagram"]["source"] = ""
+            document["architecture_views"]["extra_diagrams"] = [
+                {
+                    "id": "MER-ARCH-EMPTY",
+                    "kind": "extra",
+                    "title": "空图",
+                    "diagram_type": "flowchart",
+                    "description": "补充图",
+                    "source": "",
+                    "confidence": "observed",
+                }
+            ]
+            path = write_json(tmpdir, "diagrams-empty.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.runtime_view.runtime_flow_diagram.source", completed.stderr)
+        self.assertIn("$.architecture_views.extra_diagrams[0].source", completed.stderr)
+
+    def test_runtime_sequence_diagram_must_use_sequence_diagram_when_present(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["runtime_view"]["runtime_sequence_diagram"] = {
+                "id": "MER-RUNTIME-SEQ",
+                "kind": "runtime_sequence",
+                "title": "运行时序列图",
+                "diagram_type": "flowchart",
+                "description": "错误类型",
+                "source": "flowchart TD\n  A --> B",
+                "confidence": "observed",
+            }
+            path = write_json(tmpdir, "runtime-sequence.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.runtime_view.runtime_sequence_diagram.source", completed.stderr)
+        self.assertIn("must use sequenceDiagram", completed.stderr)

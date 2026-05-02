@@ -404,7 +404,126 @@ def validate_document_fields(document, report):
 
 
 def check_chapter_rules(document, context):
+    check_chapter_2(document, context)
+    check_chapter_3(document, context)
+    check_chapter_4(document, context)
+    check_chapter_5(document, context)
+    check_chapter_6(document, context)
+    check_chapter_7(document, context)
+    check_chapter_8(document, context)
+    check_chapter_9(document, context)
+    check_all_extra_diagrams(document, context)
+
+
+def require_non_empty(report, path, value, label):
+    if is_blank(value):
+        report.error(path, f"{label} must be non-empty", "Revise the structured design content")
+
+
+def require_non_empty_list(report, path, value, label):
+    if not isinstance(value, list) or len(value) == 0:
+        report.error(path, f"{label} must contain at least one item", "Provide real content or use the documented empty representation only when allowed")
+
+
+def diagram_source_required(report, path, diagram, label):
+    if is_blank(diagram.get("source", "")):
+        report.error(f"{path}.source", f"{label} source must be non-empty", "Mermaid syntax is checked by validate_mermaid.py; this validator only requires content")
+
+
+def check_chapter_2(document, context):
+    overview = document["system_overview"]
+    require_non_empty(context.report, "$.system_overview.summary", overview["summary"], "chapter 2 summary")
+    require_non_empty(context.report, "$.system_overview.purpose", overview["purpose"], "chapter 2 purpose")
+    for i, capability in enumerate(overview["core_capabilities"]):
+        base = f"$.system_overview.core_capabilities[{i}]"
+        require_non_empty(context.report, f"{base}.capability_id", capability["capability_id"], "core capability ID")
+        require_non_empty(context.report, f"{base}.name", capability["name"], "core capability name")
+        require_non_empty(context.report, f"{base}.description", capability["description"], "core capability description")
+
+
+def check_chapter_3(document, context):
+    arch = document["architecture_views"]
+    require_non_empty(context.report, "$.architecture_views.summary", arch["summary"], "chapter 3 summary")
+    rows = arch["module_intro"]["rows"]
+    if not rows:
+        context.report.error("$.architecture_views.module_intro.rows", "must contain at least one module", "Chapter 3 defines canonical module IDs")
+    diagram_source_required(context.report, "$.architecture_views.module_relationship_diagram", arch["module_relationship_diagram"], "module relationship diagram")
+    source = arch["module_relationship_diagram"].get("source", "")
+    for i, row in enumerate(rows):
+        base = f"$.architecture_views.module_intro.rows[{i}]"
+        for field_name in ["module_id", "module_name", "responsibility"]:
+            require_non_empty(context.report, f"{base}.{field_name}", row[field_name], field_name)
+        if row["module_id"] not in source and row["module_name"] not in source:
+            context.report.warn(f"{base}.module_id", f"module relationship diagram does not mention module {row['module_id']} or {row['module_name']}", "Mention the module ID or name in the diagram source")
+
+
+def check_chapter_4(document, context):
+    module_ids = [row["module_id"] for row in document["architecture_views"]["module_intro"]["rows"]]
+    design_modules = document["module_design"]["modules"]
+    design_ids = [item["module_id"] for item in design_modules]
+    require_non_empty(context.report, "$.module_design.summary", document["module_design"]["summary"], "chapter 4 summary")
+    if sorted(module_ids) != sorted(design_ids) or len(module_ids) != len(design_ids):
+        context.report.error("$.module_design.modules", "must match chapter 3 modules one-to-one", "Create exactly one module design entry for each chapter 3 module")
+    for i, module in enumerate(design_modules):
+        base = f"$.module_design.modules[{i}]"
+        context.require_ref("module", module["module_id"], f"{base}.module_id", "module")
+        require_non_empty_list(context.report, f"{base}.responsibilities", module["responsibilities"], "module responsibilities")
+        require_non_empty(context.report, f"{base}.external_capability_summary.description", module["external_capability_summary"]["description"], "external capability summary description")
+        rows = module["external_capability_details"]["provided_capabilities"]["rows"]
+        require_non_empty_list(context.report, f"{base}.external_capability_details.provided_capabilities.rows", rows, "provided capability rows")
+        internal = module["internal_structure"]
+        if is_blank(internal["diagram"].get("source", "")) and is_blank(internal["textual_structure"]):
+            context.report.error(f"{base}.internal_structure", "requires diagram source or textual_structure", "not_applicable_reason alone does not satisfy the internal structure rule")
+
+
+def check_chapter_5(document, context):
+    runtime = document["runtime_view"]
+    require_non_empty(context.report, "$.runtime_view.summary", runtime["summary"], "chapter 5 summary")
+    units = runtime["runtime_units"]["rows"]
+    require_non_empty_list(context.report, "$.runtime_view.runtime_units.rows", units, "runtime units")
+    for i, unit in enumerate(units):
+        base = f"$.runtime_view.runtime_units.rows[{i}]"
+        for ref_i, module_id in enumerate(unit["related_module_ids"]):
+            context.require_ref("module", module_id, f"{base}.related_module_ids[{ref_i}]", "module")
+        if is_blank(unit["entrypoint"]):
+            require_non_empty(context.report, f"{base}.entrypoint_not_applicable_reason", unit["entrypoint_not_applicable_reason"], "entrypoint_not_applicable_reason")
+        if not unit["related_module_ids"]:
+            require_non_empty(context.report, f"{base}.external_environment_reason", unit["external_environment_reason"], "external_environment_reason")
+    diagram_source_required(context.report, "$.runtime_view.runtime_flow_diagram", runtime["runtime_flow_diagram"], "runtime flow diagram")
+    sequence = runtime.get("runtime_sequence_diagram")
+    if sequence and not is_blank(sequence.get("source", "")) and not sequence["source"].lstrip().startswith("sequenceDiagram"):
+        context.report.error("$.runtime_view.runtime_sequence_diagram.source", "must use sequenceDiagram", "Mermaid syntax remains the responsibility of validate_mermaid.py")
+
+
+def check_chapter_6(document, context):
+    for table_name, id_field, required_fields in [
+        ("configuration_items", "config_id", ["config_id", "config_name", "purpose"]),
+        ("structural_data_artifacts", "artifact_id", ["artifact_id", "artifact_name", "artifact_type", "owner"]),
+        ("dependencies", "dependency_id", ["dependency_id", "dependency_name", "dependency_type", "purpose"]),
+    ]:
+        for i, row in enumerate(document["configuration_data_dependencies"][table_name]["rows"]):
+            base = f"$.configuration_data_dependencies.{table_name}.rows[{i}]"
+            for field_name in required_fields:
+                require_non_empty(context.report, f"{base}.{field_name}", row[field_name], field_name)
+
+
+def check_chapter_7(document, context):
     pass
+
+
+def check_chapter_8(document, context):
+    pass
+
+
+def check_chapter_9(document, context):
+    pass
+
+
+def check_all_extra_diagrams(document, context):
+    for path, value in walk(document):
+        if path.endswith(".extra_diagrams") and isinstance(value, list):
+            for i, diagram in enumerate(value):
+                diagram_source_required(context.report, f"{path}[{i}]", diagram, "extra diagram")
 
 
 def check_source_snippets(document, context, *, allow_long_snippets):
