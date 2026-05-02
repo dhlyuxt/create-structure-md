@@ -163,9 +163,25 @@ REGISTERED_REFERENCE_PATHS = [
     re.compile(r"^\$\.key_flows\.flows\[\d+\]\.(flow_id|related_module_ids|related_runtime_unit_ids)$"),
     re.compile(r"^\$\.key_flows\.flows\[\d+\]\.steps\[\d+\]\.(step_id|related_module_ids|related_runtime_unit_ids)$"),
     re.compile(r"^\$\.key_flows\.flows\[\d+\]\.branches_or_exceptions\[\d+\]\.(branch_id|related_module_ids|related_runtime_unit_ids)$"),
+    # traceability.target_id resolution depends on target_type and is deferred to Task 6.
     re.compile(r"^\$\.traceability\[\d+\]\.(id|source_external_id|target_id)$"),
     re.compile(r"^\$\.(evidence|risks|assumptions|source_snippets)\[\d+\]\.id$"),
     re.compile(r"^\$.*\.(?:extra_tables\[\d+\]|extra_diagrams\[\d+\]|.*diagram)\.id$"),
+]
+
+REFERENCE_FIELD_RULES = [
+    (re.compile(r"^\$\.module_design\.modules\[\d+\]\.module_id$"), "module", False, "module"),
+    (re.compile(r"^\$\.runtime_view\.runtime_units\.rows\[\d+\]\.related_module_ids$"), "module", True, "module"),
+    (re.compile(r"^\$\.cross_module_collaboration\.collaboration_scenarios\.rows\[\d+\]\.initiator_module_id$"), "module", False, "module"),
+    (re.compile(r"^\$\.cross_module_collaboration\.collaboration_scenarios\.rows\[\d+\]\.participant_module_ids$"), "module", True, "module"),
+    (re.compile(r"^\$\.key_flows\.flow_index\.rows\[\d+\]\.participant_module_ids$"), "module", True, "module"),
+    (re.compile(r"^\$\.key_flows\.flow_index\.rows\[\d+\]\.participant_runtime_unit_ids$"), "runtime_unit", True, "runtime unit"),
+    (re.compile(r"^\$\.key_flows\.flows\[\d+\]\.related_module_ids$"), "module", True, "module"),
+    (re.compile(r"^\$\.key_flows\.flows\[\d+\]\.related_runtime_unit_ids$"), "runtime_unit", True, "runtime unit"),
+    (re.compile(r"^\$\.key_flows\.flows\[\d+\]\.steps\[\d+\]\.related_module_ids$"), "module", True, "module"),
+    (re.compile(r"^\$\.key_flows\.flows\[\d+\]\.steps\[\d+\]\.related_runtime_unit_ids$"), "runtime_unit", True, "runtime unit"),
+    (re.compile(r"^\$\.key_flows\.flows\[\d+\]\.branches_or_exceptions\[\d+\]\.related_module_ids$"), "module", True, "module"),
+    (re.compile(r"^\$\.key_flows\.flows\[\d+\]\.branches_or_exceptions\[\d+\]\.related_runtime_unit_ids$"), "runtime_unit", True, "runtime unit"),
 ]
 
 
@@ -193,6 +209,18 @@ def is_extra_table_object(value):
     return isinstance(value, dict) and {"id", "title", "columns", "rows"}.issubset(value)
 
 
+def is_diagram_registration_path(path):
+    return (
+        path.endswith("_diagram")
+        or path.endswith(".diagram")
+        or ".extra_diagrams[" in path
+    ) and ".rows[" not in path
+
+
+def is_extra_table_registration_path(path):
+    return ".extra_tables[" in path and ".rows[" not in path
+
+
 class ValidationContext:
     def __init__(self, document, report):
         self.document = document
@@ -204,8 +232,8 @@ class ValidationContext:
         self.traceability_targets = {}
 
     def build(self):
-        pass
         self._register_all_ids()
+        self._check_registered_references()
         self._check_support_refs(self.document)
         self._check_unregistered_id_fields(self.document)
 
@@ -268,10 +296,22 @@ class ValidationContext:
             for i, item in enumerate(doc[collection_name]):
                 self.register(kind, item["id"], f"$.{collection_name}[{i}].id")
         for path, value in walk(doc):
-            if is_diagram_object(value):
+            if is_diagram_object(value) and is_diagram_registration_path(path):
                 self.register("diagram", value["id"], f"{path}.id")
-            elif is_extra_table_object(value):
+            elif is_extra_table_object(value) and is_extra_table_registration_path(path):
                 self.register("extra_table", value["id"], f"{path}.id")
+
+    def _check_registered_references(self):
+        for path, value in walk(self.document):
+            for pattern, target_kind, is_list, label in REFERENCE_FIELD_RULES:
+                if not pattern.match(path):
+                    continue
+                if is_list:
+                    for i, ref in enumerate(value):
+                        self.require_ref(target_kind, ref, f"{path}[{i}]", label)
+                else:
+                    self.require_ref(target_kind, value, path, label)
+                break
 
     def _check_support_refs(self, value, path="$"):
         if isinstance(value, dict):

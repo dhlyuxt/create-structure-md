@@ -201,9 +201,12 @@ class IdAndReferenceValidationTests(unittest.TestCase):
             document["architecture_views"]["module_intro"]["rows"][0]["module_id"] = "MOD-RENDER-ALPHA"
             document["module_design"]["modules"][0]["module_id"] = "MOD-RENDER-ALPHA"
             document["runtime_view"]["runtime_units"]["rows"][0]["related_module_ids"] = ["MOD-RENDER-ALPHA"]
+            document["cross_module_collaboration"]["collaboration_scenarios"]["rows"][0]["initiator_module_id"] = "MOD-RENDER-ALPHA"
+            document["cross_module_collaboration"]["collaboration_scenarios"]["rows"][0]["participant_module_ids"] = ["MOD-RENDER-ALPHA"]
             document["key_flows"]["flow_index"]["rows"][0]["participant_module_ids"] = ["MOD-RENDER-ALPHA"]
             document["key_flows"]["flows"][0]["related_module_ids"] = ["MOD-RENDER-ALPHA"]
             document["key_flows"]["flows"][0]["steps"][0]["related_module_ids"] = ["MOD-RENDER-ALPHA"]
+            document["key_flows"]["flows"][0]["branches_or_exceptions"][0]["related_module_ids"] = ["MOD-RENDER-ALPHA"]
             path = write_json(tmpdir, "non-numeric.dsl.json", document)
             completed = run_validator(path)
         self.assertEqual(0, completed.returncode, completed.stderr)
@@ -227,6 +230,63 @@ class IdAndReferenceValidationTests(unittest.TestCase):
         self.assertEqual(1, completed.returncode)
         self.assertIn("$.architecture_views.module_intro.rows[0].evidence_refs[0]", completed.stderr)
         self.assertIn("references unknown evidence ID EV-MISSING", completed.stderr)
+
+    def test_registered_module_reference_must_resolve(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["runtime_view"]["runtime_units"]["rows"][0]["related_module_ids"] = ["MOD-MISSING"]
+            path = write_json(tmpdir, "missing-module-ref.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.runtime_view.runtime_units.rows[0].related_module_ids[0]", completed.stderr)
+        self.assertIn("references unknown module ID MOD-MISSING", completed.stderr)
+
+    def test_module_design_module_id_must_reference_module_intro(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["module_design"]["modules"][0]["module_id"] = "MOD-MISSING"
+            path = write_json(tmpdir, "missing-module-design-ref.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.module_design.modules[0].module_id", completed.stderr)
+        self.assertIn("references unknown module ID MOD-MISSING", completed.stderr)
+
+    def test_registered_runtime_unit_reference_must_resolve(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["key_flows"]["flow_index"]["rows"][0]["participant_runtime_unit_ids"] = ["RUN-MISSING"]
+            path = write_json(tmpdir, "missing-runtime-ref.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.key_flows.flow_index.rows[0].participant_runtime_unit_ids[0]", completed.stderr)
+        self.assertIn("references unknown runtime unit ID RUN-MISSING", completed.stderr)
+
+    def test_extra_table_row_diagram_like_columns_are_plain_data(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["architecture_views"]["extra_tables"] = [
+                {
+                    "id": "TBL-ARCH-DIAGRAM-LIKE",
+                    "title": "补充表",
+                    "columns": [
+                        {"key": "id", "title": "ID"},
+                        {"key": "kind", "title": "类型"},
+                        {"key": "diagram_type", "title": "图类型"},
+                        {"key": "source", "title": "来源"},
+                    ],
+                    "rows": [
+                        {
+                            "id": "plain-row",
+                            "kind": "note",
+                            "diagram_type": "free text",
+                            "source": "not a Mermaid diagram",
+                        }
+                    ],
+                }
+            ]
+            path = write_json(tmpdir, "diagram-like-extra-row.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(0, completed.returncode, completed.stderr)
 
     def test_unregistered_id_field_fails(self):
         with tempfile.TemporaryDirectory() as tmpdir:
