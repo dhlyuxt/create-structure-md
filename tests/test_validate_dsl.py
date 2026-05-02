@@ -671,5 +671,24 @@ class SchemaSupportDataTests(unittest.TestCase):
         )
 
 
+class SchemaExampleValidationTests(unittest.TestCase):
+    def test_example_dsl_files_pass_schema_validation(self):
+        schema_validator = validator()
+        for path in EXAMPLE_PATHS:
+            with self.subTest(path=path.name):
+                schema_validator.validate(json.loads(path.read_text(encoding="utf-8")))
+
+    def test_examples_use_concrete_output_filenames(self):
+        for path in EXAMPLE_PATHS:
+            document = json.loads(path.read_text(encoding="utf-8"))
+            output_file = document["document"]["output_file"]
+            with self.subTest(path=path.name):
+                self.assertTrue(output_file.endswith("_STRUCTURE_DESIGN.md"))
+                self.assertNotEqual("STRUCTURE_DESIGN.md", output_file)
+                self.assertNotEqual("structure_design.md", output_file)
+                self.assertNotEqual("design.md", output_file)
+                self.assertNotEqual("软件结构设计说明书.md", output_file)
+
+
 if __name__ == "__main__":
     unittest.main()

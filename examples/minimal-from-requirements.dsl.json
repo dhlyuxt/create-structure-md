@@ -1,1 +1,236 @@
-{}
+{
+  "dsl_version": "0.1.0",
+  "document": {
+    "title": "软件结构设计说明书",
+    "project_name": "requirements-note-example",
+    "project_version": "0.1.0",
+    "document_version": "0.1.0",
+    "status": "draft",
+    "generated_at": "",
+    "generated_by": "Codex",
+    "language": "zh-CN",
+    "source_type": "requirements",
+    "scope_summary": "从需求说明生成结构设计文档的最小示例。",
+    "not_applicable_policy": "固定章节；按章节规则处理空内容。",
+    "output_file": "requirements-note-example_STRUCTURE_DESIGN.md"
+  },
+  "system_overview": {
+    "summary": "根据需求说明整理结构设计内容并生成单个 Markdown 文档。",
+    "purpose": "演示需求来源 DSL 的结构字段。",
+    "core_capabilities": [
+      {
+        "capability_id": "CAP-001",
+        "name": "结构设计文档生成",
+        "description": "把完整 DSL 内容转为固定章节的 Markdown 文档。",
+        "confidence": "observed"
+      }
+    ],
+    "notes": []
+  },
+  "architecture_views": {
+    "summary": "技能由 DSL、校验脚本、渲染脚本、示例和参考文档组成。",
+    "notes": [],
+    "module_intro": {
+      "rows": [
+        {
+          "module_id": "MOD-SKILL",
+          "module_name": "技能文档生成模块",
+          "responsibility": "承载 DSL 结构、校验入口、渲染入口和使用说明。",
+          "inputs": "结构化设计 DSL JSON",
+          "outputs": "单个结构设计 Markdown 文档",
+          "notes": "",
+          "confidence": "observed",
+          "evidence_refs": [],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        }
+      ]
+    },
+    "module_relationship_diagram": {
+      "id": "MER-ARCH-MODULES",
+      "kind": "module_relationship",
+      "title": "模块关系图",
+      "diagram_type": "flowchart",
+      "description": "展示单模块技能的主要输入输出关系。",
+      "source": "flowchart TD\n  DSL[DSL JSON] --> SKILL[技能文档生成模块]\n  SKILL --> MD[结构设计 Markdown]",
+      "confidence": "observed"
+    },
+    "extra_tables": [],
+    "extra_diagrams": []
+  },
+  "module_design": {
+    "summary": "模块围绕 DSL 校验和 Markdown 生成边界组织。",
+    "notes": [],
+    "modules": [
+      {
+        "module_id": "MOD-SKILL",
+        "name": "技能文档生成模块",
+        "summary": "接收已经准备好的 DSL 内容，执行结构检查并生成文档。",
+        "responsibilities": ["维护 DSL 结构契约", "暴露校验和渲染入口"],
+        "external_capability_summary": {
+          "description": "为 Codex 提供结构设计文档生成能力。",
+          "consumers": ["Codex"],
+          "interface_style": "命令行脚本与 Markdown 参考文档",
+          "boundary_notes": ["不负责仓库分析", "不负责需求推理"]
+        },
+        "external_capability_details": {
+          "provided_capabilities": {
+            "rows": [
+              {
+                "capability_id": "CAP-MOD-SKILL-001",
+                "capability_name": "文档 DSL 处理",
+                "interface_style": "JSON 文件输入",
+                "description": "读取结构化 DSL 并交给校验与渲染流程。",
+                "inputs": "structure.dsl.json",
+                "outputs": "结构设计 Markdown",
+                "notes": "",
+                "confidence": "observed",
+                "evidence_refs": [],
+                "traceability_refs": [],
+                "source_snippet_refs": []
+              }
+            ]
+          },
+          "extra_tables": [],
+          "extra_diagrams": []
+        },
+        "internal_structure": {
+          "summary": "内部结构以 DSL schema、校验脚本、渲染脚本和参考文档为主要组成。",
+          "diagram": {
+            "id": "MER-MOD-SKILL-STRUCT",
+            "kind": "internal_structure",
+            "title": "模块内部结构图",
+            "diagram_type": "flowchart",
+            "description": "展示模块内部结构。",
+            "source": "",
+            "confidence": "observed"
+          },
+          "textual_structure": "schema 描述 DSL 结构，校验脚本负责质量门禁，渲染脚本负责输出 Markdown。",
+          "not_applicable_reason": "单模块示例中使用文字结构说明即可。"
+        },
+        "extra_tables": [],
+        "extra_diagrams": [],
+        "evidence_refs": [],
+        "traceability_refs": [],
+        "source_snippet_refs": [],
+        "notes": [],
+        "confidence": "observed"
+      }
+    ]
+  },
+  "runtime_view": {
+    "summary": "运行时由 Codex 准备 DSL 后依次调用校验、Mermaid 检查和渲染脚本。",
+    "notes": [],
+    "runtime_units": {
+      "rows": [
+        {
+          "unit_id": "RUN-GENERATE",
+          "unit_name": "文档生成命令序列",
+          "unit_type": "CLI workflow",
+          "entrypoint": "python scripts/render_markdown.py",
+          "entrypoint_not_applicable_reason": "",
+          "responsibility": "在校验通过后生成 Markdown 文档。",
+          "related_module_ids": ["MOD-SKILL"],
+          "external_environment_reason": "",
+          "notes": "",
+          "confidence": "observed",
+          "evidence_refs": [],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        }
+      ]
+    },
+    "runtime_flow_diagram": {
+      "id": "MER-RUNTIME-FLOW",
+      "kind": "runtime_flow",
+      "title": "运行时流程图",
+      "diagram_type": "flowchart",
+      "description": "展示文档生成命令序列。",
+      "source": "flowchart TD\n  Prepare[准备 DSL] --> Validate[校验 DSL]\n  Validate --> Mermaid[校验 Mermaid]\n  Mermaid --> Render[渲染 Markdown]",
+      "confidence": "observed"
+    },
+    "extra_tables": [],
+    "extra_diagrams": []
+  },
+  "configuration_data_dependencies": {
+    "summary": "",
+    "notes": [],
+    "configuration_items": { "rows": [] },
+    "structural_data_artifacts": { "rows": [] },
+    "dependencies": { "rows": [] },
+    "extra_tables": [],
+    "extra_diagrams": []
+  },
+  "cross_module_collaboration": {
+    "summary": "",
+    "notes": [],
+    "collaboration_scenarios": { "rows": [] },
+    "extra_tables": [],
+    "extra_diagrams": []
+  },
+  "key_flows": {
+    "summary": "关键流程覆盖从 DSL 准备到 Markdown 输出的主路径。",
+    "notes": [],
+    "flow_index": {
+      "rows": [
+        {
+          "flow_id": "FLOW-GENERATE",
+          "flow_name": "生成结构设计文档",
+          "trigger_condition": "Codex 已准备完整 DSL。",
+          "participant_module_ids": ["MOD-SKILL"],
+          "participant_runtime_unit_ids": ["RUN-GENERATE"],
+          "main_steps": "校验 DSL、校验 Mermaid、渲染 Markdown。",
+          "output_result": "模块专属结构设计 Markdown 文件。",
+          "notes": ""
+        }
+      ]
+    },
+    "flows": [
+      {
+        "flow_id": "FLOW-GENERATE",
+        "name": "生成结构设计文档",
+        "overview": "从 DSL 输入生成一个结构设计 Markdown 文件。",
+        "steps": [
+          {
+            "step_id": "STEP-GENERATE-001",
+            "order": 1,
+            "description": "准备结构化 DSL JSON。",
+            "actor": "Codex",
+            "related_module_ids": ["MOD-SKILL"],
+            "related_runtime_unit_ids": ["RUN-GENERATE"],
+            "input": "结构设计内容",
+            "output": "structure.dsl.json",
+            "confidence": "observed",
+            "evidence_refs": [],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          }
+        ],
+        "branches_or_exceptions": [],
+        "related_module_ids": ["MOD-SKILL"],
+        "related_runtime_unit_ids": ["RUN-GENERATE"],
+        "confidence": "observed",
+        "evidence_refs": [],
+        "traceability_refs": [],
+        "source_snippet_refs": [],
+        "diagram": {
+          "id": "MER-FLOW-GENERATE",
+          "kind": "key_flow",
+          "title": "生成流程图",
+          "diagram_type": "flowchart",
+          "description": "展示生成结构设计文档的关键流程。",
+          "source": "flowchart TD\n  A[准备 DSL] --> B[校验]\n  B --> C[渲染 Markdown]",
+          "confidence": "observed"
+        }
+      }
+    ],
+    "extra_tables": [],
+    "extra_diagrams": []
+  },
+  "structure_issues_and_suggestions": "",
+  "evidence": [],
+  "traceability": [],
+  "risks": [],
+  "assumptions": [],
+  "source_snippets": []
+}
