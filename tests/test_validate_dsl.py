@@ -315,6 +315,8 @@ class SchemaCommonShapeTests(unittest.TestCase):
             "../create-structure-md_STRUCTURE_DESIGN.md",
             "bad..name.md",
             "bad\u0001name.md",
+            "bad\u007fname.md",
+            "bad\u009fname.md",
         ]
         for output_file in invalid_names:
             document = valid_example()
