@@ -284,17 +284,253 @@
         "modules": { "type": "array", "items": { "$ref": "#/$defs/moduleDesignItem" } }
       }
     },
+    "runtimeUnitRow": {
+      "type": "object",
+      "required": ["unit_id", "unit_name", "unit_type", "entrypoint", "entrypoint_not_applicable_reason", "responsibility", "related_module_ids", "external_environment_reason", "notes", "confidence", "evidence_refs", "traceability_refs", "source_snippet_refs"],
+      "additionalProperties": false,
+      "properties": {
+        "unit_id": { "$ref": "#/$defs/nonEmptyString" },
+        "unit_name": { "$ref": "#/$defs/nonEmptyString" },
+        "unit_type": { "$ref": "#/$defs/nonEmptyString" },
+        "entrypoint": { "type": "string" },
+        "entrypoint_not_applicable_reason": { "type": "string" },
+        "responsibility": { "$ref": "#/$defs/nonEmptyString" },
+        "related_module_ids": { "$ref": "#/$defs/referenceArray" },
+        "external_environment_reason": { "type": "string" },
+        "notes": { "type": "string" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" },
+        "traceability_refs": { "$ref": "#/$defs/referenceArray" },
+        "source_snippet_refs": { "$ref": "#/$defs/referenceArray" }
+      }
+    },
+    "runtimeUnitsTable": {
+      "type": "object",
+      "required": ["rows"],
+      "additionalProperties": false,
+      "properties": { "rows": { "type": "array", "items": { "$ref": "#/$defs/runtimeUnitRow" } } }
+    },
     "runtimeView": {
-      "type": "object"
+      "type": "object",
+      "required": ["summary", "notes", "runtime_units", "runtime_flow_diagram", "extra_tables", "extra_diagrams"],
+      "additionalProperties": false,
+      "properties": {
+        "summary": { "$ref": "#/$defs/nonEmptyString" },
+        "notes": { "$ref": "#/$defs/stringArray" },
+        "runtime_units": { "$ref": "#/$defs/runtimeUnitsTable" },
+        "runtime_flow_diagram": { "$ref": "#/$defs/diagram" },
+        "runtime_sequence_diagram": { "$ref": "#/$defs/diagram" },
+        "extra_tables": { "$ref": "#/$defs/extraTables" },
+        "extra_diagrams": { "$ref": "#/$defs/extraDiagrams" }
+      }
+    },
+    "configurationItemRow": {
+      "type": "object",
+      "required": ["config_id", "config_name", "source", "used_by", "purpose", "notes", "confidence", "evidence_refs", "traceability_refs", "source_snippet_refs"],
+      "additionalProperties": false,
+      "properties": {
+        "config_id": { "$ref": "#/$defs/nonEmptyString" },
+        "config_name": { "$ref": "#/$defs/nonEmptyString" },
+        "source": { "type": "string" },
+        "used_by": { "type": "string" },
+        "purpose": { "$ref": "#/$defs/nonEmptyString" },
+        "notes": { "type": "string" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" },
+        "traceability_refs": { "$ref": "#/$defs/referenceArray" },
+        "source_snippet_refs": { "$ref": "#/$defs/referenceArray" }
+      }
+    },
+    "configurationItemsTable": {
+      "type": "object",
+      "required": ["rows"],
+      "additionalProperties": false,
+      "properties": { "rows": { "type": "array", "items": { "$ref": "#/$defs/configurationItemRow" } } }
+    },
+    "structuralDataArtifactRow": {
+      "type": "object",
+      "required": ["artifact_id", "artifact_name", "artifact_type", "owner", "producer", "consumer", "notes", "confidence", "evidence_refs", "traceability_refs", "source_snippet_refs"],
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": { "$ref": "#/$defs/nonEmptyString" },
+        "artifact_name": { "$ref": "#/$defs/nonEmptyString" },
+        "artifact_type": { "$ref": "#/$defs/nonEmptyString" },
+        "owner": { "$ref": "#/$defs/nonEmptyString" },
+        "producer": { "type": "string" },
+        "consumer": { "type": "string" },
+        "notes": { "type": "string" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" },
+        "traceability_refs": { "$ref": "#/$defs/referenceArray" },
+        "source_snippet_refs": { "$ref": "#/$defs/referenceArray" }
+      }
+    },
+    "structuralDataArtifactsTable": {
+      "type": "object",
+      "required": ["rows"],
+      "additionalProperties": false,
+      "properties": { "rows": { "type": "array", "items": { "$ref": "#/$defs/structuralDataArtifactRow" } } }
+    },
+    "dependencyRow": {
+      "type": "object",
+      "required": ["dependency_id", "dependency_name", "dependency_type", "used_by", "purpose", "notes", "confidence", "evidence_refs", "traceability_refs", "source_snippet_refs"],
+      "additionalProperties": false,
+      "properties": {
+        "dependency_id": { "$ref": "#/$defs/nonEmptyString" },
+        "dependency_name": { "$ref": "#/$defs/nonEmptyString" },
+        "dependency_type": { "$ref": "#/$defs/nonEmptyString" },
+        "used_by": { "type": "string" },
+        "purpose": { "$ref": "#/$defs/nonEmptyString" },
+        "notes": { "type": "string" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" },
+        "traceability_refs": { "$ref": "#/$defs/referenceArray" },
+        "source_snippet_refs": { "$ref": "#/$defs/referenceArray" }
+      }
+    },
+    "dependenciesTable": {
+      "type": "object",
+      "required": ["rows"],
+      "additionalProperties": false,
+      "properties": { "rows": { "type": "array", "items": { "$ref": "#/$defs/dependencyRow" } } }
     },
     "configurationDataDependencies": {
-      "type": "object"
+      "type": "object",
+      "required": ["summary", "notes", "configuration_items", "structural_data_artifacts", "dependencies", "extra_tables", "extra_diagrams"],
+      "additionalProperties": false,
+      "properties": {
+        "summary": { "type": "string" },
+        "notes": { "$ref": "#/$defs/stringArray" },
+        "configuration_items": { "$ref": "#/$defs/configurationItemsTable" },
+        "structural_data_artifacts": { "$ref": "#/$defs/structuralDataArtifactsTable" },
+        "dependencies": { "$ref": "#/$defs/dependenciesTable" },
+        "extra_tables": { "$ref": "#/$defs/extraTables" },
+        "extra_diagrams": { "$ref": "#/$defs/extraDiagrams" }
+      }
+    },
+    "collaborationScenarioRow": {
+      "type": "object",
+      "required": ["collaboration_id", "scenario", "initiator_module_id", "participant_module_ids", "collaboration_method", "description", "confidence", "evidence_refs", "traceability_refs", "source_snippet_refs"],
+      "additionalProperties": false,
+      "properties": {
+        "collaboration_id": { "$ref": "#/$defs/nonEmptyString" },
+        "scenario": { "$ref": "#/$defs/nonEmptyString" },
+        "initiator_module_id": { "$ref": "#/$defs/nonEmptyString" },
+        "participant_module_ids": { "$ref": "#/$defs/referenceArray" },
+        "collaboration_method": { "$ref": "#/$defs/nonEmptyString" },
+        "description": { "$ref": "#/$defs/nonEmptyString" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" },
+        "traceability_refs": { "$ref": "#/$defs/referenceArray" },
+        "source_snippet_refs": { "$ref": "#/$defs/referenceArray" }
+      }
+    },
+    "collaborationScenariosTable": {
+      "type": "object",
+      "required": ["rows"],
+      "additionalProperties": false,
+      "properties": { "rows": { "type": "array", "items": { "$ref": "#/$defs/collaborationScenarioRow" } } }
     },
     "crossModuleCollaboration": {
-      "type": "object"
+      "type": "object",
+      "required": ["summary", "notes", "collaboration_scenarios", "extra_tables", "extra_diagrams"],
+      "additionalProperties": false,
+      "properties": {
+        "summary": { "type": "string" },
+        "notes": { "$ref": "#/$defs/stringArray" },
+        "collaboration_scenarios": { "$ref": "#/$defs/collaborationScenariosTable" },
+        "collaboration_relationship_diagram": { "$ref": "#/$defs/diagram" },
+        "extra_tables": { "$ref": "#/$defs/extraTables" },
+        "extra_diagrams": { "$ref": "#/$defs/extraDiagrams" }
+      }
+    },
+    "flowIndexRow": {
+      "type": "object",
+      "required": ["flow_id", "flow_name", "trigger_condition", "participant_module_ids", "participant_runtime_unit_ids", "main_steps", "output_result", "notes"],
+      "additionalProperties": false,
+      "properties": {
+        "flow_id": { "$ref": "#/$defs/nonEmptyString" },
+        "flow_name": { "$ref": "#/$defs/nonEmptyString" },
+        "trigger_condition": { "$ref": "#/$defs/nonEmptyString" },
+        "participant_module_ids": { "$ref": "#/$defs/referenceArray" },
+        "participant_runtime_unit_ids": { "$ref": "#/$defs/referenceArray" },
+        "main_steps": { "$ref": "#/$defs/nonEmptyString" },
+        "output_result": { "$ref": "#/$defs/nonEmptyString" },
+        "notes": { "type": "string" }
+      }
+    },
+    "flowStep": {
+      "type": "object",
+      "required": ["step_id", "order", "description", "actor", "related_module_ids", "related_runtime_unit_ids", "input", "output", "confidence", "evidence_refs", "traceability_refs", "source_snippet_refs"],
+      "additionalProperties": false,
+      "properties": {
+        "step_id": { "$ref": "#/$defs/nonEmptyString" },
+        "order": { "type": "integer", "minimum": 1 },
+        "description": { "$ref": "#/$defs/nonEmptyString" },
+        "actor": { "type": "string" },
+        "related_module_ids": { "$ref": "#/$defs/referenceArray" },
+        "related_runtime_unit_ids": { "$ref": "#/$defs/referenceArray" },
+        "input": { "type": "string" },
+        "output": { "type": "string" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" },
+        "traceability_refs": { "$ref": "#/$defs/referenceArray" },
+        "source_snippet_refs": { "$ref": "#/$defs/referenceArray" }
+      }
+    },
+    "flowBranch": {
+      "type": "object",
+      "required": ["branch_id", "condition", "handling", "related_module_ids", "related_runtime_unit_ids", "confidence", "evidence_refs", "traceability_refs", "source_snippet_refs"],
+      "additionalProperties": false,
+      "properties": {
+        "branch_id": { "$ref": "#/$defs/nonEmptyString" },
+        "condition": { "$ref": "#/$defs/nonEmptyString" },
+        "handling": { "$ref": "#/$defs/nonEmptyString" },
+        "related_module_ids": { "$ref": "#/$defs/referenceArray" },
+        "related_runtime_unit_ids": { "$ref": "#/$defs/referenceArray" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" },
+        "traceability_refs": { "$ref": "#/$defs/referenceArray" },
+        "source_snippet_refs": { "$ref": "#/$defs/referenceArray" }
+      }
+    },
+    "flowIndexTable": {
+      "type": "object",
+      "required": ["rows"],
+      "additionalProperties": false,
+      "properties": { "rows": { "type": "array", "items": { "$ref": "#/$defs/flowIndexRow" } } }
+    },
+    "keyFlow": {
+      "type": "object",
+      "required": ["flow_id", "name", "overview", "steps", "branches_or_exceptions", "related_module_ids", "related_runtime_unit_ids", "confidence", "evidence_refs", "traceability_refs", "source_snippet_refs", "diagram"],
+      "additionalProperties": false,
+      "properties": {
+        "flow_id": { "$ref": "#/$defs/nonEmptyString" },
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "overview": { "$ref": "#/$defs/nonEmptyString" },
+        "steps": { "type": "array", "items": { "$ref": "#/$defs/flowStep" } },
+        "branches_or_exceptions": { "type": "array", "items": { "$ref": "#/$defs/flowBranch" } },
+        "related_module_ids": { "$ref": "#/$defs/referenceArray" },
+        "related_runtime_unit_ids": { "$ref": "#/$defs/referenceArray" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" },
+        "traceability_refs": { "$ref": "#/$defs/referenceArray" },
+        "source_snippet_refs": { "$ref": "#/$defs/referenceArray" },
+        "diagram": { "$ref": "#/$defs/diagram" }
+      }
     },
     "keyFlows": {
-      "type": "object"
+      "type": "object",
+      "required": ["summary", "notes", "flow_index", "flows", "extra_tables", "extra_diagrams"],
+      "additionalProperties": false,
+      "properties": {
+        "summary": { "$ref": "#/$defs/nonEmptyString" },
+        "notes": { "$ref": "#/$defs/stringArray" },
+        "flow_index": { "$ref": "#/$defs/flowIndexTable" },
+        "flows": { "type": "array", "items": { "$ref": "#/$defs/keyFlow" } },
+        "extra_tables": { "$ref": "#/$defs/extraTables" },
+        "extra_diagrams": { "$ref": "#/$defs/extraDiagrams" }
+      }
     },
     "evidence": {
       "type": "object"

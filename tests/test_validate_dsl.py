@@ -430,5 +430,111 @@ class SchemaChapterTwoThroughFourTests(unittest.TestCase):
         )
 
 
+class SchemaChapterFiveThroughNineTests(unittest.TestCase):
+    def test_fixture_passes_with_chapter_five_through_nine_schema(self):
+        validator().validate(valid_example())
+
+    def test_runtime_related_module_ids_are_string_arrays(self):
+        document = valid_example()
+        document["runtime_view"]["runtime_units"]["rows"][0]["related_module_ids"] = [1]
+        assert_invalid(
+            self,
+            document,
+            "is not of type 'string'",
+            expected_validator="type",
+            expected_path=["runtime_view", "runtime_units", "rows", 0, "related_module_ids", 0],
+        )
+
+    def test_collaboration_optional_diagram_allows_omission_but_rejects_empty_object(self):
+        document = valid_example()
+        document["cross_module_collaboration"].pop("collaboration_relationship_diagram", None)
+        validator().validate(document)
+
+        document = valid_example()
+        document["cross_module_collaboration"]["collaboration_relationship_diagram"] = {}
+        assert_invalid(
+            self,
+            document,
+            "is a required property",
+            expected_validator="required",
+            expected_path=["cross_module_collaboration", "collaboration_relationship_diagram"],
+        )
+
+    def test_runtime_optional_sequence_diagram_rejects_empty_object(self):
+        document = valid_example()
+        document["runtime_view"]["runtime_sequence_diagram"] = {}
+        assert_invalid(
+            self,
+            document,
+            "is a required property",
+            expected_validator="required",
+            expected_path=["runtime_view", "runtime_sequence_diagram"],
+        )
+
+    def test_flow_index_rejects_common_metadata(self):
+        for forbidden in ["confidence", "evidence_refs", "traceability_refs", "source_snippet_refs"]:
+            document = valid_example()
+            document["key_flows"]["flow_index"]["rows"][0][forbidden] = "observed"
+            with self.subTest(field=forbidden):
+                assert_invalid(
+                    self,
+                    document,
+                    "Additional properties are not allowed",
+                    expected_validator="additionalProperties",
+                    expected_path=["key_flows", "flow_index", "rows", 0],
+                )
+
+    def test_flow_step_order_must_be_positive_integer(self):
+        document = valid_example()
+        document["key_flows"]["flows"][0]["steps"][0]["order"] = 0
+        assert_invalid(
+            self,
+            document,
+            "is less than the minimum",
+            expected_validator="minimum",
+            expected_path=["key_flows", "flows", 0, "steps", 0, "order"],
+        )
+
+    def test_chapter_six_rows_reject_unknown_id_fields(self):
+        cases = [
+            ("configuration_items", "unknown_id"),
+            ("structural_data_artifacts", "owner_module_id"),
+            ("dependencies", "dependency_ids"),
+        ]
+        for table_name, field_name in cases:
+            document = valid_example()
+            document["configuration_data_dependencies"][table_name]["rows"][0][field_name] = "BAD-001"
+            with self.subTest(table=table_name, field=field_name):
+                assert_invalid(
+                    self,
+                    document,
+                    "Additional properties are not allowed",
+                    expected_validator="additionalProperties",
+                    expected_path=["configuration_data_dependencies", table_name, "rows", 0],
+                )
+
+    def test_collaboration_row_rejects_unknown_reference_fields(self):
+        document = valid_example()
+        document["cross_module_collaboration"]["collaboration_scenarios"]["rows"][0]["participant_ids"] = ["MOD-SKILL"]
+        assert_invalid(
+            self,
+            document,
+            "Additional properties are not allowed",
+            expected_validator="additionalProperties",
+            expected_path=["cross_module_collaboration", "collaboration_scenarios", "rows", 0],
+        )
+
+    def test_flow_branch_related_runtime_unit_ids_must_be_string_arrays(self):
+        document = valid_example()
+        document["key_flows"]["flows"][0]["branches_or_exceptions"][0]["related_runtime_unit_ids"] = [1]
+        assert_invalid(
+            self,
+            document,
+            "is not of type 'string'",
+            expected_validator="type",
+            expected_path=["key_flows", "flows", 0, "branches_or_exceptions", 0, "related_runtime_unit_ids", 0],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
