@@ -980,6 +980,23 @@ class MarkdownSafetyAndLowConfidenceTests(unittest.TestCase):
         self.assertIn("$.architecture_views.extra_tables[0].rows[0].diagram.source", completed.stderr)
         self.assertIn("unsafe Markdown structure", completed.stderr)
 
+    def test_extra_table_content_and_diagram_type_fields_are_plain_text_linted(self):
+        for field_name in ["content", "diagram_type"]:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                document = valid_document()
+                document["architecture_views"]["extra_tables"] = [{
+                    "id": "TBL-ARCH-EXEMPT-NAME",
+                    "title": "保留字段名",
+                    "columns": [{"key": field_name, "title": "字段"}],
+                    "rows": [{field_name: "# injected heading"}],
+                }]
+                path = write_json(tmpdir, "extra-table-exempt-name.dsl.json", document)
+                completed = run_validator(path)
+            with self.subTest(field_name=field_name):
+                self.assertEqual(1, completed.returncode)
+                self.assertIn(f"$.architecture_views.extra_tables[0].rows[0].{field_name}", completed.stderr)
+                self.assertIn("unsafe Markdown structure", completed.stderr)
+
     def test_plain_text_fields_reject_large_code_like_blocks(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             document = valid_document()

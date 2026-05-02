@@ -75,8 +75,6 @@ PROTOTYPE_PATTERNS = [
     re.compile(r"(?m)^\s*class\s*\{"),
 ]
 
-TEXT_LINT_EXEMPT_FIELD_NAMES = {"content", "diagram_type"}
-
 CODE_LIKE_LINE_RE = re.compile(
     r"^\s*(?:if |else:|elif |for |while |try:|except |return\b|raise\b|[A-Za-z_]\w*\(.*\)|[A-Za-z_]\w*\s*=|[{};])"
 )
@@ -868,34 +866,48 @@ def check_chapter_9(document, context):
 
 
 def is_mermaid_source_path(path):
-    diagram_source_patterns = [
-        r"^\$\.architecture_views\.module_relationship_diagram\.source$",
-        r"^\$\.module_design\.modules\[\d+\]\.internal_structure\.diagram\.source$",
-        r"^\$\.runtime_view\.runtime_flow_diagram\.source$",
-        r"^\$\.runtime_view\.runtime_sequence_diagram\.source$",
-        r"^\$\.cross_module_collaboration\.collaboration_relationship_diagram\.source$",
-        r"^\$\.key_flows\.flows\[\d+\]\.diagram\.source$",
-        r"^\$\.architecture_views\.extra_diagrams\[\d+\]\.source$",
-        r"^\$\.module_design\.modules\[\d+\]\.external_capability_details\.extra_diagrams\[\d+\]\.source$",
-        r"^\$\.module_design\.modules\[\d+\]\.extra_diagrams\[\d+\]\.source$",
-        r"^\$\.runtime_view\.extra_diagrams\[\d+\]\.source$",
-        r"^\$\.configuration_data_dependencies\.extra_diagrams\[\d+\]\.source$",
-        r"^\$\.cross_module_collaboration\.extra_diagrams\[\d+\]\.source$",
-        r"^\$\.key_flows\.extra_diagrams\[\d+\]\.source$",
-    ]
+    return is_real_diagram_field_path(path, "source")
+
+
+def is_diagram_type_path(path):
+    return is_real_diagram_field_path(path, "diagram_type")
+
+
+def is_real_diagram_field_path(path, field_name):
+    diagram_source_patterns = real_diagram_field_patterns(field_name)
     return any(re.match(pattern, path) for pattern in diagram_source_patterns)
+
+
+def real_diagram_field_patterns(field_name):
+    escaped_field_name = re.escape(field_name)
+    return [
+        rf"^\$\.architecture_views\.module_relationship_diagram\.{escaped_field_name}$",
+        rf"^\$\.module_design\.modules\[\d+\]\.internal_structure\.diagram\.{escaped_field_name}$",
+        rf"^\$\.runtime_view\.runtime_flow_diagram\.{escaped_field_name}$",
+        rf"^\$\.runtime_view\.runtime_sequence_diagram\.{escaped_field_name}$",
+        rf"^\$\.cross_module_collaboration\.collaboration_relationship_diagram\.{escaped_field_name}$",
+        rf"^\$\.key_flows\.flows\[\d+\]\.diagram\.{escaped_field_name}$",
+        rf"^\$\.architecture_views\.extra_diagrams\[\d+\]\.{escaped_field_name}$",
+        rf"^\$\.module_design\.modules\[\d+\]\.external_capability_details\.extra_diagrams\[\d+\]\.{escaped_field_name}$",
+        rf"^\$\.module_design\.modules\[\d+\]\.extra_diagrams\[\d+\]\.{escaped_field_name}$",
+        rf"^\$\.runtime_view\.extra_diagrams\[\d+\]\.{escaped_field_name}$",
+        rf"^\$\.configuration_data_dependencies\.extra_diagrams\[\d+\]\.{escaped_field_name}$",
+        rf"^\$\.cross_module_collaboration\.extra_diagrams\[\d+\]\.{escaped_field_name}$",
+        rf"^\$\.key_flows\.extra_diagrams\[\d+\]\.{escaped_field_name}$",
+    ]
 
 
 def check_markdown_safety(document, context):
     for path, value in walk(document):
         if not isinstance(value, str):
             continue
-        field_name = path.rsplit(".", 1)[-1]
+        if path.startswith("$.source_snippets["):
+            continue
         if is_mermaid_source_path(path):
             if "```" in value:
                 context.report.error(path, "Mermaid source must not include Markdown fences", "Store raw Mermaid source only")
             continue
-        if field_name in TEXT_LINT_EXEMPT_FIELD_NAMES or path.startswith("$.source_snippets["):
+        if is_diagram_type_path(path):
             continue
         if path == "$.structure_issues_and_suggestions":
             continue
