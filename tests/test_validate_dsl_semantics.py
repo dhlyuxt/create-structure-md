@@ -1065,3 +1065,56 @@ class MarkdownSafetyAndLowConfidenceTests(unittest.TestCase):
         self.assertIn("WARNING", completed.stdout)
         self.assertIn("$.evidence[0].id", completed.stdout)
         self.assertIn("unreferenced evidence", completed.stdout)
+
+
+class AcceptanceTests(unittest.TestCase):
+    def test_examples_pass_semantic_cli_validation(self):
+        for relative_path in [
+            "examples/minimal-from-code.dsl.json",
+            "examples/minimal-from-requirements.dsl.json",
+        ]:
+            completed = run_validator(ROOT / relative_path)
+            with self.subTest(path=relative_path):
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                self.assertIn("Validation succeeded", completed.stdout)
+
+    def test_semantic_validation_accumulates_multiple_errors_after_schema_success(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["document"]["output_file"] = "design.md"
+            document["runtime_view"]["runtime_flow_diagram"]["source"] = ""
+            document["key_flows"]["flows"][0]["diagram"]["source"] = ""
+            path = write_json(tmpdir, "multi-error.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertGreaterEqual(completed.stderr.count("ERROR:"), 3)
+        self.assertIn("$.document.output_file", completed.stderr)
+        self.assertIn("$.runtime_view.runtime_flow_diagram.source", completed.stderr)
+        self.assertIn("$.key_flows.flows[0].diagram.source", completed.stderr)
+
+    def test_unsafe_output_file_path_stops_at_schema_validation(self):
+        for output_file in [
+            "nested/create-structure-md_STRUCTURE_DESIGN.md",
+            "nested\\create-structure-md_STRUCTURE_DESIGN.md",
+            "../create-structure-md_STRUCTURE_DESIGN.md",
+            "bad\u0001name.md",
+        ]:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                document = valid_document()
+                document["document"]["output_file"] = output_file
+                path = write_json(tmpdir, "unsafe-output.dsl.json", document)
+                completed = run_validator(path)
+            with self.subTest(output_file=output_file):
+                self.assertEqual(2, completed.returncode)
+                self.assertIn("$.document.output_file", completed.stderr)
+                self.assertIn("schema validation failed", completed.stderr)
+                self.assertNotIn("semantic validation failed", completed.stderr)
+
+    def test_no_new_dependencies_are_required(self):
+        requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
+        dependency_lines = [
+            line.strip()
+            for line in requirements.splitlines()
+            if line.strip() and not line.strip().startswith("#")
+        ]
+        self.assertEqual(["jsonschema"], dependency_lines)
