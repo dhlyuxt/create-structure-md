@@ -734,6 +734,7 @@ flowchart TD
 ```mermaid
 sequenceDiagram
   A->>B: call
+  B->C: return
 ```
 """
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -758,6 +759,82 @@ flowchart TD
         self.assertIn("Mermaid block 1 line 1", stderr)
         self.assertIn("Graphviz/DOT syntax is not supported", stderr)
         self.assertIn("line 2", stderr)
+
+    def test_static_rejects_graphviz_graph_keyword_in_dsl(self):
+        module = load_validator_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            diagram = document["architecture_views"]["module_relationship_diagram"]
+            diagram["diagram_type"] = "graph"
+            diagram["source"] = "graph G {\n  A -- B;\n}"
+            path = write_json(document, tmpdir, "dot-graph.dsl.json")
+            code, stdout, stderr = call_main(module, ["--from-dsl", str(path), "--static"])
+
+        self.assertEqual(1, code)
+        self.assertEqual("", stdout)
+        self.assertIn("Graphviz/DOT syntax is not supported", stderr)
+        self.assertIn("line 1", stderr)
+
+    def test_static_rejects_graphviz_graph_keyword_in_markdown(self):
+        module = load_validator_module()
+        markdown = """```mermaid
+graph G {
+  A -- B;
+}
+```
+"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = write_markdown(tmpdir, "dot-graph.md", markdown)
+            code, stdout, stderr = call_main(module, ["--from-markdown", str(path), "--static"])
+
+        self.assertEqual(1, code)
+        self.assertIn("Mermaid block 1 line 1", stderr)
+        self.assertIn("Graphviz/DOT syntax is not supported", stderr)
+
+    def test_static_rejects_dot_edge_with_attributes(self):
+        module = load_validator_module()
+        markdown = """```mermaid
+flowchart TD
+  A -> B [label="calls"];
+```
+"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = write_markdown(tmpdir, "dot-attribute.md", markdown)
+            code, stdout, stderr = call_main(module, ["--from-markdown", str(path), "--static"])
+
+        self.assertEqual(1, code)
+        self.assertIn("Graphviz/DOT syntax is not supported", stderr)
+        self.assertIn("line 2", stderr)
+
+    def test_static_rejects_dot_edge_with_quoted_ids(self):
+        module = load_validator_module()
+        markdown = """```mermaid
+flowchart TD
+  "A node" -> "B node";
+```
+"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = write_markdown(tmpdir, "dot-quoted.md", markdown)
+            code, stdout, stderr = call_main(module, ["--from-markdown", str(path), "--static"])
+
+        self.assertEqual(1, code)
+        self.assertIn("Graphviz/DOT syntax is not supported", stderr)
+        self.assertIn("line 2", stderr)
+
+    def test_static_reports_dot_syntax_and_duplicate_dsl_ids_together(self):
+        module = load_validator_module()
+        document = valid_document()
+        document["runtime_view"]["runtime_flow_diagram"]["id"] = "MER-DUPLICATE-DOT"
+        document["runtime_view"]["runtime_flow_diagram"]["source"] = "digraph G {\n  A -> B;\n}"
+        document["cross_module_collaboration"]["collaboration_relationship_diagram"]["id"] = "MER-DUPLICATE-DOT"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = write_json(document, tmpdir, "duplicate-dot.dsl.json")
+            code, stdout, stderr = call_main(module, ["--from-dsl", str(path), "--static"])
+
+        self.assertEqual(1, code)
+        self.assertEqual("", stdout)
+        self.assertIn("Graphviz/DOT syntax is not supported", stderr)
+        self.assertIn("duplicate diagram id MER-DUPLICATE-DOT", stderr)
 
 
 if __name__ == "__main__":

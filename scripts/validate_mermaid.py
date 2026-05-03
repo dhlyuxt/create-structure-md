@@ -43,8 +43,14 @@ KNOWN_UNSUPPORTED_MARKDOWN_TYPES = {
 }
 DOT_PATTERNS = [
     re.compile(r"(?im)^\s*digraph\b"),
+    re.compile(r"(?im)^\s*(?:strict\s+)?graph\b.*\{"),
     re.compile(r"(?im)^\s*rankdir\s*="),
-    re.compile(r"(?m)^\s*[A-Za-z_][\w.-]*\s*->\s*[A-Za-z_][\w.-]*\s*;?\s*$"),
+    re.compile(
+        r'(?m)^\s*(?:[A-Za-z_][\w.-]*|"[^"\n]+")\s*'
+        r'(?:->(?!>)|--(?![-\>]))\s*'
+        r'(?:[A-Za-z_][\w.-]*|"[^"\n]+")'
+        r'(?:\s+\[[^\]\n]*\])?\s*;?\s*$'
+    ),
 ]
 DOT_SYNTAX_HINT = "Use Mermaid syntax only; final Graphviz, DOT, SVG, PNG, and image export are out of scope"
 ROOT = Path(__file__).resolve().parents[1]
@@ -169,6 +175,17 @@ def find_dot_syntax(source):
                 findings.append((line_number, line.strip()))
                 break
     return findings
+
+
+def report_dot_syntax(report, location, source):
+    findings = find_dot_syntax(source)
+    for line_number, line in findings:
+        report.error(
+            location,
+            f"Graphviz/DOT syntax is not supported at line {line_number}: {line}",
+            DOT_SYNTAX_HINT,
+        )
+    return bool(findings)
 
 
 def infer_type_from_source(source):
@@ -433,14 +450,7 @@ def validate_static(diagrams, source_kind):
             if not diagram.source.strip():
                 report.error(location, "Mermaid block body must be non-empty")
                 continue
-            dot_findings = find_dot_syntax(diagram.source)
-            if dot_findings:
-                for line_number, line in dot_findings:
-                    report.error(
-                        location,
-                        f"Graphviz/DOT syntax is not supported at line {line_number}: {line}",
-                        DOT_SYNTAX_HINT,
-                    )
+            if report_dot_syntax(report, location, diagram.source):
                 continue
             inferred_type = infer_type_from_source(diagram.source)
             if inferred_type:
@@ -458,26 +468,19 @@ def validate_static(diagrams, source_kind):
             report.error(location, f"unsupported diagram_type {diagram.diagram_type}")
         if source_kind == "dsl" and "```" in diagram.source:
             report.error(location, "DSL Mermaid source must not include Markdown code fences")
-        dot_findings = find_dot_syntax(diagram.source)
-        if dot_findings:
-            for line_number, line in dot_findings:
+        has_dot_syntax = report_dot_syntax(report, location, diagram.source)
+        if not has_dot_syntax:
+            inferred_type = infer_type_from_source(diagram.source)
+            if not inferred_type:
                 report.error(
                     location,
-                    f"Graphviz/DOT syntax is not supported at line {line_number}: {line}",
-                    DOT_SYNTAX_HINT,
+                    "first meaningful line does not start with a supported Mermaid diagram type",
                 )
-            continue
-        inferred_type = infer_type_from_source(diagram.source)
-        if not inferred_type:
-            report.error(
-                location,
-                "first meaningful line does not start with a supported Mermaid diagram type",
-            )
-        elif diagram.diagram_type in SUPPORTED_TYPES and inferred_type != diagram.diagram_type:
-            report.error(
-                location,
-                f"first meaningful line starts with {inferred_type} but diagram_type is {diagram.diagram_type}",
-            )
+            elif diagram.diagram_type in SUPPORTED_TYPES and inferred_type != diagram.diagram_type:
+                report.error(
+                    location,
+                    f"first meaningful line starts with {inferred_type} but diagram_type is {diagram.diagram_type}",
+                )
         if source_kind == "dsl":
             if diagram.diagram_id in seen_ids:
                 report.error(
