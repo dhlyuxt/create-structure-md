@@ -245,6 +245,41 @@ class RendererCliAndFilenameTests(unittest.TestCase):
             self.assertNotIn("Traceback", completed.stderr)
             self.assertEqual([], list(Path(tmpdir).glob("*.md")))
 
+    def test_non_string_filename_context_fails_as_input_error_without_traceback(self):
+        cases = [
+            ("document.project_name", lambda document: document["document"].__setitem__("project_name", 123)),
+            (
+                "architecture_views.module_intro.rows[0].module_id",
+                lambda document: document["architecture_views"]["module_intro"]["rows"][0].__setitem__("module_id", 123),
+            ),
+            (
+                "architecture_views.module_intro.rows[0].module_name",
+                lambda document: document["architecture_views"]["module_intro"]["rows"][0].__setitem__("module_name", 123),
+            ),
+            (
+                "module_design.modules[0].name",
+                lambda document: document["module_design"]["modules"][0].__setitem__("name", 123),
+            ),
+        ]
+        for field_name, mutate in cases:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                document = valid_document()
+                mutate(document)
+                dsl_path = write_json(tmpdir, "non-string-context.dsl.json", document)
+                completed = subprocess.run(
+                    [PYTHON, str(RENDERER), str(dsl_path), "--output-dir", tmpdir],
+                    cwd=ROOT,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+                with self.subTest(field_name=field_name):
+                    self.assertEqual(2, completed.returncode)
+                    self.assertIn("ERROR:", completed.stderr)
+                    self.assertIn("filename context", completed.stderr)
+                    self.assertNotIn("Traceback", completed.stderr)
+                    self.assertEqual([], list(Path(tmpdir).glob("*.md")))
+
     def test_write_oserror_fails_as_render_error_without_traceback(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             document = valid_document()

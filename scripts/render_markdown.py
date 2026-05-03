@@ -64,6 +64,8 @@ def load_json_file(path):
 
 
 def normalized_name_tokens(value):
+    if not isinstance(value, str):
+        raise TypeError("filename context values must be strings")
     normalized = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff]+", " ", value.casefold())
     return [token for token in normalized.split() if token]
 
