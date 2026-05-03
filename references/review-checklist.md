@@ -25,6 +25,16 @@
 - Confirm rendered Mermaid passes `validate_mermaid.py --from-markdown <output-file> --static`.
 - If static-only validation was used, confirm the final report states that strict validation was not performed, local Mermaid CLI tooling unavailable was the reason, and the user accepted static-only validation for this run.
 
+## Support Data
+
+- Confirm evidence notes render near the referenced design item or after the referenced table row.
+- Confirm unreferenced evidence warnings were reviewed.
+- Confirm traceability uses `target_type` and `target_id` as the authoritative binding and duplicates render once.
+- Confirm source snippets are necessary, redacted, safely fenced, and not inside table cells.
+- Confirm risks and assumptions render in chapter 9 with support refs when present.
+- Confirm low-confidence summary excludes support data and Mermaid diagram nodes.
+- Confirm extra table evidence renders after the table, support metadata names are not visible column keys, and extra diagrams render only when non-empty.
+
 ## No Repo Analysis
 
 - Confirm this skill only rendered prepared design content.

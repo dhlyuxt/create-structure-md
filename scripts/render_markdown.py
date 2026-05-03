@@ -317,12 +317,36 @@ def rows_with_display_refs(rows, module_display_names, runtime_unit_display_name
     return mapped_rows
 
 
-def render_extra_table(table):
+def first_display_value(row, columns):
+    for key, _title in columns:
+        value = stringify_markdown_value(row.get(key, "")).strip()
+        if value:
+            return value
+    return "未命名补充行"
+
+
+def render_extra_table_support(table, context):
+    columns = [(column.get("key", ""), column.get("title", "")) for column in table.get("columns", [])]
+    parts = []
+    for row in table.get("rows", []):
+        support = render_node_support(row, context)
+        if support:
+            label = first_display_value(row, columns)
+            parts.append(f"支持数据（{escape_plain_text(label).strip()}）\n\n{support}")
+    return "\n\n".join(parts)
+
+
+def render_extra_table(table, support_context=None):
     columns = table.get("columns", [])
     rows = table.get("rows", [])
     declared_columns = [(column.get("key", ""), column.get("title", "")) for column in columns]
     title = escape_heading_label(table.get("title", ""))
-    return f"#### {title}\n\n{render_fixed_table(rows, declared_columns)}"
+    rendered = f"#### {title}\n\n{render_fixed_table(rows, declared_columns)}"
+    if support_context is not None:
+        support = render_extra_table_support(table, support_context)
+        if support:
+            rendered = f"{rendered}\n\n{support}"
+    return rendered
 
 
 def render_extra_diagram(diagram):
@@ -332,10 +356,10 @@ def render_extra_diagram(diagram):
     return f"#### {title}\n\n{render_mermaid_block(untitled_diagram)}"
 
 
-def render_extras(extra_tables, extra_diagrams, empty_text="无补充内容。"):
+def render_extras(extra_tables, extra_diagrams, empty_text="无补充内容。", support_context=None):
     parts = []
     for table in extra_tables or []:
-        parts.append(render_extra_table(table))
+        parts.append(render_extra_table(table, support_context=support_context))
     for diagram in extra_diagrams or []:
         parts.append(render_extra_diagram(diagram))
     if not parts:
@@ -586,7 +610,11 @@ def render_chapter_3(document, support_context):
         subchapter_heading(3, 3, "模块关系图"),
         render_mermaid_block(architecture.get("module_relationship_diagram", {}), empty_text="无模块关系图。"),
         subchapter_heading(3, 4, "补充架构图表"),
-        render_extras(architecture.get("extra_tables", []), architecture.get("extra_diagrams", [])),
+        render_extras(
+            architecture.get("extra_tables", []),
+            architecture.get("extra_diagrams", []),
+            support_context=support_context,
+        ),
     ]
     return "\n\n".join(part for part in parts if part != "")
 
@@ -639,13 +667,23 @@ def render_internal_structure(internal_structure):
     return "\n\n".join(part for part in parts if part != "")
 
 
-def render_module_supplement(module):
+def render_module_supplement(module, support_context):
     details = module.get("external_capability_details", {})
     parts = []
-    details_extras = render_extras(details.get("extra_tables", []), details.get("extra_diagrams", []), empty_text="")
+    details_extras = render_extras(
+        details.get("extra_tables", []),
+        details.get("extra_diagrams", []),
+        empty_text="",
+        support_context=support_context,
+    )
     if details_extras:
         parts.append(details_extras)
-    module_extras = render_extras(module.get("extra_tables", []), module.get("extra_diagrams", []), empty_text="")
+    module_extras = render_extras(
+        module.get("extra_tables", []),
+        module.get("extra_diagrams", []),
+        empty_text="",
+        support_context=support_context,
+    )
     if module_extras:
         parts.append(module_extras)
     notes = render_bullets(module.get("notes", []))
@@ -693,7 +731,7 @@ def render_module_design_section(module, index, support_context):
         nested_heading(4, index, 5, "模块内部结构关系图"),
         render_internal_structure(module.get("internal_structure", {})),
         nested_heading(4, index, 6, "补充说明"),
-        render_module_supplement(module),
+        render_module_supplement(module, support_context),
     ]
     return "\n\n".join(part for part in parts if part != "")
 
@@ -734,7 +772,11 @@ def render_chapter_5(document, module_display_names, support_context):
         subchapter_heading(5, 4, "运行时序图（推荐）"),
         render_mermaid_block(runtime.get("runtime_sequence_diagram", {}), empty_text="未提供运行时序图。"),
         subchapter_heading(5, 5, "补充运行时图表"),
-        render_extras(runtime.get("extra_tables", []), runtime.get("extra_diagrams", [])),
+        render_extras(
+            runtime.get("extra_tables", []),
+            runtime.get("extra_diagrams", []),
+            support_context=support_context,
+        ),
     ]
     return "\n\n".join(part for part in parts if part != "")
 
@@ -780,7 +822,11 @@ def render_chapter_6(document, support_context):
                 target_type="dependency",
             ),
             subchapter_heading(6, 4, "补充图表"),
-            render_extras(configuration.get("extra_tables", []), configuration.get("extra_diagrams", [])),
+            render_extras(
+                configuration.get("extra_tables", []),
+                configuration.get("extra_diagrams", []),
+                support_context=support_context,
+            ),
         ]
     )
     return "\n\n".join(part for part in parts if part != "")
@@ -813,7 +859,11 @@ def render_chapter_7(document, module_display_names, support_context):
             empty_text="未提供跨模块协作关系图。",
         ),
         subchapter_heading(7, 4, "补充协作图表"),
-        render_extras(collaboration.get("extra_tables", []), collaboration.get("extra_diagrams", [])),
+        render_extras(
+            collaboration.get("extra_tables", []),
+            collaboration.get("extra_diagrams", []),
+            support_context=support_context,
+        ),
     ]
     return "\n\n".join(part for part in parts if part != "")
 
@@ -886,7 +936,12 @@ def render_chapter_8(document, module_display_names, runtime_unit_display_names,
         subchapter_heading(8, 1, "关键流程概述"),
         render_paragraph(key_flows.get("summary", "")),
     ]
-    extras = render_extras(key_flows.get("extra_tables", []), key_flows.get("extra_diagrams", []), empty_text="")
+    extras = render_extras(
+        key_flows.get("extra_tables", []),
+        key_flows.get("extra_diagrams", []),
+        empty_text="",
+        support_context=support_context,
+    )
     if extras:
         parts.append(extras)
     parts.extend(

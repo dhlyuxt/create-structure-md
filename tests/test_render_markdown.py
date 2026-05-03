@@ -1826,6 +1826,99 @@ class RendererIntegrationTests(unittest.TestCase):
         self.assertNotIn("\n# hostile config", markdown)
         self.assertIn("\\# hostile config", markdown)
 
+    def test_extra_table_evidence_renders_after_extra_table_using_row_display_value(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["evidence"] = [
+            {"id": "EV-EXTRA", "kind": "note", "title": "补充表证据", "location": "notes", "description": "", "confidence": "observed"},
+        ]
+        document["architecture_views"]["extra_tables"] = [{
+            "id": "TBL-ARCH-EVIDENCE",
+            "title": "架构补充依据",
+            "columns": [{"key": "name", "title": "名称"}, {"key": "note", "title": "说明"}],
+            "rows": [
+                {"name": "补充行A", "note": "说明A", "evidence_refs": ["EV-EXTRA"]},
+                {"name": "补充行B"},
+            ],
+        }]
+
+        markdown = module.render_markdown(document)
+        section = section_between(markdown, "### 3.4 补充架构图表", "## 4. 模块设计")
+
+        self.assertIn("#### 架构补充依据", section)
+        self.assertIn("| 名称 | 说明 |", section)
+        self.assertIn("| 补充行B |  |", section)
+        self.assertIn("支持数据（补充行A）", section)
+        self.assertIn("依据：EV-EXTRA（补充表证据，notes）", section)
+        self.assertNotIn("| EV-EXTRA |", section)
+
+    def test_phase_6_support_data_render_integration_passes_mermaid_static_validation(self):
+        document = valid_document()
+        document["evidence"] = [
+            {"id": "EV-MODULE", "kind": "source", "title": "模块证据", "location": "schema", "description": "", "confidence": "observed"},
+            {"id": "EV-EXTRA", "kind": "note", "title": "补充表证据", "location": "", "description": "", "confidence": "observed"},
+        ]
+        document["traceability"] = [
+            {"id": "TR-MODULE", "source_external_id": "REQ-MODULE", "source_type": "requirement", "target_type": "module", "target_id": "MOD-SKILL", "description": "模块追踪。"},
+            {"id": "TR-STEP", "source_external_id": "REQ-STEP", "source_type": "requirement", "target_type": "flow_step", "target_id": "STEP-GENERATE-001", "description": ""},
+        ]
+        document["source_snippets"] = [
+            {"id": "SNIP-MODULE", "path": "scripts/render_markdown.py", "line_start": 1, "line_end": 3, "language": "python", "purpose": "模块片段。", "content": "```nested```\nprint('safe fence')", "confidence": "observed"},
+        ]
+        document["architecture_views"]["module_intro"]["rows"][0]["evidence_refs"] = ["EV-MODULE"]
+        document["module_design"]["modules"][0]["traceability_refs"] = ["TR-MODULE"]
+        document["module_design"]["modules"][0]["source_snippet_refs"] = ["SNIP-MODULE"]
+        document["key_flows"]["flows"][0]["steps"][0]["traceability_refs"] = []
+        document["architecture_views"]["extra_tables"] = [{
+            "id": "TBL-PHASE-6",
+            "title": "Phase 6 补充表",
+            "columns": [{"key": "name", "title": "名称"}],
+            "rows": [{"name": "补充证据行", "evidence_refs": ["EV-EXTRA"]}],
+        }]
+        document["architecture_views"]["extra_diagrams"] = [
+            synthetic_diagram("MER-PHASE-6-EXTRA", "flowchart TD\n  P6A[支持数据] --> P6B[渲染输出]")
+        ]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dsl_path = write_json(tmpdir, "phase-6-support.dsl.json", document)
+            validate = subprocess.run(
+                [PYTHON, str(ROOT / "scripts/validate_dsl.py"), str(dsl_path)],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(0, validate.returncode, validate.stderr)
+
+            render = subprocess.run(
+                [PYTHON, str(RENDERER), str(dsl_path), "--output-dir", tmpdir],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(0, render.returncode, render.stderr)
+            output_path = Path(tmpdir) / document["document"]["output_file"]
+            markdown = output_path.read_text(encoding="utf-8")
+            self.assertIn("依据：EV-MODULE（模块证据，schema）", markdown)
+            self.assertIn("关联来源：REQ-MODULE（模块追踪。）", markdown)
+            self.assertIn("支持数据（STEP-GENERATE-001 / 准备结构化 DSL JSON。）", markdown)
+            self.assertIn("关联来源：REQ-STEP", markdown)
+            self.assertEqual([], document["key_flows"]["flows"][0]["traceability_refs"])
+            self.assertIn("````python\n```nested```\nprint('safe fence')\n````", markdown)
+            self.assertIn("#### Phase 6 补充表", markdown)
+            self.assertIn("#### MER-PHASE-6-EXTRA", markdown)
+
+            mermaid = subprocess.run(
+                [PYTHON, str(VALIDATOR), "--from-markdown", str(output_path), "--static"],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(0, mermaid.returncode, mermaid.stderr)
+            self.assertIn("Mermaid validation succeeded", mermaid.stdout)
+
     def test_reference_docs_describe_phase_5_renderer_contract(self):
         document_structure = (ROOT / "references/document-structure.md").read_text(encoding="utf-8")
         review_checklist = (ROOT / "references/review-checklist.md").read_text(encoding="utf-8")

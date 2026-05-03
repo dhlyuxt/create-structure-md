@@ -51,3 +51,7 @@ The renderer writes into the requested output directory and does not overwrite a
 Every non-empty DSL Mermaid source is rendered in exactly one Mermaid code fence. After rendering, run `validate_mermaid.py --from-markdown <output-file> --static` to validate the Markdown output.
 
 Tables use fixed visible table columns for each section. IDs, confidence, evidence refs, traceability refs, and source snippet refs are hidden from normal tables. They may appear only in chapter 9 risks, assumptions, and low-confidence summaries where review traceability is the purpose.
+
+Support data renders as compact notes near the relevant node or immediately after the relevant table. Fixed table rows keep fixed visible columns; evidence, traceability, and source snippet refs never become table cells. Extra table row evidence renders after the extra table using the first non-empty displayed row value as the support label; support metadata names are reserved and cannot be declared as extra table columns.
+
+Chapter 6 empty tables render the documented empty-state sentences. Chapter 7 keeps sections 7.1 through 7.4 in single-module documents and renders the fixed collaboration absence text plus no-diagram text.
