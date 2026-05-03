@@ -2,6 +2,7 @@ import contextlib
 import importlib.util
 import io
 import os
+import shlex
 import subprocess
 import sys
 import unittest
@@ -128,7 +129,7 @@ class InstallerCliTests(unittest.TestCase):
 
     def test_existing_target_fails_before_copying(self):
         run_dir = make_run_dir("existing-target")
-        codex_home = run_dir / "codex-home"
+        codex_home = run_dir / "codex home"
         target = codex_home / "skills/create-structure-md"
         target.mkdir(parents=True)
         marker = target / "marker.txt"
@@ -139,7 +140,10 @@ class InstallerCliTests(unittest.TestCase):
         self.assertEqual(1, completed.returncode)
         self.assertIn("ERROR: target already exists", completed.stderr)
         self.assertIn(str(target), completed.stderr)
-        self.assertIn("Example user-run cleanup command: rm -r", completed.stderr)
+        self.assertIn(
+            f"Example user-run cleanup command: rm -r {shlex.quote(str(target))}",
+            completed.stderr,
+        )
         self.assertTrue(marker.exists())
         self.assertFalse((target / "SKILL.md").exists())
 

@@ -5,6 +5,7 @@ import argparse
 import importlib.util
 import os
 import re
+import shlex
 import shutil
 import sys
 from dataclasses import dataclass
@@ -55,6 +56,10 @@ def resolve_codex_home(raw_home: Optional[str] = None) -> Path:
 
 def target_for(codex_home: Path) -> Path:
     return codex_home / "skills" / SKILL_NAME
+
+
+def cleanup_command(path: Path) -> str:
+    return f"rm -r {shlex.quote(str(path))}"
 
 
 def validate_source(source: Path) -> ValidationReport:
@@ -205,14 +210,18 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if target.exists():
         print(f"ERROR: target already exists: {target}", file=sys.stderr)
-        print(f"Example user-run cleanup command: rm -r {target}", file=sys.stderr)
+        print(f"Example user-run cleanup command: {cleanup_command(target)}", file=sys.stderr)
         return 1
 
     try:
         copy_skill(source, target)
     except Exception as exc:
         print(f"ERROR: install failed while copying: {exc}", file=sys.stderr)
-        print(f"Manual inspection required. To clean partial output, review then run: rm -r {target}", file=sys.stderr)
+        print(
+            "Manual inspection required. "
+            f"To clean partial output, review then run: {cleanup_command(target)}",
+            file=sys.stderr,
+        )
         return 1
 
     print(f"Installed create-structure-md to {target}")
