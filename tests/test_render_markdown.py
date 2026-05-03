@@ -741,6 +741,63 @@ class MarkdownPrimitiveTests(unittest.TestCase):
                 self.assertNotIn("py`thon", rendered)
 
 
+class SupportDataPrimitiveTests(unittest.TestCase):
+    def test_build_support_context_indexes_support_data_by_id_and_trace_target(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["evidence"] = [
+            {"id": "EV-001", "kind": "source", "title": "入口脚本", "location": "scripts/render_markdown.py:1", "description": "渲染入口。", "confidence": "observed"},
+        ]
+        document["traceability"] = [
+            {"id": "TR-001", "source_external_id": "REQ-001", "source_type": "requirement", "target_type": "module", "target_id": "MOD-SKILL", "description": "模块需求。"},
+            {"id": "TR-002", "source_external_id": "REQ-002", "source_type": "requirement", "target_type": "runtime_unit", "target_id": "RUN-GENERATE", "description": ""},
+        ]
+        document["source_snippets"] = [
+            {"id": "SNIP-001", "path": "scripts/render_markdown.py", "line_start": 1, "line_end": 3, "language": "python", "purpose": "证明渲染入口。", "content": "def main():\n    return 0", "confidence": "observed"},
+        ]
+
+        context = module.build_support_context(document)
+
+        self.assertEqual("入口脚本", context.evidence_by_id["EV-001"]["title"])
+        self.assertEqual("SNIP-001", context.snippets_by_id["SNIP-001"]["id"])
+        self.assertEqual(["TR-001"], [item["id"] for item in context.traceability_by_target[("module", "MOD-SKILL")]])
+        self.assertEqual(["TR-002"], [item["id"] for item in context.traceability_by_target[("runtime_unit", "RUN-GENERATE")]])
+
+    def test_render_node_support_combines_refs_authoritative_traceability_and_deduplicates(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["evidence"] = [
+            {"id": "EV-001", "kind": "source", "title": "入口脚本", "location": "scripts/render_markdown.py:1", "description": "很长描述不应内联。", "confidence": "observed"},
+        ]
+        document["traceability"] = [
+            {"id": "TR-001", "source_external_id": "REQ-001", "source_type": "requirement", "target_type": "module", "target_id": "MOD-SKILL", "description": "覆盖模块生成能力。"},
+        ]
+        document["source_snippets"] = [
+            {"id": "SNIP-001", "path": "scripts/render_markdown.py", "line_start": 10, "line_end": 12, "language": "python", "purpose": "展示入口。", "content": "def main():\n    return 0", "confidence": "observed"},
+        ]
+        node = {
+            "evidence_refs": ["EV-001", "EV-001"],
+            "traceability_refs": ["TR-001"],
+            "source_snippet_refs": ["SNIP-001"],
+        }
+        context = module.build_support_context(document)
+
+        rendered = module.render_node_support(node, context, target_type="module", target_id="MOD-SKILL")
+
+        self.assertEqual(1, rendered.count("依据：EV-001（入口脚本，scripts/render_markdown.py:1）"))
+        self.assertEqual(1, rendered.count("关联来源：REQ-001（覆盖模块生成能力。）"))
+        self.assertIn("Source: scripts/render_markdown.py:10-12", rendered)
+        self.assertIn("Purpose: 展示入口。", rendered)
+        self.assertIn("```python\ndef main():\n    return 0\n```", rendered)
+        self.assertNotIn("很长描述不应内联", rendered)
+
+    def test_render_node_support_returns_empty_string_when_no_support_exists(self):
+        module = load_renderer_module()
+        context = module.build_support_context(valid_document())
+        rendered = module.render_node_support({}, context, target_type="module", target_id="MOD-SKILL")
+        self.assertEqual("", rendered)
+
+
 def section_between(text, start_marker, end_marker):
     start = text.index(start_marker)
     end = text.index(end_marker, start)

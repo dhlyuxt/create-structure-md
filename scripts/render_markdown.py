@@ -5,6 +5,7 @@ import json
 import re
 import shutil
 import sys
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
@@ -354,6 +355,93 @@ def safe_fence_info_string(value):
     if SAFE_FENCE_INFO_RE.fullmatch(language):
         return language
     return ""
+
+
+@dataclass
+class SupportContext:
+    evidence_by_id: dict = field(default_factory=dict)
+    traceability_by_id: dict = field(default_factory=dict)
+    traceability_by_target: dict = field(default_factory=dict)
+    snippets_by_id: dict = field(default_factory=dict)
+
+
+def build_support_context(document):
+    context = SupportContext()
+    context.evidence_by_id = {item.get("id"): item for item in document.get("evidence", [])}
+    context.traceability_by_id = {item.get("id"): item for item in document.get("traceability", [])}
+    context.snippets_by_id = {item.get("id"): item for item in document.get("source_snippets", [])}
+    for item in document.get("traceability", []):
+        target = (item.get("target_type"), item.get("target_id"))
+        context.traceability_by_target.setdefault(target, []).append(item)
+    return context
+
+
+def unique_existing_items(refs, items_by_id):
+    seen = set()
+    items = []
+    for ref in refs or []:
+        if ref in seen:
+            continue
+        item = items_by_id.get(ref)
+        if item is not None:
+            items.append(item)
+            seen.add(ref)
+    return items
+
+
+def evidence_label(evidence):
+    title = stringify_markdown_value(evidence.get("title", "")).strip()
+    location = stringify_markdown_value(evidence.get("location", "")).strip()
+    details = [part for part in [title, location] if part]
+    if details:
+        return f"{evidence.get('id')}（{'，'.join(details)}）"
+    return stringify_markdown_value(evidence.get("id", ""))
+
+
+def traceability_label(trace):
+    source = stringify_markdown_value(trace.get("source_external_id", "")).strip()
+    description = stringify_markdown_value(trace.get("description", "")).strip()
+    if description:
+        return f"{source}（{description}）"
+    return source
+
+
+def render_support_lines(lines):
+    rendered = []
+    for line in lines:
+        escaped = escape_plain_text(line).strip()
+        if escaped:
+            rendered.append(f"- {escaped}")
+    return "\n".join(rendered)
+
+
+def render_node_support(node, context, target_type=None, target_id=None):
+    lines = []
+    for evidence in unique_existing_items(node.get("evidence_refs", []), context.evidence_by_id):
+        lines.append(f"依据：{evidence_label(evidence)}")
+
+    trace_items = []
+    seen_trace_ids = set()
+    for trace in context.traceability_by_target.get((target_type, target_id), []):
+        trace_id = trace.get("id")
+        if trace_id not in seen_trace_ids:
+            trace_items.append(trace)
+            seen_trace_ids.add(trace_id)
+    for trace in unique_existing_items(node.get("traceability_refs", []), context.traceability_by_id):
+        trace_id = trace.get("id")
+        if trace_id not in seen_trace_ids:
+            trace_items.append(trace)
+            seen_trace_ids.add(trace_id)
+    for trace in trace_items:
+        lines.append(f"关联来源：{traceability_label(trace)}")
+
+    parts = []
+    support_lines = render_support_lines(lines)
+    if support_lines:
+        parts.append(support_lines)
+    for snippet in unique_existing_items(node.get("source_snippet_refs", []), context.snippets_by_id):
+        parts.append(render_source_snippet(snippet))
+    return "\n\n".join(parts)
 
 
 def generated_at_value():
