@@ -44,11 +44,6 @@ JSON_SCAFFOLD_FILES = [
 
 SCRIPT_CASES = [
     (
-        "scripts/validate_mermaid.py",
-        ["--from-dsl", "structure.dsl.json", "--strict"],
-        "Mermaid validation is not implemented in Phase 1",
-    ),
-    (
         "scripts/render_markdown.py",
         ["structure.dsl.json", "--output-dir", "."],
         "Markdown rendering is not implemented in Phase 1",

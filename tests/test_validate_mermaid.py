@@ -1,8 +1,20 @@
+import contextlib
+import importlib.util
+import io
+import json
+import subprocess
+import sys
+import tempfile
 import unittest
+from copy import deepcopy
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
+VALIDATOR = ROOT / "scripts/validate_mermaid.py"
+FIXTURE = ROOT / "tests/fixtures/valid-phase2.dsl.json"
+PYTHON = sys.executable
 SKILL = ROOT / "SKILL.md"
 
 EXPECTED_DESCRIPTION = (
@@ -39,6 +51,36 @@ WORKFLOW_ORDER = [
 ]
 
 
+def load_validator_module():
+    spec = importlib.util.spec_from_file_location("validate_mermaid_under_test", VALIDATOR)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def call_main(module, args):
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+        try:
+            result = module.main(args)
+        except SystemExit as exc:
+            code = exc.code
+        else:
+            code = result
+    return code or 0, stdout.getvalue(), stderr.getvalue()
+
+
+def valid_document():
+    return deepcopy(json.loads(FIXTURE.read_text(encoding="utf-8")))
+
+
+def write_json(document, directory, name="structure.dsl.json"):
+    path = Path(directory) / name
+    path.write_text(json.dumps(document), encoding="utf-8")
+    return path
+
+
 def front_matter_value(front_matter, key):
     prefix = f"{key}: "
     values = [
@@ -49,6 +91,136 @@ def front_matter_value(front_matter, key):
     if len(values) != 1:
         raise AssertionError(f"Expected exactly one {key!r} front matter value")
     return values[0]
+
+
+class MermaidCliContractTests(unittest.TestCase):
+    def test_dsl_and_markdown_sources_are_mutually_exclusive(self):
+        completed = subprocess.run(
+            [
+                PYTHON,
+                str(VALIDATOR),
+                "--from-dsl",
+                "structure.dsl.json",
+                "--from-markdown",
+                "rendered.md",
+            ],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(2, completed.returncode)
+        self.assertIn("not allowed with argument", completed.stderr)
+
+    def test_static_and_strict_are_mutually_exclusive(self):
+        completed = subprocess.run(
+            [
+                PYTHON,
+                str(VALIDATOR),
+                "--from-dsl",
+                "structure.dsl.json",
+                "--static",
+                "--strict",
+            ],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(2, completed.returncode)
+        self.assertIn("--strict and --static are mutually exclusive", completed.stderr)
+
+    def test_check_env_must_be_used_by_itself(self):
+        completed = subprocess.run(
+            [PYTHON, str(VALIDATOR), "--check-env", "--from-dsl", "structure.dsl.json"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(2, completed.returncode)
+        self.assertIn("--check-env must be used by itself", completed.stderr)
+
+    def test_check_env_reports_missing_mmdc(self):
+        module = load_validator_module()
+        with mock.patch.object(module.shutil, "which", side_effect=lambda name: "/usr/bin/node" if name == "node" else None):
+            code, stdout, stderr = call_main(module, ["--check-env"])
+        self.assertEqual(1, code)
+        self.assertIn("node: found at /usr/bin/node", stdout)
+        self.assertIn("mmdc: missing", stdout)
+        self.assertEqual("", stderr)
+
+    def test_check_env_reports_node_mmdc_and_mermaid_cli_version(self):
+        module = load_validator_module()
+
+        def fake_which(name):
+            return {
+                "node": "/usr/bin/node",
+                "mmdc": "/usr/local/bin/mmdc",
+            }.get(name)
+
+        completed = subprocess.CompletedProcess(
+            ["mmdc", "--version"],
+            0,
+            stdout="10.9.1\n",
+            stderr="",
+        )
+        with (
+            mock.patch.object(module.shutil, "which", side_effect=fake_which),
+            mock.patch.object(module.subprocess, "run", return_value=completed),
+        ):
+            code, stdout, stderr = call_main(module, ["--check-env"])
+        self.assertEqual(0, code)
+        self.assertIn("node: found at /usr/bin/node", stdout)
+        self.assertIn("mmdc: found at /usr/local/bin/mmdc", stdout)
+        self.assertIn("mermaid-cli: 10.9.1", stdout)
+        self.assertEqual("", stderr)
+
+    def test_work_dir_is_valid_when_default_mode_is_strict(self):
+        module = load_validator_module()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = write_json(valid_document(), temp_dir)
+            parser = module.build_parser()
+            args = parser.parse_args(
+                [
+                    "--from-dsl",
+                    str(source),
+                    "--work-dir",
+                    str(Path(temp_dir) / "mermaid-work"),
+                ]
+            )
+            module.validate_args(args, parser)
+        self.assertEqual("strict", module.effective_mode(args))
+
+    def test_static_work_dir_fails(self):
+        completed = subprocess.run(
+            [
+                PYTHON,
+                str(VALIDATOR),
+                "--from-dsl",
+                "structure.dsl.json",
+                "--static",
+                "--work-dir",
+                "mermaid-work",
+            ],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(2, completed.returncode)
+        self.assertIn("--work-dir is valid only in strict mode", completed.stderr)
+
+    def test_source_or_check_env_is_required(self):
+        completed = subprocess.run(
+            [PYTHON, str(VALIDATOR)],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(2, completed.returncode)
+        self.assertIn("one of --from-dsl, --from-markdown, or --check-env is required", completed.stderr)
 
 
 class SkillMetadataTests(unittest.TestCase):
