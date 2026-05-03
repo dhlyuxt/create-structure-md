@@ -11,6 +11,13 @@ from pathlib import Path
 
 
 SUPPORTED_TYPES = {"flowchart", "graph", "sequenceDiagram", "classDiagram", "stateDiagram-v2"}
+TYPE_PREFIXES = {
+    "flowchart": re.compile(r"^flowchart(?=\s|$)"),
+    "graph": re.compile(r"^graph(?=\s|$)"),
+    "sequenceDiagram": re.compile(r"^sequenceDiagram(?=\s|$)"),
+    "classDiagram": re.compile(r"^classDiagram(?=\s|$)"),
+    "stateDiagram-v2": re.compile(r"^stateDiagram-v2(?=\s|$)"),
+}
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -95,6 +102,210 @@ def print_report(report):
         print(issue.format(), file=sys.stderr)
 
 
+def json_path(*parts):
+    path = "$"
+    for part in parts:
+        if isinstance(part, int):
+            path += f"[{part}]"
+        else:
+            path += f".{part}"
+    return path
+
+
+def is_diagram_object(value):
+    return isinstance(value, dict) and {"id", "kind", "diagram_type", "source"}.issubset(value)
+
+
+def first_meaningful_line(source):
+    for line in source.splitlines():
+        stripped = line.strip()
+        if stripped and not stripped.startswith("%%"):
+            return stripped
+    return ""
+
+
+def infer_type_from_source(source):
+    first_line = first_meaningful_line(source)
+    for diagram_type, pattern in TYPE_PREFIXES.items():
+        if pattern.search(first_line):
+            return diagram_type
+    return ""
+
+
+def append_diagram(diagrams, value, path):
+    if not is_diagram_object(value):
+        return
+    source = value["source"]
+    if not isinstance(source, str) or not source.strip():
+        return
+    diagrams.append(
+        MermaidDiagram(
+            diagram_id=str(value["id"]),
+            source=source,
+            diagram_type=str(value["diagram_type"]),
+            json_path=path,
+        )
+    )
+
+
+def append_diagram_array(diagrams, values, path):
+    if not isinstance(values, list):
+        return
+    for index, value in enumerate(values):
+        append_diagram(diagrams, value, f"{path}[{index}]")
+
+
+def extract_diagrams_from_dsl(document):
+    diagrams = []
+    architecture_views = document.get("architecture_views", {})
+    append_diagram(
+        diagrams,
+        architecture_views.get("module_relationship_diagram"),
+        json_path("architecture_views", "module_relationship_diagram"),
+    )
+    append_diagram_array(
+        diagrams,
+        architecture_views.get("extra_diagrams"),
+        json_path("architecture_views", "extra_diagrams"),
+    )
+
+    module_design = document.get("module_design", {})
+    modules = module_design.get("modules", [])
+    if isinstance(modules, list):
+        for module_index, module in enumerate(modules):
+            if not isinstance(module, dict):
+                continue
+            append_diagram(
+                diagrams,
+                module.get("internal_structure", {}).get("diagram")
+                if isinstance(module.get("internal_structure"), dict)
+                else None,
+                json_path("module_design", "modules", module_index, "internal_structure", "diagram"),
+            )
+            external_details = module.get("external_capability_details", {})
+            append_diagram_array(
+                diagrams,
+                external_details.get("extra_diagrams") if isinstance(external_details, dict) else None,
+                json_path(
+                    "module_design",
+                    "modules",
+                    module_index,
+                    "external_capability_details",
+                    "extra_diagrams",
+                ),
+            )
+            append_diagram_array(
+                diagrams,
+                module.get("extra_diagrams"),
+                json_path("module_design", "modules", module_index, "extra_diagrams"),
+            )
+
+    runtime_view = document.get("runtime_view", {})
+    append_diagram(
+        diagrams,
+        runtime_view.get("runtime_flow_diagram"),
+        json_path("runtime_view", "runtime_flow_diagram"),
+    )
+    append_diagram(
+        diagrams,
+        runtime_view.get("runtime_sequence_diagram"),
+        json_path("runtime_view", "runtime_sequence_diagram"),
+    )
+    append_diagram_array(
+        diagrams,
+        runtime_view.get("extra_diagrams"),
+        json_path("runtime_view", "extra_diagrams"),
+    )
+
+    configuration = document.get("configuration_data_dependencies", {})
+    append_diagram_array(
+        diagrams,
+        configuration.get("extra_diagrams"),
+        json_path("configuration_data_dependencies", "extra_diagrams"),
+    )
+
+    collaboration = document.get("cross_module_collaboration", {})
+    append_diagram(
+        diagrams,
+        collaboration.get("collaboration_relationship_diagram"),
+        json_path("cross_module_collaboration", "collaboration_relationship_diagram"),
+    )
+    append_diagram_array(
+        diagrams,
+        collaboration.get("extra_diagrams"),
+        json_path("cross_module_collaboration", "extra_diagrams"),
+    )
+
+    key_flows = document.get("key_flows", {})
+    flows = key_flows.get("flows", [])
+    if isinstance(flows, list):
+        for flow_index, flow in enumerate(flows):
+            if isinstance(flow, dict):
+                append_diagram(
+                    diagrams,
+                    flow.get("diagram"),
+                    json_path("key_flows", "flows", flow_index, "diagram"),
+                )
+    append_diagram_array(
+        diagrams,
+        key_flows.get("extra_diagrams"),
+        json_path("key_flows", "extra_diagrams"),
+    )
+    return diagrams
+
+
+def validate_static(diagrams, source_kind):
+    report = MermaidReport()
+    seen_ids = {}
+    for diagram in diagrams:
+        location = diagram.label()
+        if not diagram.source.strip():
+            report.error(location, "source must be non-empty")
+            continue
+        if diagram.diagram_type not in SUPPORTED_TYPES:
+            report.error(location, f"unsupported diagram_type {diagram.diagram_type}")
+        if source_kind == "dsl" and "```" in diagram.source:
+            report.error(location, "DSL Mermaid source must not include Markdown code fences")
+        inferred_type = infer_type_from_source(diagram.source)
+        if not inferred_type:
+            report.error(
+                location,
+                "first meaningful line does not start with a supported Mermaid diagram type",
+            )
+        elif diagram.diagram_type in SUPPORTED_TYPES and inferred_type != diagram.diagram_type:
+            report.error(
+                location,
+                f"first meaningful line starts with {inferred_type} but diagram_type is {diagram.diagram_type}",
+            )
+        if source_kind == "dsl":
+            if diagram.diagram_id in seen_ids:
+                report.error(
+                    location,
+                    f"duplicate diagram id {diagram.diagram_id}; first seen at {seen_ids[diagram.diagram_id]}",
+                )
+            else:
+                seen_ids[diagram.diagram_id] = diagram.json_path
+    return report
+
+
+def load_json_file(path):
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise ValueError(f"could not read file {path}: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"invalid JSON in {path}: {exc}") from exc
+
+
+def run_static_validation(diagrams, source_kind):
+    report = validate_static(diagrams, source_kind)
+    if report.errors:
+        print_report(report)
+        return 1
+    print(f"Mermaid validation succeeded: {len(diagrams)} diagram(s) checked in static mode.")
+    return 0
+
+
 def main(argv=None):
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -104,7 +315,21 @@ def main(argv=None):
         for line in lines:
             print(line)
         return 0 if ok else 1
-    print("ERROR: validation mode requires Task 2 static extraction", file=sys.stderr)
+    try:
+        if args.dsl_file and effective_mode(args) == "static":
+            document = load_json_file(args.dsl_file)
+            diagrams = extract_diagrams_from_dsl(document)
+            return run_static_validation(diagrams, "dsl")
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+    if args.dsl_file:
+        print("ERROR: strict validation requires Task 5 Mermaid CLI adapter", file=sys.stderr)
+        return 2
+    if args.markdown_file:
+        print("ERROR: Markdown validation requires Task 3 fence extraction", file=sys.stderr)
+        return 2
+    print("ERROR: unsupported validation mode", file=sys.stderr)
     return 2
 
 

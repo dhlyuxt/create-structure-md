@@ -81,6 +81,12 @@ def write_json(document, directory, name="structure.dsl.json"):
     return path
 
 
+def write_markdown(tmpdir, name, text):
+    path = Path(tmpdir) / name
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
 def front_matter_value(front_matter, key):
     prefix = f"{key}: "
     values = [
@@ -312,6 +318,198 @@ class SkillBodyContractTests(unittest.TestCase):
         self.assertIn("This skill does not analyze repositories", self.text)
         self.assertIn("Do not run repository analysis tools as part of this skill", self.text)
         self.assertIn("Create one module- or system-specific Markdown file", self.text)
+
+
+class DslMermaidStaticTests(unittest.TestCase):
+    def diagram(self, diagram_id, diagram_type="flowchart", source="flowchart TD\n  A --> B"):
+        return {
+            "id": diagram_id,
+            "kind": "test",
+            "title": diagram_id,
+            "diagram_type": diagram_type,
+            "description": "Test diagram.",
+            "source": source,
+            "confidence": "observed",
+        }
+
+    def document_with_all_known_paths(self):
+        document = valid_document()
+        document["architecture_views"]["module_relationship_diagram"] = self.diagram("MER-ARCH-MODULES")
+        document["architecture_views"]["extra_diagrams"] = [
+            self.diagram("MER-ARCH-EXTRA"),
+            self.diagram("MER-ARCH-EMPTY", source=" \n\t"),
+        ]
+        module = document["module_design"]["modules"][0]
+        module["internal_structure"]["diagram"] = self.diagram("MER-MODULE-INTERNAL")
+        module["external_capability_details"]["extra_diagrams"] = [
+            self.diagram("MER-MODULE-CAPABILITY-EXTRA")
+        ]
+        module["extra_diagrams"] = [self.diagram("MER-MODULE-EXTRA")]
+        document["runtime_view"]["runtime_flow_diagram"] = self.diagram("MER-RUNTIME-FLOW")
+        document["runtime_view"]["runtime_sequence_diagram"] = self.diagram(
+            "MER-RUNTIME-SEQUENCE",
+            diagram_type="sequenceDiagram",
+            source="sequenceDiagram\n  participant A\n  participant B\n  A->>B: call",
+        )
+        document["runtime_view"]["extra_diagrams"] = [self.diagram("MER-RUNTIME-EXTRA")]
+        document["configuration_data_dependencies"]["extra_diagrams"] = [
+            self.diagram("MER-CONFIG-EXTRA")
+        ]
+        document["cross_module_collaboration"]["collaboration_relationship_diagram"] = self.diagram(
+            "MER-COLLABORATION-RELATIONSHIP"
+        )
+        document["cross_module_collaboration"]["extra_diagrams"] = [
+            self.diagram("MER-COLLAB-EXTRA")
+        ]
+        document["key_flows"]["flows"][0]["diagram"] = self.diagram("MER-KEY-FLOW")
+        document["key_flows"]["extra_diagrams"] = [self.diagram("MER-KEY-FLOW-EXTRA")]
+        return document
+
+    def test_extracts_non_empty_diagrams_from_all_known_dsl_paths_and_skips_empty_optional_sources(self):
+        module = load_validator_module()
+        diagrams = module.extract_diagrams_from_dsl(self.document_with_all_known_paths())
+        paths_by_id = {diagram.diagram_id: diagram.json_path for diagram in diagrams}
+        expected_paths = {
+            "MER-ARCH-MODULES": "$.architecture_views.module_relationship_diagram",
+            "MER-ARCH-EXTRA": "$.architecture_views.extra_diagrams[0]",
+            "MER-MODULE-INTERNAL": "$.module_design.modules[0].internal_structure.diagram",
+            "MER-MODULE-CAPABILITY-EXTRA": "$.module_design.modules[0].external_capability_details.extra_diagrams[0]",
+            "MER-MODULE-EXTRA": "$.module_design.modules[0].extra_diagrams[0]",
+            "MER-RUNTIME-FLOW": "$.runtime_view.runtime_flow_diagram",
+            "MER-RUNTIME-SEQUENCE": "$.runtime_view.runtime_sequence_diagram",
+            "MER-RUNTIME-EXTRA": "$.runtime_view.extra_diagrams[0]",
+            "MER-CONFIG-EXTRA": "$.configuration_data_dependencies.extra_diagrams[0]",
+            "MER-COLLABORATION-RELATIONSHIP": "$.cross_module_collaboration.collaboration_relationship_diagram",
+            "MER-COLLAB-EXTRA": "$.cross_module_collaboration.extra_diagrams[0]",
+            "MER-KEY-FLOW": "$.key_flows.flows[0].diagram",
+            "MER-KEY-FLOW-EXTRA": "$.key_flows.extra_diagrams[0]",
+        }
+        self.assertEqual(expected_paths, paths_by_id)
+        self.assertNotIn("MER-ARCH-EMPTY", paths_by_id)
+
+    def test_from_dsl_static_succeeds(self):
+        module = load_validator_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = write_json(valid_document(), tmpdir)
+            code, stdout, stderr = call_main(module, ["--from-dsl", str(source), "--static"])
+        self.assertEqual(0, code)
+        self.assertIn("Mermaid validation succeeded", stdout)
+        self.assertIn("static mode", stdout)
+        self.assertEqual("", stderr)
+
+    def test_missing_dsl_file_exits_2_with_read_error(self):
+        module = load_validator_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = Path(tmpdir) / "missing.dsl.json"
+            code, stdout, stderr = call_main(module, ["--from-dsl", str(source), "--static"])
+        self.assertEqual(2, code)
+        self.assertEqual("", stdout)
+        self.assertIn("ERROR", stderr)
+        self.assertIn("could not read file", stderr)
+
+    def test_directory_path_as_dsl_exits_2_with_read_error(self):
+        module = load_validator_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            code, stdout, stderr = call_main(module, ["--from-dsl", tmpdir, "--static"])
+        self.assertEqual(2, code)
+        self.assertEqual("", stdout)
+        self.assertIn("ERROR", stderr)
+        self.assertIn("could not read file", stderr)
+
+    def test_invalid_json_exits_2_with_invalid_json_error(self):
+        module = load_validator_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = Path(tmpdir) / "invalid.dsl.json"
+            source.write_text("{", encoding="utf-8")
+            code, stdout, stderr = call_main(module, ["--from-dsl", str(source), "--static"])
+        self.assertEqual(2, code)
+        self.assertEqual("", stdout)
+        self.assertIn("ERROR", stderr)
+        self.assertIn("invalid JSON", stderr)
+
+    def test_dsl_static_rejects_diagram_type_first_line_mismatch(self):
+        module = load_validator_module()
+        document = valid_document()
+        diagram = document["runtime_view"]["runtime_flow_diagram"]
+        diagram["id"] = "MER-RUNTIME-MISMATCH"
+        diagram["diagram_type"] = "sequenceDiagram"
+        diagram["source"] = "flowchart TD\n  A --> B"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = write_json(document, tmpdir)
+            code, stdout, stderr = call_main(module, ["--from-dsl", str(source), "--static"])
+        self.assertEqual(1, code)
+        self.assertEqual("", stdout)
+        self.assertIn("$.runtime_view.runtime_flow_diagram", stderr)
+        self.assertIn("MER-RUNTIME-MISMATCH", stderr)
+        self.assertIn(
+            "first meaningful line starts with flowchart but diagram_type is sequenceDiagram",
+            stderr,
+        )
+
+    def test_dsl_static_rejects_unsupported_diagram_type(self):
+        module = load_validator_module()
+        document = valid_document()
+        document["runtime_view"]["runtime_flow_diagram"]["diagram_type"] = "erDiagram"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = write_json(document, tmpdir)
+            code, stdout, stderr = call_main(module, ["--from-dsl", str(source), "--static"])
+        self.assertEqual(1, code)
+        self.assertIn("$.runtime_view.runtime_flow_diagram", stderr)
+        self.assertIn("unsupported diagram_type erDiagram", stderr)
+
+    def test_optional_full_runtime_sequence_diagram_with_empty_source_is_skipped(self):
+        module = load_validator_module()
+        document = valid_document()
+        document["runtime_view"]["runtime_sequence_diagram"] = self.diagram(
+            "MER-RUNTIME-SEQUENCE-EMPTY",
+            diagram_type="sequenceDiagram",
+            source="",
+        )
+        diagrams = module.extract_diagrams_from_dsl(document)
+        self.assertNotIn("MER-RUNTIME-SEQUENCE-EMPTY", {diagram.diagram_id for diagram in diagrams})
+
+    def test_duplicate_diagram_ids_fail_for_dsl_input(self):
+        module = load_validator_module()
+        document = valid_document()
+        document["runtime_view"]["runtime_flow_diagram"]["id"] = "MER-DUPLICATE"
+        document["cross_module_collaboration"]["collaboration_relationship_diagram"]["id"] = "MER-DUPLICATE"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = write_json(document, tmpdir)
+            code, stdout, stderr = call_main(module, ["--from-dsl", str(source), "--static"])
+        self.assertEqual(1, code)
+        self.assertEqual("", stdout)
+        self.assertIn("duplicate diagram id MER-DUPLICATE", stderr)
+        self.assertIn("$.runtime_view.runtime_flow_diagram", stderr)
+        self.assertIn("$.cross_module_collaboration.collaboration_relationship_diagram", stderr)
+
+    def test_markdown_fences_inside_dsl_source_fail(self):
+        module = load_validator_module()
+        document = valid_document()
+        document["architecture_views"]["module_relationship_diagram"]["source"] = (
+            "```mermaid\nflowchart TD\n  A --> B\n```"
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = write_json(document, tmpdir)
+            code, stdout, stderr = call_main(module, ["--from-dsl", str(source), "--static"])
+        self.assertEqual(1, code)
+        self.assertIn("$.architecture_views.module_relationship_diagram", stderr)
+        self.assertIn("must not include Markdown code fences", stderr)
+
+    def test_type_inference_fails_closed_for_unsupported_prefixes(self):
+        module = load_validator_module()
+        for first_line in ["graphical TD", "flowchartish TD", "stateDiagram-v20"]:
+            with self.subTest(first_line=first_line):
+                document = valid_document()
+                document["architecture_views"]["module_relationship_diagram"]["source"] = first_line
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    source = write_json(document, tmpdir)
+                    code, stdout, stderr = call_main(module, ["--from-dsl", str(source), "--static"])
+                self.assertEqual(1, code)
+                self.assertEqual("", stdout)
+                self.assertIn(
+                    "first meaningful line does not start with a supported Mermaid diagram type",
+                    stderr,
+                )
 
 
 if __name__ == "__main__":
