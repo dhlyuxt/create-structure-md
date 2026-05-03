@@ -139,6 +139,7 @@ class InstallerCliTests(unittest.TestCase):
         self.assertEqual(1, completed.returncode)
         self.assertIn("ERROR: target already exists", completed.stderr)
         self.assertIn(str(target), completed.stderr)
+        self.assertIn("Example user-run cleanup command: rm -r", completed.stderr)
         self.assertTrue(marker.exists())
         self.assertFalse((target / "SKILL.md").exists())
 

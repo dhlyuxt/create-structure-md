@@ -205,6 +205,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if target.exists():
         print(f"ERROR: target already exists: {target}", file=sys.stderr)
+        print(f"Example user-run cleanup command: rm -r {target}", file=sys.stderr)
         return 1
 
     try:
