@@ -34,6 +34,77 @@ GENERIC_OUTPUT_TOKENS = {
 CONTROL_CHARACTER_RE = re.compile(r"[\x00-\x1f\x7f-\x9f]")
 SAFE_FENCE_INFO_RE = re.compile(r"^[A-Za-z0-9_+.-]+$")
 
+RUNTIME_UNIT_COLUMNS = [
+    ("unit_name", "运行单元"),
+    ("unit_type", "类型"),
+    ("entrypoint", "入口"),
+    ("entrypoint_not_applicable_reason", "入口不适用原因"),
+    ("responsibility", "职责"),
+    ("related_module_ids", "关联模块"),
+    ("external_environment_reason", "外部环境原因"),
+    ("notes", "备注"),
+]
+
+CONFIGURATION_ITEM_COLUMNS = [
+    ("config_name", "配置项"),
+    ("source", "来源"),
+    ("used_by", "使用方"),
+    ("purpose", "用途"),
+    ("notes", "备注"),
+]
+
+STRUCTURAL_DATA_ARTIFACT_COLUMNS = [
+    ("artifact_name", "数据/产物"),
+    ("artifact_type", "类型"),
+    ("owner", "归属"),
+    ("producer", "生产方"),
+    ("consumer", "消费方"),
+    ("notes", "备注"),
+]
+
+DEPENDENCY_COLUMNS = [
+    ("dependency_name", "依赖项"),
+    ("dependency_type", "类型"),
+    ("used_by", "使用方"),
+    ("purpose", "用途"),
+    ("notes", "备注"),
+]
+
+COLLABORATION_COLUMNS = [
+    ("scenario", "场景"),
+    ("initiator_module_id", "发起模块"),
+    ("participant_module_ids", "参与模块"),
+    ("collaboration_method", "协作方式"),
+    ("description", "描述"),
+]
+
+FLOW_INDEX_COLUMNS = [
+    ("flow_name", "流程"),
+    ("trigger_condition", "触发条件"),
+    ("participant_module_ids", "参与模块"),
+    ("participant_runtime_unit_ids", "参与运行单元"),
+    ("main_steps", "主要步骤"),
+    ("output_result", "输出结果"),
+    ("notes", "备注"),
+]
+
+FLOW_STEP_COLUMNS = [
+    ("order", "序号"),
+    ("actor", "执行方"),
+    ("description", "说明"),
+    ("input", "输入"),
+    ("output", "输出"),
+    ("related_module_ids", "关联模块"),
+    ("related_runtime_unit_ids", "关联运行单元"),
+]
+
+FLOW_BRANCH_COLUMNS = [
+    ("condition", "条件"),
+    ("handling", "处理方式"),
+    ("related_module_ids", "关联模块"),
+    ("related_runtime_unit_ids", "关联运行单元"),
+]
+
 
 class RenderError(Exception):
     exit_code = 1
@@ -102,6 +173,56 @@ def render_fixed_table(rows, columns):
         cells = [escape_table_cell(row.get(field_key, "")) for field_key, _ in columns]
         rendered_rows.append("| " + " | ".join(cells) + " |")
     return "\n".join(rendered_rows)
+
+
+def render_fixed_table_or_empty(rows, columns, empty_text):
+    if not rows:
+        return empty_text
+    return render_fixed_table(rows, columns)
+
+
+def build_module_display_names(document):
+    rows = document.get("architecture_views", {}).get("module_intro", {}).get("rows", [])
+    return {row.get("module_id"): row.get("module_name", "") for row in rows}
+
+
+def build_runtime_unit_display_names(document):
+    rows = document.get("runtime_view", {}).get("runtime_units", {}).get("rows", [])
+    return {row.get("unit_id"): row.get("unit_name", "") for row in rows}
+
+
+def display_names_for_refs(refs, display_names):
+    if refs is None:
+        return ""
+    if isinstance(refs, list):
+        return [display_names.get(ref, ref) for ref in refs]
+    return display_names.get(refs, refs)
+
+
+def render_reference_summary(label, refs, display_names):
+    names = display_names_for_refs(refs, display_names)
+    rendered_names = stringify_markdown_value(names)
+    if rendered_names == "":
+        return ""
+    return f"{label}：{escape_plain_text(rendered_names)}"
+
+
+def rows_with_display_refs(rows, module_display_names, runtime_unit_display_names):
+    mapped_rows = []
+    for row in rows or []:
+        mapped_row = dict(row)
+        for key in ("related_module_ids", "participant_module_ids"):
+            if key in mapped_row:
+                mapped_row[key] = display_names_for_refs(mapped_row[key], module_display_names)
+        for key in ("related_runtime_unit_ids", "participant_runtime_unit_ids"):
+            if key in mapped_row:
+                mapped_row[key] = display_names_for_refs(mapped_row[key], runtime_unit_display_names)
+        if "initiator_module_id" in mapped_row:
+            mapped_row["initiator_module_id"] = display_names_for_refs(
+                mapped_row["initiator_module_id"], module_display_names
+            )
+        mapped_rows.append(mapped_row)
+    return mapped_rows
 
 
 def render_extra_table(table):
@@ -386,6 +507,160 @@ def render_chapter_4(document):
     return "\n\n".join(part for part in parts if part != "")
 
 
+def render_chapter_5(document, module_display_names):
+    runtime = document["runtime_view"]
+    runtime_unit_rows = rows_with_display_refs(
+        runtime.get("runtime_units", {}).get("rows", []),
+        module_display_names,
+        {},
+    )
+    parts = [
+        chapter_heading(5, "运行时视图"),
+        subchapter_heading(5, 1, "运行时概述"),
+        render_paragraph(runtime.get("summary", "")),
+        subchapter_heading(5, 2, "运行单元说明"),
+        render_fixed_table(runtime_unit_rows, RUNTIME_UNIT_COLUMNS),
+        subchapter_heading(5, 3, "运行时流程图"),
+        render_mermaid_block(runtime.get("runtime_flow_diagram", {})),
+        subchapter_heading(5, 4, "运行时序图（推荐）"),
+        render_mermaid_block(runtime.get("runtime_sequence_diagram", {}), empty_text="未提供运行时序图。"),
+        subchapter_heading(5, 5, "补充运行时图表"),
+        render_extras(runtime.get("extra_tables", []), runtime.get("extra_diagrams", [])),
+    ]
+    return "\n\n".join(part for part in parts if part != "")
+
+
+def render_chapter_6(document):
+    configuration = document["configuration_data_dependencies"]
+    parts = [
+        chapter_heading(6, "配置、数据与依赖关系"),
+    ]
+    summary = render_paragraph(configuration.get("summary", ""))
+    if summary:
+        parts.append(summary)
+    parts.extend(
+        [
+            subchapter_heading(6, 1, "配置项说明"),
+            render_fixed_table_or_empty(
+                configuration.get("configuration_items", {}).get("rows", []),
+                CONFIGURATION_ITEM_COLUMNS,
+                "不适用。",
+            ),
+            subchapter_heading(6, 2, "关键结构数据与产物"),
+            render_fixed_table_or_empty(
+                configuration.get("structural_data_artifacts", {}).get("rows", []),
+                STRUCTURAL_DATA_ARTIFACT_COLUMNS,
+                "未识别到需要在结构设计阶段单独说明的关键结构数据或产物。",
+            ),
+            subchapter_heading(6, 3, "依赖项说明"),
+            render_fixed_table_or_empty(
+                configuration.get("dependencies", {}).get("rows", []),
+                DEPENDENCY_COLUMNS,
+                "未识别到需要在结构设计阶段单独说明的外部依赖项。",
+            ),
+            subchapter_heading(6, 4, "补充图表"),
+            render_extras(configuration.get("extra_tables", []), configuration.get("extra_diagrams", [])),
+        ]
+    )
+    return "\n\n".join(part for part in parts if part != "")
+
+
+def render_chapter_7(document, module_display_names):
+    collaboration = document["cross_module_collaboration"]
+    collaboration_rows = rows_with_display_refs(
+        collaboration.get("collaboration_scenarios", {}).get("rows", []),
+        module_display_names,
+        {},
+    )
+    parts = [
+        chapter_heading(7, "跨模块协作关系"),
+        subchapter_heading(7, 1, "协作关系概述"),
+        render_paragraph(collaboration.get("summary", "")),
+        subchapter_heading(7, 2, "跨模块协作说明"),
+        render_fixed_table_or_empty(
+            collaboration_rows,
+            COLLABORATION_COLUMNS,
+            "本系统当前仅识别到一个结构模块，暂无跨模块协作关系。",
+        ),
+        subchapter_heading(7, 3, "跨模块协作关系图"),
+        render_mermaid_block(
+            collaboration.get("collaboration_relationship_diagram", {}),
+            empty_text="未提供跨模块协作关系图。",
+        ),
+        subchapter_heading(7, 4, "补充协作图表"),
+        render_extras(collaboration.get("extra_tables", []), collaboration.get("extra_diagrams", [])),
+    ]
+    return "\n\n".join(part for part in parts if part != "")
+
+
+def flows_by_id(key_flows):
+    return {flow.get("flow_id"): flow for flow in key_flows.get("flows", [])}
+
+
+def render_key_flow_overview(flow, module_display_names, runtime_unit_display_names):
+    parts = [
+        render_paragraph(flow.get("overview", "")),
+        render_reference_summary("关联模块", flow.get("related_module_ids", []), module_display_names),
+        render_reference_summary("关联运行单元", flow.get("related_runtime_unit_ids", []), runtime_unit_display_names),
+    ]
+    return "\n\n".join(part for part in parts if part != "")
+
+
+def render_key_flow_section(flow, section_number, module_display_names, runtime_unit_display_names):
+    step_rows = rows_with_display_refs(
+        sorted(flow.get("steps", []), key=lambda step: step.get("order", 0)),
+        module_display_names,
+        runtime_unit_display_names,
+    )
+    branch_rows = rows_with_display_refs(
+        flow.get("branches_or_exceptions", []),
+        module_display_names,
+        runtime_unit_display_names,
+    )
+    parts = [
+        subchapter_heading(8, section_number, escape_heading_label(flow.get("name", ""))),
+        nested_heading(8, section_number, 1, "流程概述"),
+        render_key_flow_overview(flow, module_display_names, runtime_unit_display_names),
+        nested_heading(8, section_number, 2, "步骤说明"),
+        render_fixed_table(step_rows, FLOW_STEP_COLUMNS),
+        nested_heading(8, section_number, 3, "异常/分支说明"),
+        render_fixed_table_or_empty(branch_rows, FLOW_BRANCH_COLUMNS, "未识别到异常或分支说明。"),
+        nested_heading(8, section_number, 4, "流程图"),
+        render_mermaid_block(flow.get("diagram", {})),
+    ]
+    return "\n\n".join(part for part in parts if part != "")
+
+
+def render_chapter_8(document, module_display_names, runtime_unit_display_names):
+    key_flows = document["key_flows"]
+    flow_index_rows = rows_with_display_refs(
+        key_flows.get("flow_index", {}).get("rows", []),
+        module_display_names,
+        runtime_unit_display_names,
+    )
+    parts = [
+        chapter_heading(8, "关键流程"),
+        subchapter_heading(8, 1, "关键流程概述"),
+        render_paragraph(key_flows.get("summary", "")),
+    ]
+    extras = render_extras(key_flows.get("extra_tables", []), key_flows.get("extra_diagrams", []), empty_text="")
+    if extras:
+        parts.append(extras)
+    parts.extend(
+        [
+            subchapter_heading(8, 2, "关键流程清单"),
+            render_fixed_table(flow_index_rows, FLOW_INDEX_COLUMNS),
+        ]
+    )
+
+    detail_by_id = flows_by_id(key_flows)
+    for section_number, flow_row in enumerate(key_flows.get("flow_index", {}).get("rows", []), start=3):
+        flow = detail_by_id.get(flow_row.get("flow_id"))
+        if flow is not None:
+            parts.append(render_key_flow_section(flow, section_number, module_display_names, runtime_unit_display_names))
+    return "\n\n".join(part for part in parts if part != "")
+
+
 def build_parser():
     parser = argparse.ArgumentParser(description="Render create-structure-md DSL JSON to Markdown.")
     parser.add_argument("dsl_file", help="Path to structure DSL JSON.")
@@ -471,12 +746,18 @@ def resolve_output_path(output_dir, output_file):
 
 
 def render_markdown(document):
+    module_display_names = build_module_display_names(document)
+    runtime_unit_display_names = build_runtime_unit_display_names(document)
     parts = [
         "# 软件结构设计说明书",
         render_chapter_1(document),
         render_chapter_2(document),
         render_chapter_3(document),
         render_chapter_4(document),
+        render_chapter_5(document, module_display_names),
+        render_chapter_6(document),
+        render_chapter_7(document, module_display_names),
+        render_chapter_8(document, module_display_names, runtime_unit_display_names),
     ]
     return "\n\n".join(parts) + "\n"
 

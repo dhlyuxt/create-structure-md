@@ -874,5 +874,219 @@ class ChapterOneToFourRenderingTests(unittest.TestCase):
         self.assertNotIn("无补充内容。", section)
 
 
+class ChapterFiveToEightRenderingTests(unittest.TestCase):
+    def test_chapters_5_to_8_have_fixed_headings_even_when_optional_content_is_absent(self):
+        module = load_renderer_module()
+        markdown = module.render_markdown(valid_document())
+        assert_in_order(
+            self,
+            markdown,
+            [
+                "## 5. 运行时视图",
+                "### 5.1 运行时概述",
+                "### 5.2 运行单元说明",
+                "### 5.3 运行时流程图",
+                "### 5.4 运行时序图（推荐）",
+                "### 5.5 补充运行时图表",
+                "## 6. 配置、数据与依赖关系",
+                "### 6.1 配置项说明",
+                "### 6.2 关键结构数据与产物",
+                "### 6.3 依赖项说明",
+                "### 6.4 补充图表",
+                "## 7. 跨模块协作关系",
+                "### 7.1 协作关系概述",
+                "### 7.2 跨模块协作说明",
+                "### 7.3 跨模块协作关系图",
+                "### 7.4 补充协作图表",
+                "## 8. 关键流程",
+                "### 8.1 关键流程概述",
+                "### 8.2 关键流程清单",
+                "### 8.3 生成结构设计文档",
+                "#### 8.3.1 流程概述",
+                "#### 8.3.2 步骤说明",
+                "#### 8.3.3 异常/分支说明",
+                "#### 8.3.4 流程图",
+            ],
+        )
+
+    def test_runtime_units_table_uses_fixed_visible_columns_only(self):
+        module = load_renderer_module()
+        markdown = module.render_markdown(valid_document())
+        section = section_between(markdown, "### 5.2 运行单元说明", "### 5.3 运行时流程图")
+        self.assertIn("| 运行单元 | 类型 | 入口 | 入口不适用原因 | 职责 | 关联模块 | 外部环境原因 | 备注 |", section)
+        self.assertNotIn("unit_id", section)
+        self.assertNotIn("RUN-GENERATE", section)
+        self.assertNotIn("MOD-SKILL", section)
+        self.assertIn("技能文档生成模块", section)
+        self.assertNotIn("confidence", section)
+
+    def test_optional_runtime_sequence_diagram_renders_empty_state_without_mermaid_block(self):
+        module = load_renderer_module()
+        markdown = module.render_markdown(valid_document())
+        section = section_between(markdown, "### 5.4 运行时序图（推荐）", "### 5.5 补充运行时图表")
+        self.assertIn("未提供运行时序图。", section)
+        self.assertNotIn("```mermaid", section)
+
+    def test_chapter_6_empty_tables_render_fixed_empty_states(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["configuration_data_dependencies"]["configuration_items"]["rows"] = []
+        document["configuration_data_dependencies"]["structural_data_artifacts"]["rows"] = []
+        document["configuration_data_dependencies"]["dependencies"]["rows"] = []
+        markdown = module.render_markdown(document)
+        self.assertIn("不适用。", section_between(markdown, "### 6.1 配置项说明", "### 6.2 关键结构数据与产物"))
+        self.assertIn(
+            "未识别到需要在结构设计阶段单独说明的关键结构数据或产物。",
+            section_between(markdown, "### 6.2 关键结构数据与产物", "### 6.3 依赖项说明"),
+        )
+        self.assertIn(
+            "未识别到需要在结构设计阶段单独说明的外部依赖项。",
+            section_between(markdown, "### 6.3 依赖项说明", "### 6.4 补充图表"),
+        )
+
+    def test_chapter_6_tables_use_fixed_visible_columns_only(self):
+        module = load_renderer_module()
+        markdown = module.render_markdown(valid_document())
+        config_section = section_between(markdown, "### 6.1 配置项说明", "### 6.2 关键结构数据与产物")
+        artifact_section = section_between(markdown, "### 6.2 关键结构数据与产物", "### 6.3 依赖项说明")
+        dependency_section = section_between(markdown, "### 6.3 依赖项说明", "### 6.4 补充图表")
+        self.assertIn("| 配置项 | 来源 | 使用方 | 用途 | 备注 |", config_section)
+        self.assertIn("| 数据/产物 | 类型 | 归属 | 生产方 | 消费方 | 备注 |", artifact_section)
+        self.assertIn("| 依赖项 | 类型 | 使用方 | 用途 | 备注 |", dependency_section)
+        self.assertNotIn("CFG-001", config_section)
+        self.assertNotIn("DATA-001", artifact_section)
+        self.assertNotIn("DEP-001", dependency_section)
+        self.assertNotIn("confidence", config_section + artifact_section + dependency_section)
+
+    def test_single_module_collaboration_renders_fixed_empty_states(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["cross_module_collaboration"]["summary"] = ""
+        document["cross_module_collaboration"]["collaboration_scenarios"]["rows"] = []
+        document["cross_module_collaboration"].pop("collaboration_relationship_diagram", None)
+        markdown = module.render_markdown(document)
+        self.assertIn(
+            "本系统当前仅识别到一个结构模块，暂无跨模块协作关系。",
+            section_between(markdown, "### 7.2 跨模块协作说明", "### 7.3 跨模块协作关系图"),
+        )
+        self.assertIn(
+            "未提供跨模块协作关系图。",
+            section_between(markdown, "### 7.3 跨模块协作关系图", "### 7.4 补充协作图表"),
+        )
+
+    def test_collaboration_and_flow_index_tables_use_fixed_columns_and_display_names(self):
+        module = load_renderer_module()
+        markdown = module.render_markdown(valid_document())
+        collaboration_section = section_between(markdown, "### 7.2 跨模块协作说明", "### 7.3 跨模块协作关系图")
+        flow_index_section = section_between(markdown, "### 8.2 关键流程清单", "### 8.3 生成结构设计文档")
+        self.assertIn("| 场景 | 发起模块 | 参与模块 | 协作方式 | 描述 |", collaboration_section)
+        self.assertIn("| 流程 | 触发条件 | 参与模块 | 参与运行单元 | 主要步骤 | 输出结果 | 备注 |", flow_index_section)
+        self.assertNotIn("COL-001", collaboration_section)
+        self.assertNotIn("MOD-SKILL", collaboration_section)
+        self.assertNotIn("MOD-SKILL", flow_index_section)
+        self.assertNotIn("RUN-GENERATE", flow_index_section)
+        self.assertIn("技能文档生成模块", collaboration_section)
+        self.assertIn("技能文档生成模块", flow_index_section)
+        self.assertIn("文档生成命令序列", flow_index_section)
+
+    def test_key_flow_extras_render_between_overview_and_index_without_new_numbering(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["key_flows"]["extra_tables"] = [
+            {
+                "id": "TBL-FLOW-EXTRA",
+                "title": "关键流程补充表",
+                "columns": [{"key": "item", "title": "项目"}, {"key": "note", "title": "说明"}],
+                "rows": [{"item": "流程补充项", "note": "A|B", "evidence_refs": []}],
+            }
+        ]
+        document["key_flows"]["extra_diagrams"] = [
+            {
+                "id": "MER-FLOW-EXTRA",
+                "kind": "extra",
+                "title": "关键流程补充图",
+                "diagram_type": "flowchart",
+                "description": "展示关键流程补充关系。",
+                "source": "flowchart TD\n  FlowExtraA[流程补充A] --> FlowExtraB[流程补充B]",
+                "confidence": "observed",
+            }
+        ]
+        markdown = module.render_markdown(document)
+        intro_to_index = section_between(markdown, "### 8.1 关键流程概述", "### 8.2 关键流程清单")
+        self.assertIn("#### 关键流程补充表", intro_to_index)
+        self.assertIn("| 项目 | 说明 |", intro_to_index)
+        self.assertIn("A\\|B", intro_to_index)
+        self.assertIn("#### 关键流程补充图", intro_to_index)
+        self.assertIn("```mermaid\nflowchart TD\n  FlowExtraA[流程补充A] --> FlowExtraB[流程补充B]\n```", intro_to_index)
+        self.assertNotIn("无补充内容。", intro_to_index)
+        self.assertNotIn("### 8.1.1", intro_to_index)
+        self.assertNotIn("### 8.2 补充", intro_to_index)
+
+    def test_key_flow_details_follow_flow_index_order_and_steps_follow_step_order(self):
+        module = load_renderer_module()
+        document = valid_document()
+        flow_a = deepcopy(document["key_flows"]["flows"][0])
+        flow_b = deepcopy(flow_a)
+        flow_a["flow_id"] = "FLOW-A"
+        flow_a["name"] = "流程A"
+        flow_a["diagram"]["id"] = "MER-FLOW-A"
+        flow_b["flow_id"] = "FLOW-B"
+        flow_b["name"] = "流程B"
+        flow_b["diagram"]["id"] = "MER-FLOW-B"
+        flow_b["steps"] = [
+            {**deepcopy(flow_b["steps"][0]), "step_id": "STEP-B-002", "order": 2, "description": "第二步"},
+            {**deepcopy(flow_b["steps"][0]), "step_id": "STEP-B-001", "order": 1, "description": "第一步"},
+        ]
+        document["key_flows"]["flow_index"]["rows"] = [
+            {**document["key_flows"]["flow_index"]["rows"][0], "flow_id": "FLOW-B", "flow_name": "流程B"},
+            {**document["key_flows"]["flow_index"]["rows"][0], "flow_id": "FLOW-A", "flow_name": "流程A"},
+        ]
+        document["key_flows"]["flows"] = [flow_a, flow_b]
+
+        markdown = module.render_markdown(document)
+        assert_in_order(self, markdown, ["### 8.3 流程B", "### 8.4 流程A"])
+        flow_b_section = section_between(markdown, "### 8.3 流程B", "### 8.4 流程A")
+        assert_in_order(self, flow_b_section, ["第一步", "第二步"])
+
+    def test_key_flow_step_and_branch_tables_use_fixed_columns_display_names_and_empty_state(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["key_flows"]["flows"][0]["branches_or_exceptions"] = [
+            {
+                "branch_id": "BR-GENERATE-RETRY",
+                "condition": "校验失败",
+                "handling": "停止渲染并报告问题。",
+                "related_module_ids": ["MOD-SKILL"],
+                "related_runtime_unit_ids": ["RUN-GENERATE"],
+                "confidence": "unknown",
+                "evidence_refs": [],
+                "traceability_refs": [],
+                "source_snippet_refs": [],
+            }
+        ]
+        markdown = module.render_markdown(document)
+        flow_section = section_from(markdown, "### 8.3 生成结构设计文档")
+        steps_section = section_between(flow_section, "#### 8.3.2 步骤说明", "#### 8.3.3 异常/分支说明")
+        branch_section = section_between(flow_section, "#### 8.3.3 异常/分支说明", "#### 8.3.4 流程图")
+
+        self.assertIn("| 序号 | 执行方 | 说明 | 输入 | 输出 | 关联模块 | 关联运行单元 |", steps_section)
+        self.assertIn("| 条件 | 处理方式 | 关联模块 | 关联运行单元 |", branch_section)
+        self.assertNotIn("STEP-GENERATE-001", steps_section)
+        self.assertNotIn("BR-GENERATE-RETRY", branch_section)
+        self.assertNotIn("observed", steps_section)
+        self.assertNotIn("unknown", branch_section)
+        self.assertNotIn("MOD-SKILL", steps_section + branch_section)
+        self.assertNotIn("RUN-GENERATE", steps_section + branch_section)
+        self.assertIn("技能文档生成模块", steps_section + branch_section)
+        self.assertIn("文档生成命令序列", steps_section + branch_section)
+
+        empty_branch_document = valid_document()
+        empty_branch_document["key_flows"]["flows"][0]["branches_or_exceptions"] = []
+        empty_markdown = module.render_markdown(empty_branch_document)
+        empty_flow_section = section_from(empty_markdown, "### 8.3 生成结构设计文档")
+        empty_branch_section = section_between(empty_flow_section, "#### 8.3.3 异常/分支说明", "#### 8.3.4 流程图")
+        self.assertIn("未识别到异常或分支说明。", empty_branch_section)
+
+
 if __name__ == "__main__":
     unittest.main()
