@@ -838,6 +838,15 @@ flowchart TD
 
 
 class MermaidStrictValidationTests(unittest.TestCase):
+    def call_main_without_traceback(self, module, args):
+        try:
+            return call_main(module, args)
+        except Exception as exc:
+            self.fail(f"unexpected exception {type(exc).__name__}: {exc}")
+
+    def fake_strict_tooling(self, name):
+        return {"node": "/usr/bin/node", "mmdc": "mmdc"}.get(name)
+
     def test_default_mode_is_strict_and_missing_tooling_is_explicit(self):
         module = load_validator_module()
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -878,7 +887,7 @@ class MermaidStrictValidationTests(unittest.TestCase):
             self.assertTrue((work_dir / "MER-ARCH-MODULES.mmd").is_file())
             self.assertTrue((work_dir / "MER-ARCH-MODULES.svg").parent.is_dir())
             first_command = mocked_run.call_args_list[0].args[0]
-            self.assertEqual("mmdc", first_command[0])
+            self.assertEqual("/usr/local/bin/mmdc", first_command[0])
             self.assertIn("-i", first_command)
             self.assertIn("-o", first_command)
             input_path = Path(first_command[first_command.index("-i") + 1])
@@ -1065,6 +1074,71 @@ erDiagram
         self.assertIn("Markdown line 3", stderr)
         self.assertIn("unbalanced fenced code block starting at line 3", stderr)
         mocked_run.assert_not_called()
+
+    def test_strict_work_dir_existing_file_reports_preparation_error_without_traceback(self):
+        module = load_validator_module()
+        completed = subprocess.CompletedProcess(["mmdc"], 0, stdout="", stderr="")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = write_json(valid_document(), tmpdir)
+            work_dir = Path(tmpdir) / "requirements.txt"
+            work_dir.write_text("not a directory", encoding="utf-8")
+            with (
+                mock.patch.object(module.shutil, "which", side_effect=self.fake_strict_tooling),
+                mock.patch.object(module.subprocess, "run", return_value=completed),
+            ):
+                code, stdout, stderr = self.call_main_without_traceback(
+                    module,
+                    ["--from-dsl", str(source), "--strict", "--work-dir", str(work_dir)],
+                )
+
+        self.assertEqual(1, code)
+        self.assertEqual("", stdout)
+        self.assertIn("strict Mermaid validation", stderr)
+        self.assertIn(str(work_dir), stderr)
+        self.assertIn("could not prepare work directory", stderr)
+        self.assertNotIn("Traceback", stderr)
+
+    def test_strict_artifact_write_failure_reports_diagram_location_without_traceback(self):
+        module = load_validator_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = write_json(valid_document(), tmpdir)
+            with (
+                mock.patch.object(module.shutil, "which", side_effect=self.fake_strict_tooling),
+                mock.patch.object(module.Path, "write_text", side_effect=OSError("disk full")),
+            ):
+                code, stdout, stderr = self.call_main_without_traceback(
+                    module,
+                    ["--from-dsl", str(source), "--strict"],
+                )
+
+        self.assertEqual(1, code)
+        self.assertEqual("", stdout)
+        self.assertIn("$.architecture_views.module_relationship_diagram", stderr)
+        self.assertIn("MER-ARCH-MODULES", stderr)
+        self.assertIn(".mmd", stderr)
+        self.assertIn("disk full", stderr)
+        self.assertNotIn("Traceback", stderr)
+
+    def test_strict_mmdc_start_failure_reports_diagram_location_without_traceback(self):
+        module = load_validator_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = write_json(valid_document(), tmpdir)
+            with (
+                mock.patch.object(module.shutil, "which", side_effect=self.fake_strict_tooling),
+                mock.patch.object(module.subprocess, "run", side_effect=FileNotFoundError("mmdc")),
+            ):
+                code, stdout, stderr = self.call_main_without_traceback(
+                    module,
+                    ["--from-dsl", str(source), "--strict"],
+                )
+
+        self.assertEqual(1, code)
+        self.assertEqual("", stdout)
+        self.assertIn("$.architecture_views.module_relationship_diagram", stderr)
+        self.assertIn("MER-ARCH-MODULES", stderr)
+        self.assertIn("mmdc failed to start", stderr)
+        self.assertIn("mmdc", stderr)
+        self.assertNotIn("Traceback", stderr)
 
 
 if __name__ == "__main__":

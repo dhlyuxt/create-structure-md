@@ -537,35 +537,52 @@ def ensure_strict_tooling(report):
             + ", ".join(missing),
             "Install node and @mermaid-js/mermaid-cli with mmdc on PATH, or ask the user before using --static for this run",
         )
-        return False
-    return True
+        return None
+    return mmdc_path
 
 
 def run_strict_validation(diagrams, work_dir=None):
     report = MermaidReport()
-    if not ensure_strict_tooling(report):
+    mmdc_path = ensure_strict_tooling(report)
+    if not mmdc_path:
         return report
 
-    if work_dir:
-        root = Path(work_dir)
-        root.mkdir(parents=True, exist_ok=True)
-        cleanup_context = None
-    else:
-        cleanup_context = tempfile.TemporaryDirectory(prefix="create-structure-md-mermaid-")
-        root = Path(cleanup_context.__enter__())
+    cleanup_context = None
+    try:
+        if work_dir:
+            root = Path(work_dir)
+            root.mkdir(parents=True, exist_ok=True)
+        else:
+            cleanup_context = tempfile.TemporaryDirectory(prefix="create-structure-md-mermaid-")
+            root = Path(cleanup_context.__enter__())
+    except OSError as exc:
+        location = str(work_dir) if work_dir else "temporary work directory"
+        report.error(
+            "strict Mermaid validation",
+            f"could not prepare work directory {location}: {exc}",
+        )
+        return report
 
     try:
         for diagram in diagrams:
             stem = safe_artifact_stem(diagram)
             input_path = root / f"{stem}.mmd"
             output_path = root / f"{stem}.svg"
-            input_path.write_text(diagram.source, encoding="utf-8")
-            completed = subprocess.run(
-                ["mmdc", "-i", str(input_path), "-o", str(output_path)],
-                text=True,
-                capture_output=True,
-                check=False,
-            )
+            try:
+                input_path.write_text(diagram.source, encoding="utf-8")
+            except OSError as exc:
+                report.error(diagram.label(), f"could not write Mermaid artifact {input_path}: {exc}")
+                continue
+            try:
+                completed = subprocess.run(
+                    [mmdc_path, "-i", str(input_path), "-o", str(output_path)],
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+            except OSError as exc:
+                report.error(diagram.label(), f"mmdc failed to start: {exc}")
+                continue
             if completed.returncode != 0:
                 detail = completed.stderr.strip() or completed.stdout.strip() or f"exit code {completed.returncode}"
                 report.error(diagram.label(), f"mmdc failed: {detail}")
