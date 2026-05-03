@@ -427,6 +427,33 @@ class DslMermaidStaticTests(unittest.TestCase):
         self.assertIn("ERROR", stderr)
         self.assertIn("invalid JSON", stderr)
 
+    def test_non_object_dsl_root_exits_2_without_traceback(self):
+        module = load_validator_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = write_json([], tmpdir)
+            code, stdout, stderr = call_main(module, ["--from-dsl", str(source), "--static"])
+        self.assertEqual(2, code)
+        self.assertEqual("", stdout)
+        self.assertIn("ERROR", stderr)
+        self.assertIn("DSL root must be an object", stderr)
+        self.assertNotIn("Traceback", stderr)
+
+    def test_non_object_known_dsl_sections_exit_2_without_traceback(self):
+        module = load_validator_module()
+        for section_name in ["runtime_view", "architecture_views"]:
+            with self.subTest(section_name=section_name):
+                document = valid_document()
+                document[section_name] = []
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    source = write_json(document, tmpdir)
+                    code, stdout, stderr = call_main(module, ["--from-dsl", str(source), "--static"])
+                self.assertEqual(2, code)
+                self.assertEqual("", stdout)
+                self.assertIn("ERROR", stderr)
+                self.assertIn("must be an object", stderr)
+                self.assertIn(f"$.{section_name}", stderr)
+                self.assertNotIn("Traceback", stderr)
+
     def test_dsl_static_rejects_diagram_type_first_line_mismatch(self):
         module = load_validator_module()
         document = valid_document()

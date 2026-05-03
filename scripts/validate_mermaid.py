@@ -8,6 +8,7 @@ import sys
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import List, Optional
 
 
 SUPPORTED_TYPES = {"flowchart", "graph", "sequenceDiagram", "classDiagram", "stateDiagram-v2"}
@@ -39,8 +40,8 @@ class MermaidDiagram:
     source: str
     diagram_type: str = ""
     json_path: str = ""
-    markdown_block_index: int | None = None
-    line_start: int | None = None
+    markdown_block_index: Optional[int] = None
+    line_start: Optional[int] = None
 
     def label(self):
         if self.json_path:
@@ -50,7 +51,7 @@ class MermaidDiagram:
 
 @dataclass
 class MermaidReport:
-    errors: list[MermaidIssue] = field(default_factory=list)
+    errors: List[MermaidIssue] = field(default_factory=list)
 
     def error(self, location, message, hint=""):
         self.errors.append(MermaidIssue("ERROR", location, message, hint))
@@ -155,9 +156,20 @@ def append_diagram_array(diagrams, values, path):
         append_diagram(diagrams, value, f"{path}[{index}]")
 
 
+def object_section(parent, name, path):
+    if name not in parent:
+        return {}
+    value = parent[name]
+    if not isinstance(value, dict):
+        raise ValueError(f"{path} must be an object")
+    return value
+
+
 def extract_diagrams_from_dsl(document):
+    if not isinstance(document, dict):
+        raise ValueError("DSL root must be an object")
     diagrams = []
-    architecture_views = document.get("architecture_views", {})
+    architecture_views = object_section(document, "architecture_views", "$.architecture_views")
     append_diagram(
         diagrams,
         architecture_views.get("module_relationship_diagram"),
@@ -169,7 +181,7 @@ def extract_diagrams_from_dsl(document):
         json_path("architecture_views", "extra_diagrams"),
     )
 
-    module_design = document.get("module_design", {})
+    module_design = object_section(document, "module_design", "$.module_design")
     modules = module_design.get("modules", [])
     if isinstance(modules, list):
         for module_index, module in enumerate(modules):
@@ -200,7 +212,7 @@ def extract_diagrams_from_dsl(document):
                 json_path("module_design", "modules", module_index, "extra_diagrams"),
             )
 
-    runtime_view = document.get("runtime_view", {})
+    runtime_view = object_section(document, "runtime_view", "$.runtime_view")
     append_diagram(
         diagrams,
         runtime_view.get("runtime_flow_diagram"),
@@ -217,14 +229,22 @@ def extract_diagrams_from_dsl(document):
         json_path("runtime_view", "extra_diagrams"),
     )
 
-    configuration = document.get("configuration_data_dependencies", {})
+    configuration = object_section(
+        document,
+        "configuration_data_dependencies",
+        "$.configuration_data_dependencies",
+    )
     append_diagram_array(
         diagrams,
         configuration.get("extra_diagrams"),
         json_path("configuration_data_dependencies", "extra_diagrams"),
     )
 
-    collaboration = document.get("cross_module_collaboration", {})
+    collaboration = object_section(
+        document,
+        "cross_module_collaboration",
+        "$.cross_module_collaboration",
+    )
     append_diagram(
         diagrams,
         collaboration.get("collaboration_relationship_diagram"),
@@ -236,7 +256,7 @@ def extract_diagrams_from_dsl(document):
         json_path("cross_module_collaboration", "extra_diagrams"),
     )
 
-    key_flows = document.get("key_flows", {})
+    key_flows = object_section(document, "key_flows", "$.key_flows")
     flows = key_flows.get("flows", [])
     if isinstance(flows, list):
         for flow_index, flow in enumerate(flows):
