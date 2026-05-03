@@ -539,5 +539,113 @@ class DslMermaidStaticTests(unittest.TestCase):
                 )
 
 
+class MarkdownMermaidStaticTests(unittest.TestCase):
+    def test_from_markdown_static_accepts_all_supported_types_and_skips_comments_and_init(self):
+        module = load_validator_module()
+        markdown = """# Output
+
+```mermaid
+
+%% comment
+%%{init: {"theme": "base"}}%%
+flowchart TD
+  A --> B
+```
+
+```mermaid
+graph LR
+  A --- B
+```
+
+```mermaid
+sequenceDiagram
+  A->>B: call
+```
+
+```mermaid
+classDiagram
+  class Renderer
+```
+
+```mermaid
+stateDiagram-v2
+  [*] --> Ready
+```
+"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = write_markdown(tmpdir, "output.md", markdown)
+            code, stdout, stderr = call_main(module, ["--from-markdown", str(path), "--static"])
+
+        self.assertEqual(0, code, stderr)
+        self.assertIn("Mermaid validation succeeded: 5 diagram(s) checked in static mode.", stdout)
+        self.assertEqual("", stderr)
+
+    def test_markdown_static_rejects_empty_mermaid_block_with_line_number(self):
+        module = load_validator_module()
+        markdown = "# Output\n\n```mermaid\n\n```\n"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = write_markdown(tmpdir, "empty.md", markdown)
+            code, stdout, stderr = call_main(module, ["--from-markdown", str(path), "--static"])
+
+        self.assertEqual(1, code)
+        self.assertEqual("", stdout)
+        self.assertIn("Mermaid block 1 line 3", stderr)
+        self.assertIn("Mermaid block body must be non-empty", stderr)
+
+    def test_from_markdown_directory_path_exits_two_with_read_error(self):
+        module = load_validator_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            code, stdout, stderr = call_main(module, ["--from-markdown", tmpdir, "--static"])
+
+        self.assertEqual(2, code)
+        self.assertEqual("", stdout)
+        self.assertIn("ERROR", stderr)
+        self.assertIn("could not read file", stderr)
+
+    def test_markdown_static_rejects_missing_or_unsupported_inferred_type(self):
+        module = load_validator_module()
+        markdown = """```mermaid
+A --> B
+```
+
+```mermaid
+erDiagram
+  CUSTOMER ||--o{ ORDER : places
+```
+"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = write_markdown(tmpdir, "unsupported.md", markdown)
+            code, stdout, stderr = call_main(module, ["--from-markdown", str(path), "--static"])
+
+        self.assertEqual(1, code)
+        self.assertIn("Mermaid block 1 line 1", stderr)
+        self.assertIn("could not infer supported Mermaid diagram type", stderr)
+        self.assertIn("Mermaid block 2 line 5", stderr)
+        self.assertIn("unsupported Mermaid diagram type erDiagram", stderr)
+
+    def test_markdown_static_rejects_unbalanced_fences(self):
+        module = load_validator_module()
+        markdown = "# Output\n\n```mermaid\nflowchart TD\n  A --> B\n"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = write_markdown(tmpdir, "unbalanced.md", markdown)
+            code, stdout, stderr = call_main(module, ["--from-markdown", str(path), "--static"])
+
+        self.assertEqual(1, code)
+        self.assertIn("Mermaid block 1 line 3", stderr)
+        self.assertIn("unbalanced fenced code block starting at line 3", stderr)
+
+    def test_markdown_static_rejects_unclosed_non_mermaid_fence_with_markdown_line(self):
+        module = load_validator_module()
+        markdown = "# Output\n\n```python\nprint('not mermaid')\n"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = write_markdown(tmpdir, "unclosed-python.md", markdown)
+            code, stdout, stderr = call_main(module, ["--from-markdown", str(path), "--static"])
+
+        self.assertEqual(1, code)
+        self.assertEqual("", stdout)
+        self.assertIn("Markdown line 3", stderr)
+        self.assertIn("unbalanced fenced code block starting at line 3", stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

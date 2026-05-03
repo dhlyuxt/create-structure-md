@@ -19,6 +19,27 @@ TYPE_PREFIXES = {
     "classDiagram": re.compile(r"^classDiagram(?=\s|$)"),
     "stateDiagram-v2": re.compile(r"^stateDiagram-v2(?=\s|$)"),
 }
+FENCE_RE = re.compile(r"^\s*(```+|~~~+)\s*([A-Za-z0-9_-]+)?\s*$")
+KNOWN_UNSUPPORTED_MARKDOWN_TYPES = {
+    "erDiagram",
+    "journey",
+    "gantt",
+    "pie",
+    "gitGraph",
+    "mindmap",
+    "timeline",
+    "quadrantChart",
+    "requirementDiagram",
+    "C4Context",
+    "C4Container",
+    "C4Component",
+    "C4Dynamic",
+    "sankey-beta",
+    "xychart-beta",
+    "block-beta",
+    "packet-beta",
+    "architecture-beta",
+}
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -103,6 +124,14 @@ def print_report(report):
         print(issue.format(), file=sys.stderr)
 
 
+def merge_reports(*reports):
+    merged = MermaidReport()
+    for report in reports:
+        if report:
+            merged.errors.extend(report.errors)
+    return merged
+
+
 def json_path(*parts):
     path = "$"
     for part in parts:
@@ -130,6 +159,23 @@ def infer_type_from_source(source):
     for diagram_type, pattern in TYPE_PREFIXES.items():
         if pattern.search(first_line):
             return diagram_type
+    return ""
+
+
+def first_meaningful_token(source):
+    first_line = first_meaningful_line(source)
+    if not first_line:
+        return ""
+    return first_line.split(None, 1)[0]
+
+
+def infer_markdown_diagram_type(source):
+    inferred_type = infer_type_from_source(source)
+    if inferred_type:
+        return inferred_type
+    token = first_meaningful_token(source)
+    if token in KNOWN_UNSUPPORTED_MARKDOWN_TYPES:
+        return token
     return ""
 
 
@@ -274,11 +320,100 @@ def extract_diagrams_from_dsl(document):
     return diagrams
 
 
+def append_markdown_diagram(diagrams, block_index, line_start, body_lines):
+    source = "\n".join(body_lines)
+    diagrams.append(
+        MermaidDiagram(
+            diagram_id=f"markdown-block-{block_index}",
+            source=source,
+            diagram_type=infer_markdown_diagram_type(source),
+            markdown_block_index=block_index,
+            line_start=line_start,
+        )
+    )
+
+
+def extract_diagrams_from_markdown(markdown_text):
+    diagrams = []
+    report = MermaidReport()
+    in_fence = False
+    fence_marker = ""
+    fence_start_line = 0
+    fence_is_mermaid = False
+    mermaid_block_index = 0
+    body_lines = []
+
+    for line_number, line in enumerate(markdown_text.splitlines(), start=1):
+        match = FENCE_RE.match(line)
+        if not in_fence:
+            if not match:
+                continue
+            fence_marker = match.group(1)
+            fence_start_line = line_number
+            language = match.group(2) or ""
+            fence_is_mermaid = language.lower() == "mermaid"
+            body_lines = []
+            in_fence = True
+            if fence_is_mermaid:
+                mermaid_block_index += 1
+            continue
+
+        if (
+            match
+            and match.group(1)[0] == fence_marker[0]
+            and len(match.group(1)) >= len(fence_marker)
+        ):
+            if fence_is_mermaid:
+                append_markdown_diagram(
+                    diagrams,
+                    mermaid_block_index,
+                    fence_start_line,
+                    body_lines,
+                )
+            in_fence = False
+            fence_marker = ""
+            fence_start_line = 0
+            fence_is_mermaid = False
+            body_lines = []
+            continue
+
+        if fence_is_mermaid:
+            body_lines.append(line)
+
+    if in_fence:
+        message = f"unbalanced fenced code block starting at line {fence_start_line}"
+        if fence_is_mermaid:
+            append_markdown_diagram(
+                diagrams,
+                mermaid_block_index,
+                fence_start_line,
+                body_lines,
+            )
+            report.error(f"Mermaid block {mermaid_block_index} line {fence_start_line}", message)
+        else:
+            report.error(f"Markdown line {fence_start_line}", message)
+
+    return diagrams, report
+
+
 def validate_static(diagrams, source_kind):
     report = MermaidReport()
     seen_ids = {}
     for diagram in diagrams:
         location = diagram.label()
+        if source_kind == "markdown":
+            if not diagram.source.strip():
+                report.error(location, "Mermaid block body must be non-empty")
+                continue
+            inferred_type = infer_type_from_source(diagram.source)
+            if inferred_type:
+                continue
+            if diagram.diagram_type:
+                report.error(location, f"unsupported Mermaid diagram type {diagram.diagram_type}")
+            else:
+                report.error(location, "could not infer supported Mermaid diagram type")
+            continue
+
         if not diagram.source.strip():
             report.error(location, "source must be non-empty")
             continue
@@ -308,17 +443,22 @@ def validate_static(diagrams, source_kind):
     return report
 
 
+def load_text_file(path):
+    try:
+        return Path(path).read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ValueError(f"could not read file: {path}: {exc}") from exc
+
+
 def load_json_file(path):
     try:
-        return json.loads(Path(path).read_text(encoding="utf-8"))
-    except OSError as exc:
-        raise ValueError(f"could not read file {path}: {exc}") from exc
+        return json.loads(load_text_file(path))
     except json.JSONDecodeError as exc:
         raise ValueError(f"invalid JSON in {path}: {exc}") from exc
 
 
-def run_static_validation(diagrams, source_kind):
-    report = validate_static(diagrams, source_kind)
+def run_static_validation(diagrams, source_kind, extraction_report=None):
+    report = merge_reports(extraction_report, validate_static(diagrams, source_kind))
     if report.errors:
         print_report(report)
         return 1
@@ -340,6 +480,10 @@ def main(argv=None):
             document = load_json_file(args.dsl_file)
             diagrams = extract_diagrams_from_dsl(document)
             return run_static_validation(diagrams, "dsl")
+        if args.markdown_file and effective_mode(args) == "static":
+            markdown_text = load_text_file(args.markdown_file)
+            diagrams, extraction_report = extract_diagrams_from_markdown(markdown_text)
+            return run_static_validation(diagrams, "markdown", extraction_report)
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
@@ -347,7 +491,7 @@ def main(argv=None):
         print("ERROR: strict validation requires Task 5 Mermaid CLI adapter", file=sys.stderr)
         return 2
     if args.markdown_file:
-        print("ERROR: Markdown validation requires Task 3 fence extraction", file=sys.stderr)
+        print("ERROR: strict validation requires Task 5 Mermaid CLI adapter", file=sys.stderr)
         return 2
     print("ERROR: unsupported validation mode", file=sys.stderr)
     return 2
