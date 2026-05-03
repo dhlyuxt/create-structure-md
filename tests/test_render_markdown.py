@@ -235,7 +235,7 @@ class RendererCliAndFilenameTests(unittest.TestCase):
             (Path(tmpdir) / output_file).mkdir()
             dsl_path = write_json(tmpdir, "write-failure.dsl.json", document)
             completed = subprocess.run(
-                [PYTHON, str(RENDERER), str(dsl_path), "--output-dir", tmpdir, "--overwrite"],
+                [PYTHON, str(RENDERER), str(dsl_path), "--output-dir", tmpdir],
                 cwd=ROOT,
                 text=True,
                 capture_output=True,
@@ -245,6 +245,23 @@ class RendererCliAndFilenameTests(unittest.TestCase):
             self.assertIn("ERROR:", completed.stderr)
             self.assertIn("failed to write", completed.stderr)
             self.assertNotIn("Traceback", completed.stderr)
+
+    def test_existing_output_policy_is_deferred_to_later_tasks(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            output_file = document["document"]["output_file"]
+            output_path = Path(tmpdir) / output_file
+            output_path.write_text("old content", encoding="utf-8")
+            dsl_path = write_json(tmpdir, "existing-output.dsl.json", document)
+            completed = subprocess.run(
+                [PYTHON, str(RENDERER), str(dsl_path), "--output-dir", tmpdir],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            self.assertEqual("# 软件结构设计说明书\n", output_path.read_text(encoding="utf-8"))
 
     def test_spaces_are_written_exactly_without_silent_rename(self):
         with tempfile.TemporaryDirectory() as tmpdir:

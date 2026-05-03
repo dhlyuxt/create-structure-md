@@ -123,10 +123,6 @@ def render_markdown(document):
 
 def write_output(output_path, markdown, overwrite=False, backup=False):
     output_path = Path(output_path)
-    if output_path.exists() and not overwrite and not backup:
-        raise RenderError(f"output file already exists: {output_path}")
-    if output_path.exists() and backup:
-        raise RenderError("backup behavior is not implemented yet")
     try:
         output_path.write_text(markdown, encoding="utf-8")
     except OSError as exc:
