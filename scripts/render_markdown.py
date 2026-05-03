@@ -107,6 +107,7 @@ FLOW_BRANCH_COLUMNS = [
 ]
 
 RISK_COLUMNS = [
+    ("id", "ID"),
     ("description", "风险"),
     ("impact", "影响"),
     ("mitigation", "缓解措施"),
@@ -114,6 +115,7 @@ RISK_COLUMNS = [
 ]
 
 ASSUMPTION_COLUMNS = [
+    ("id", "ID"),
     ("description", "假设"),
     ("rationale", "依据"),
     ("validation_suggestion", "验证建议"),
@@ -934,6 +936,7 @@ def collect_low_confidence_items(document):
                 }
             )
 
+    # Do not add evidence, traceability, source_snippets, risks, assumptions, or diagrams here.
     for index, row in enumerate(document.get("architecture_views", {}).get("module_intro", {}).get("rows", [])):
         add_item(f"$.architecture_views.module_intro.rows[{index}]", row)
 
@@ -971,7 +974,11 @@ def collect_low_confidence_items(document):
     return items
 
 
-def render_chapter_9(document):
+def render_collection_support(items, context, *, id_key, label_key, target_type):
+    return render_table_support(items, context, id_key=id_key, label_key=label_key, target_type=target_type)
+
+
+def render_chapter_9(document, support_context):
     parts = [chapter_heading(9, "结构问题与改进建议")]
     free_form_text = stringify_markdown_value(document.get("structure_issues_and_suggestions", "")).strip()
     risks = document.get("risks", [])
@@ -981,9 +988,29 @@ def render_chapter_9(document):
     if free_form_text:
         parts.append(escape_plain_text(free_form_text))
     if risks:
-        parts.extend(["### 风险", render_fixed_table(risks, RISK_COLUMNS)])
+        risk_parts = [render_fixed_table(risks, RISK_COLUMNS)]
+        support = render_collection_support(
+            risks,
+            support_context,
+            id_key="id",
+            label_key="description",
+            target_type="risk",
+        )
+        if support:
+            risk_parts.append(support)
+        parts.extend(["### 风险", "\n\n".join(risk_parts)])
     if assumptions:
-        parts.extend(["### 假设", render_fixed_table(assumptions, ASSUMPTION_COLUMNS)])
+        assumption_parts = [render_fixed_table(assumptions, ASSUMPTION_COLUMNS)]
+        support = render_collection_support(
+            assumptions,
+            support_context,
+            id_key="id",
+            label_key="description",
+            target_type="assumption",
+        )
+        if support:
+            assumption_parts.append(support)
+        parts.extend(["### 假设", "\n\n".join(assumption_parts)])
     if low_confidence_items:
         parts.extend(["### 低置信度项", render_fixed_table(low_confidence_items, LOW_CONFIDENCE_COLUMNS)])
     if len(parts) == 1:
@@ -1090,7 +1117,7 @@ def render_markdown(document):
         render_chapter_6(document, support_context),
         render_chapter_7(document, module_display_names, support_context),
         render_chapter_8(document, module_display_names, runtime_unit_display_names, support_context),
-        render_chapter_9(document),
+        render_chapter_9(document, support_context),
     ]
     return "\n\n".join(parts) + "\n"
 

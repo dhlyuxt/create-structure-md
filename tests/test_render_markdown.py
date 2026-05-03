@@ -1495,6 +1495,75 @@ class ChapterNineRenderingTests(unittest.TestCase):
         self.assertNotIn("unknown", chapter_3_table)
         self.assertIn("unknown", chapter_9)
 
+    def test_risk_and_assumption_support_refs_render_under_chapter_9_tables(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["evidence"] = [
+            {"id": "EV-RISK", "kind": "analysis", "title": "覆盖策略分析", "location": "review", "description": "", "confidence": "observed"},
+            {"id": "EV-ASM", "kind": "note", "title": "工作流假设", "location": "", "description": "", "confidence": "observed"},
+        ]
+        document["traceability"] = [
+            {"id": "TR-RISK", "source_external_id": "REQ-SAFE-WRITE", "source_type": "requirement", "target_type": "risk", "target_id": "RISK-001", "description": "覆盖风险。"},
+            {"id": "TR-ASM", "source_external_id": "NOTE-VALIDATED", "source_type": "note", "target_type": "assumption", "target_id": "ASM-001", "description": ""},
+        ]
+        document["source_snippets"] = [
+            {"id": "SNIP-RISK", "path": "scripts/render_markdown.py", "line_start": 1, "line_end": 2, "language": "python", "purpose": "风险证据。", "content": "def write_output():\n    pass", "confidence": "observed"},
+        ]
+        document["risks"] = [
+            {"id": "RISK-001", "description": "输出覆盖策略被误用。", "impact": "可能覆盖人工修改的文档。", "mitigation": "默认拒绝覆盖。", "confidence": "inferred", "evidence_refs": ["EV-RISK"], "traceability_refs": [], "source_snippet_refs": ["SNIP-RISK"]},
+        ]
+        document["assumptions"] = [
+            {"id": "ASM-001", "description": "调用方已先执行 DSL 校验。", "rationale": "Renderer 只做防御性检查。", "validation_suggestion": "保留 validate_dsl.py。", "confidence": "unknown", "evidence_refs": ["EV-ASM"], "traceability_refs": [], "source_snippet_refs": []},
+        ]
+
+        markdown = module.render_markdown(document)
+        chapter_9 = markdown[markdown.index("## 9. 结构问题与改进建议") :]
+
+        self.assertIn("### 风险", chapter_9)
+        risk_section = section_between(chapter_9, "### 风险", "### 假设")
+        self.assertIn("| ID | 风险 | 影响 | 缓解措施 | 置信度 |", risk_section)
+        self.assertIn("| RISK-001 | 输出覆盖策略被误用。 | 可能覆盖人工修改的文档。 | 默认拒绝覆盖。 | inferred |", risk_section)
+        self.assertIn("支持数据（RISK-001 / 输出覆盖策略被误用。）", chapter_9)
+        self.assertIn("依据：EV-RISK（覆盖策略分析，review）", chapter_9)
+        self.assertIn("关联来源：REQ-SAFE-WRITE（覆盖风险。）", chapter_9)
+        self.assertEqual([], document["risks"][0]["traceability_refs"])
+        self.assertIn("Source: scripts/render_markdown.py:1-2", chapter_9)
+        self.assertIn("### 假设", chapter_9)
+        assumption_section = section_between(chapter_9, "### 假设", "支持数据（ASM-001 / 调用方已先执行 DSL 校验。）")
+        self.assertIn("| ID | 假设 | 依据 | 验证建议 | 置信度 |", assumption_section)
+        self.assertIn("| ASM-001 | 调用方已先执行 DSL 校验。 | Renderer 只做防御性检查。 | 保留 validate_dsl.py。 | unknown |", assumption_section)
+        self.assertIn("支持数据（ASM-001 / 调用方已先执行 DSL 校验。）", chapter_9)
+        self.assertIn("依据：EV-ASM（工作流假设）", chapter_9)
+        self.assertIn("关联来源：NOTE-VALIDATED", chapter_9)
+        self.assertEqual([], document["assumptions"][0]["traceability_refs"])
+        self.assertNotIn("未识别到明确的结构问题与改进建议。", chapter_9)
+
+    def test_low_confidence_summary_excludes_support_data_risks_assumptions_and_diagrams(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["architecture_views"]["module_relationship_diagram"]["confidence"] = "unknown"
+        document["evidence"] = [
+            {"id": "EV-UNKNOWN", "kind": "note", "title": "未知证据", "location": "", "description": "", "confidence": "unknown"},
+        ]
+        document["risks"] = [
+            {"id": "RISK-UNKNOWN", "description": "风险置信度未知。", "impact": "", "mitigation": "", "confidence": "unknown", "evidence_refs": [], "traceability_refs": [], "source_snippet_refs": []},
+        ]
+        document["assumptions"] = [
+            {"id": "ASM-UNKNOWN", "description": "假设置信度未知。", "rationale": "", "validation_suggestion": "", "confidence": "unknown", "evidence_refs": [], "traceability_refs": [], "source_snippet_refs": []},
+        ]
+        document["architecture_views"]["module_intro"]["rows"][0]["confidence"] = "unknown"
+
+        markdown = module.render_markdown(document)
+        chapter_9 = markdown[markdown.index("## 9. 结构问题与改进建议") :]
+
+        self.assertIn("### 低置信度项", chapter_9)
+        self.assertIn("$.architecture_views.module_intro.rows[0]", chapter_9)
+        self.assertNotIn("$.evidence[0]", chapter_9)
+        low_confidence = section_from(chapter_9, "### 低置信度项")
+        self.assertNotIn("RISK-UNKNOWN", low_confidence)
+        self.assertNotIn("ASM-UNKNOWN", low_confidence)
+        self.assertNotIn("MER-ARCH-MODULES", chapter_9)
+
 
 def collect_non_empty_mermaid_sources(document):
     sources = []
