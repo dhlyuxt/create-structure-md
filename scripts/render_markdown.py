@@ -32,6 +32,7 @@ GENERIC_OUTPUT_TOKENS = {
 }
 
 CONTROL_CHARACTER_RE = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+SAFE_FENCE_INFO_RE = re.compile(r"^[A-Za-z0-9_+.-]+$")
 
 
 class RenderError(Exception):
@@ -86,14 +87,9 @@ def escape_plain_text_line(line):
 
     if re.match(r"^ {0,3}#{1,6}\s+", content) or re.match(r"^ {0,3}(=+|-+)\s*$", content):
         content = "\\" + content
-    if is_table_like_plain_text_line(content):
+    if "|" in content:
         content = content.replace("|", "\\|")
     return content + newline
-
-
-def is_table_like_plain_text_line(line):
-    stripped = line.strip()
-    return "|" in line and (stripped.startswith("|") or stripped.endswith("|") or line.count("|") >= 2)
 
 
 def render_fixed_table(rows, columns):
@@ -146,7 +142,7 @@ def longest_backtick_run(content):
 def render_source_snippet(snippet):
     content = str(snippet.get("content") or "")
     fence = "`" * max(3, longest_backtick_run(content) + 1)
-    language = escape_plain_text(snippet.get("language", "")).strip()
+    language = safe_fence_info_string(snippet.get("language", ""))
     path = escape_plain_text(snippet.get("path", "")).strip()
     line_start = escape_plain_text(snippet.get("line_start", "")).strip()
     line_end = escape_plain_text(snippet.get("line_end", "")).strip()
@@ -163,6 +159,13 @@ def render_source_snippet(snippet):
 
     details.append(f"{fence}{language}\n{content}\n{fence}")
     return "\n\n".join(details)
+
+
+def safe_fence_info_string(value):
+    language = stringify_markdown_value(value).strip()
+    if SAFE_FENCE_INFO_RE.fullmatch(language):
+        return language
+    return ""
 
 
 def build_parser():

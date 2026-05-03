@@ -582,6 +582,15 @@ class MarkdownPrimitiveTests(unittest.TestCase):
         self.assertIn("&lt;div&gt;raw&lt;/div&gt;", escaped)
         self.assertNotIn("```", escaped)
 
+    def test_escape_plain_text_escapes_one_pipe_gfm_table_shape(self):
+        module = load_renderer_module()
+        value = "a | b\n--- | ---\nx | y"
+        escaped = module.escape_plain_text(value)
+        self.assertIn("a \\| b", escaped)
+        self.assertIn("--- \\| ---", escaped)
+        self.assertIn("x \\| y", escaped)
+        self.assertNotIn("a | b\n--- | ---\nx | y", escaped)
+
     def test_render_fixed_table_uses_only_visible_columns_and_escapes_cells(self):
         module = load_renderer_module()
         rows = [
@@ -672,6 +681,29 @@ class MarkdownPrimitiveTests(unittest.TestCase):
         self.assertIn("````python", rendered)
         self.assertIn("```python\nprint('nested')\n```", rendered)
         self.assertTrue(rendered.rstrip().endswith("````"))
+
+    def test_source_snippet_omits_unsafe_language_info_string(self):
+        module = load_renderer_module()
+        unsafe_languages = [
+            "python extra",
+            "python\njavascript",
+            "py`thon",
+        ]
+        for language in unsafe_languages:
+            with self.subTest(language=language):
+                snippet = {
+                    "path": "src/example.py",
+                    "line_start": 1,
+                    "line_end": 1,
+                    "language": language,
+                    "purpose": "展示安全 info string。",
+                    "content": "print('safe')",
+                }
+                rendered = module.render_source_snippet(snippet)
+                self.assertIn("```\nprint('safe')\n```", rendered)
+                self.assertNotIn("```python", rendered)
+                self.assertNotIn("javascript", rendered)
+                self.assertNotIn("py`thon", rendered)
 
 
 if __name__ == "__main__":
