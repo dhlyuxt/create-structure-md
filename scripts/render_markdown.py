@@ -945,7 +945,7 @@ def write_output(output_path, markdown, overwrite=False, backup=False):
             raise RenderError(f"backup path already exists: {backup_path}; retry later")
         copy_backup_file(output_path, backup_path)
 
-    write_markdown_file(output_path, markdown, exclusive=not overwrite and not backup)
+    write_markdown_file(output_path, markdown, exclusive=not overwrite and backup_path is None)
     return backup_path
 
 
