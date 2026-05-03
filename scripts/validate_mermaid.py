@@ -53,6 +53,7 @@ DOT_PATTERNS = [
     ),
 ]
 DOT_SYNTAX_HINT = "Use Mermaid syntax only; final Graphviz, DOT, SVG, PNG, and image export are out of scope"
+SAFE_FILENAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -515,6 +516,80 @@ def run_static_validation(diagrams, source_kind, extraction_report=None):
     return 0
 
 
+def safe_artifact_stem(diagram):
+    raw = diagram.diagram_id or f"markdown-block-{diagram.markdown_block_index}"
+    stem = SAFE_FILENAME_RE.sub("_", raw).strip("._")
+    return stem or "mermaid-diagram"
+
+
+def ensure_strict_tooling(report):
+    node_path = shutil.which("node")
+    mmdc_path = shutil.which("mmdc")
+    if not node_path or not mmdc_path:
+        missing = []
+        if not node_path:
+            missing.append("node")
+        if not mmdc_path:
+            missing.append("mmdc")
+        report.error(
+            "strict Mermaid validation",
+            "Mermaid strict validation was not performed because local Mermaid CLI tooling unavailable: "
+            + ", ".join(missing),
+            "Install node and @mermaid-js/mermaid-cli with mmdc on PATH, or ask the user before using --static for this run",
+        )
+        return False
+    return True
+
+
+def run_strict_validation(diagrams, work_dir=None):
+    report = MermaidReport()
+    if not ensure_strict_tooling(report):
+        return report
+
+    if work_dir:
+        root = Path(work_dir)
+        root.mkdir(parents=True, exist_ok=True)
+        cleanup_context = None
+    else:
+        cleanup_context = tempfile.TemporaryDirectory(prefix="create-structure-md-mermaid-")
+        root = Path(cleanup_context.__enter__())
+
+    try:
+        for diagram in diagrams:
+            stem = safe_artifact_stem(diagram)
+            input_path = root / f"{stem}.mmd"
+            output_path = root / f"{stem}.svg"
+            input_path.write_text(diagram.source, encoding="utf-8")
+            completed = subprocess.run(
+                ["mmdc", "-i", str(input_path), "-o", str(output_path)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            if completed.returncode != 0:
+                detail = completed.stderr.strip() or completed.stdout.strip() or f"exit code {completed.returncode}"
+                report.error(diagram.label(), f"mmdc failed: {detail}")
+    finally:
+        if cleanup_context is not None:
+            cleanup_context.__exit__(None, None, None)
+
+    return report
+
+
+def run_strict_mode(diagrams, source_kind, extraction_report=None, work_dir=None):
+    preflight_report = merge_reports(extraction_report or MermaidReport(), validate_static(diagrams, source_kind))
+    if preflight_report.errors:
+        print_report(preflight_report)
+        return 1
+
+    strict_report = run_strict_validation(diagrams, work_dir)
+    if strict_report.errors:
+        print_report(strict_report)
+        return 1
+    print(f"Mermaid validation succeeded: {len(diagrams)} diagram(s) checked in strict mode.")
+    return 0
+
+
 def main(argv=None):
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -525,25 +600,23 @@ def main(argv=None):
             print(line)
         return 0 if ok else 1
     try:
-        if args.dsl_file and effective_mode(args) == "static":
+        extraction_report = None
+        if args.dsl_file:
             document = load_json_file(args.dsl_file)
             diagrams = extract_diagrams_from_dsl(document)
-            return run_static_validation(diagrams, "dsl")
-        if args.markdown_file and effective_mode(args) == "static":
+            source_kind = "dsl"
+        else:
             markdown_text = load_text_file(args.markdown_file)
             diagrams, extraction_report = extract_diagrams_from_markdown(markdown_text)
-            return run_static_validation(diagrams, "markdown", extraction_report)
+            source_kind = "markdown"
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
-    if args.dsl_file:
-        print("ERROR: strict validation requires Task 5 Mermaid CLI adapter", file=sys.stderr)
-        return 2
-    if args.markdown_file:
-        print("ERROR: strict validation requires Task 5 Mermaid CLI adapter", file=sys.stderr)
-        return 2
-    print("ERROR: unsupported validation mode", file=sys.stderr)
-    return 2
+
+    mode = effective_mode(args)
+    if mode == "static":
+        return run_static_validation(diagrams, source_kind, extraction_report)
+    return run_strict_mode(diagrams, source_kind, extraction_report, args.work_dir)
 
 
 if __name__ == "__main__":

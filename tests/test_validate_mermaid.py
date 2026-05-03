@@ -837,5 +837,235 @@ flowchart TD
         self.assertIn("duplicate diagram id MER-DUPLICATE-DOT", stderr)
 
 
+class MermaidStrictValidationTests(unittest.TestCase):
+    def test_default_mode_is_strict_and_missing_tooling_is_explicit(self):
+        module = load_validator_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = write_json(valid_document(), tmpdir)
+            with mock.patch.object(module.shutil, "which", return_value=None):
+                code, stdout, stderr = call_main(module, ["--from-dsl", str(source)])
+
+        self.assertEqual(1, code)
+        self.assertEqual("", stdout)
+        self.assertIn("Mermaid strict validation was not performed", stderr)
+        self.assertIn("local Mermaid CLI tooling unavailable", stderr)
+        self.assertIn("mmdc", stderr)
+        self.assertNotIn("proven renderable", stdout + stderr)
+
+    def test_strict_mode_writes_mmd_files_and_preserves_work_dir_artifacts(self):
+        module = load_validator_module()
+
+        def fake_which(name):
+            return {"node": "/usr/bin/node", "mmdc": "/usr/local/bin/mmdc"}.get(name)
+
+        completed = subprocess.CompletedProcess(["mmdc"], 0, stdout="", stderr="")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = write_json(valid_document(), tmpdir)
+            work_dir = Path(tmpdir) / "mermaid-work"
+            with (
+                mock.patch.object(module.shutil, "which", side_effect=fake_which),
+                mock.patch.object(module.subprocess, "run", return_value=completed) as mocked_run,
+            ):
+                code, stdout, stderr = call_main(
+                    module,
+                    ["--from-dsl", str(source), "--strict", "--work-dir", str(work_dir)],
+                )
+
+            self.assertEqual(0, code, stderr)
+            self.assertIn("Mermaid validation succeeded", stdout)
+            self.assertIn("strict mode", stdout)
+            self.assertEqual("", stderr)
+            self.assertTrue((work_dir / "MER-ARCH-MODULES.mmd").is_file())
+            self.assertTrue((work_dir / "MER-ARCH-MODULES.svg").parent.is_dir())
+            first_command = mocked_run.call_args_list[0].args[0]
+            self.assertEqual("mmdc", first_command[0])
+            self.assertIn("-i", first_command)
+            self.assertIn("-o", first_command)
+            input_path = Path(first_command[first_command.index("-i") + 1])
+            output_path = Path(first_command[first_command.index("-o") + 1])
+            self.assertEqual(work_dir / "MER-ARCH-MODULES.mmd", input_path)
+            self.assertEqual(work_dir / "MER-ARCH-MODULES.svg", output_path)
+
+    def test_default_strict_mode_accepts_work_dir_without_explicit_strict_flag_for_dsl(self):
+        module = load_validator_module()
+
+        def fake_which(name):
+            return {"node": "/usr/bin/node", "mmdc": "/usr/local/bin/mmdc"}.get(name)
+
+        completed = subprocess.CompletedProcess(["mmdc"], 0, stdout="", stderr="")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = write_json(valid_document(), tmpdir)
+            work_dir = Path(tmpdir) / "mermaid-work"
+            with (
+                mock.patch.object(module.shutil, "which", side_effect=fake_which),
+                mock.patch.object(module.subprocess, "run", return_value=completed),
+            ):
+                code, stdout, stderr = call_main(
+                    module,
+                    ["--from-dsl", str(source), "--work-dir", str(work_dir)],
+                )
+
+            self.assertEqual(0, code, stderr)
+            self.assertIn("strict mode", stdout)
+            self.assertEqual("", stderr)
+            self.assertTrue((work_dir / "MER-ARCH-MODULES.mmd").is_file())
+
+    def test_default_strict_mode_accepts_work_dir_without_explicit_strict_flag_for_markdown(self):
+        module = load_validator_module()
+
+        def fake_which(name):
+            return {"node": "/usr/bin/node", "mmdc": "/usr/local/bin/mmdc"}.get(name)
+
+        completed = subprocess.CompletedProcess(["mmdc"], 0, stdout="", stderr="")
+        markdown = """# Output
+
+```mermaid
+flowchart TD
+  A --> B
+```
+"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = write_markdown(tmpdir, "output.md", markdown)
+            work_dir = Path(tmpdir) / "mermaid-work"
+            with (
+                mock.patch.object(module.shutil, "which", side_effect=fake_which),
+                mock.patch.object(module.subprocess, "run", return_value=completed),
+            ):
+                code, stdout, stderr = call_main(
+                    module,
+                    ["--from-markdown", str(source), "--work-dir", str(work_dir)],
+                )
+
+            self.assertEqual(0, code, stderr)
+            self.assertIn("strict mode", stdout)
+            self.assertEqual("", stderr)
+            self.assertTrue((work_dir / "markdown-block-1.mmd").is_file())
+
+    def test_strict_mode_reports_mmdc_failure_with_diagram_location(self):
+        module = load_validator_module()
+
+        def fake_which(name):
+            return {"node": "/usr/bin/node", "mmdc": "/usr/local/bin/mmdc"}.get(name)
+
+        completed = subprocess.CompletedProcess(
+            ["mmdc"],
+            1,
+            stdout="",
+            stderr="Parse error on line 2",
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = write_json(valid_document(), tmpdir)
+            with (
+                mock.patch.object(module.shutil, "which", side_effect=fake_which),
+                mock.patch.object(module.subprocess, "run", return_value=completed),
+            ):
+                code, stdout, stderr = call_main(module, ["--from-dsl", str(source), "--strict"])
+
+        self.assertEqual(1, code)
+        self.assertEqual("", stdout)
+        self.assertIn("$.architecture_views.module_relationship_diagram", stderr)
+        self.assertIn("MER-ARCH-MODULES", stderr)
+        self.assertIn("mmdc failed", stderr)
+        self.assertIn("Parse error on line 2", stderr)
+
+    def test_strict_dsl_static_errors_stop_before_mmdc(self):
+        module = load_validator_module()
+
+        def fake_which(name):
+            return {"node": "/usr/bin/node", "mmdc": "/usr/local/bin/mmdc"}.get(name)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["architecture_views"]["module_relationship_diagram"]["source"] = (
+                "digraph G {\n  A -> B;\n}"
+            )
+            source = write_json(document, tmpdir)
+            with (
+                mock.patch.object(module.shutil, "which", side_effect=fake_which),
+                mock.patch.object(module.subprocess, "run") as mocked_run,
+            ):
+                code, stdout, stderr = call_main(module, ["--from-dsl", str(source), "--strict"])
+
+        self.assertEqual(1, code)
+        self.assertEqual("", stdout)
+        self.assertIn("Graphviz/DOT", stderr)
+        mocked_run.assert_not_called()
+
+    def test_strict_markdown_unbalanced_fence_stops_before_mmdc(self):
+        module = load_validator_module()
+
+        def fake_which(name):
+            return {"node": "/usr/bin/node", "mmdc": "/usr/local/bin/mmdc"}.get(name)
+
+        markdown = "# Output\n\n```mermaid\nflowchart TD\n  A --> B\n"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = write_markdown(tmpdir, "unbalanced.md", markdown)
+            with (
+                mock.patch.object(module.shutil, "which", side_effect=fake_which),
+                mock.patch.object(module.subprocess, "run") as mocked_run,
+            ):
+                code, stdout, stderr = call_main(
+                    module,
+                    ["--from-markdown", str(source), "--strict"],
+                )
+
+        self.assertEqual(1, code)
+        self.assertEqual("", stdout)
+        self.assertIn("Mermaid block 1 line 3", stderr)
+        self.assertIn("unbalanced fenced code block starting at line 3", stderr)
+        mocked_run.assert_not_called()
+
+    def test_strict_markdown_unsupported_type_stops_before_mmdc(self):
+        module = load_validator_module()
+
+        def fake_which(name):
+            return {"node": "/usr/bin/node", "mmdc": "/usr/local/bin/mmdc"}.get(name)
+
+        markdown = """```mermaid
+erDiagram
+  CUSTOMER ||--o{ ORDER : places
+```
+"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = write_markdown(tmpdir, "unsupported.md", markdown)
+            with (
+                mock.patch.object(module.shutil, "which", side_effect=fake_which),
+                mock.patch.object(module.subprocess, "run") as mocked_run,
+            ):
+                code, stdout, stderr = call_main(
+                    module,
+                    ["--from-markdown", str(source), "--strict"],
+                )
+
+        self.assertEqual(1, code)
+        self.assertEqual("", stdout)
+        self.assertIn("unsupported Mermaid diagram type erDiagram", stderr)
+        mocked_run.assert_not_called()
+
+    def test_strict_markdown_unclosed_non_mermaid_fence_stops_before_mmdc(self):
+        module = load_validator_module()
+
+        def fake_which(name):
+            return {"node": "/usr/bin/node", "mmdc": "/usr/local/bin/mmdc"}.get(name)
+
+        markdown = "# Output\n\n```python\nprint('not mermaid')\n"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = write_markdown(tmpdir, "unclosed-python.md", markdown)
+            with (
+                mock.patch.object(module.shutil, "which", side_effect=fake_which),
+                mock.patch.object(module.subprocess, "run") as mocked_run,
+            ):
+                code, stdout, stderr = call_main(
+                    module,
+                    ["--from-markdown", str(source), "--strict"],
+                )
+
+        self.assertEqual(1, code)
+        self.assertEqual("", stdout)
+        self.assertIn("Markdown line 3", stderr)
+        self.assertIn("unbalanced fenced code block starting at line 3", stderr)
+        mocked_run.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()
