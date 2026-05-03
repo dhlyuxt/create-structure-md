@@ -2,13 +2,11 @@ import contextlib
 import importlib.util
 import io
 import os
-import shutil
 import subprocess
 import sys
 import unittest
 import uuid
 from pathlib import Path
-from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -68,7 +66,7 @@ def call_main(module, argv):
     return code or 0, stdout.getvalue(), stderr.getvalue()
 
 
-def create_minimal_source(root, skill_text=None):
+def create_minimal_source(root, skill_text=None, include_requirements=True):
     root.mkdir(parents=True, exist_ok=True)
     (root / "references").mkdir()
     (root / "schemas").mkdir()
@@ -87,7 +85,8 @@ Read `references/dsl-spec.md` before writing DSL.
 """,
         encoding="utf-8",
     )
-    (root / "requirements.txt").write_text("jsonschema\n", encoding="utf-8")
+    if include_requirements:
+        (root / "requirements.txt").write_text("jsonschema\n", encoding="utf-8")
     (root / "references/dsl-spec.md").write_text("# DSL Spec\n", encoding="utf-8")
     (root / "scripts/validate_dsl.py").write_text("def main(argv=None):\n    return 0\n", encoding="utf-8")
     (root / "scripts/validate_mermaid.py").write_text("def main(argv=None):\n    return 0\n", encoding="utf-8")
@@ -193,8 +192,7 @@ class InstallerStructureValidationTests(unittest.TestCase):
         module = load_installer_module()
         run_dir = make_run_dir("missing-required")
         source = run_dir / "source"
-        create_minimal_source(source)
-        (source / "requirements.txt").unlink()
+        create_minimal_source(source, include_requirements=False)
 
         report = module.validate_source(source)
 
