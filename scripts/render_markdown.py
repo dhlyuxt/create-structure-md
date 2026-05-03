@@ -85,7 +85,7 @@ def escape_plain_text_line(line):
         content = content[:-1]
         newline = "\r"
 
-    if re.match(r"^ {0,3}#{1,6}\s+", content) or re.match(r"^ {0,3}(=+|-+)\s*$", content):
+    if re.match(r"^ {0,3}#{1,6}(?:\s+|$)", content) or re.match(r"^ {0,3}(=+|-+)\s*$", content):
         content = "\\" + content
     if "|" in content:
         content = content.replace("|", "\\|")

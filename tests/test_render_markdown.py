@@ -582,6 +582,12 @@ class MarkdownPrimitiveTests(unittest.TestCase):
         self.assertIn("&lt;div&gt;raw&lt;/div&gt;", escaped)
         self.assertNotIn("```", escaped)
 
+    def test_escape_plain_text_blocks_empty_atx_headings(self):
+        module = load_renderer_module()
+        escaped = module.escape_plain_text("#\n###\n######")
+        self.assertEqual("\\#\n\\###\n\\######", escaped)
+        self.assertNotIn("\n###\n", escaped)
+
     def test_escape_plain_text_escapes_one_pipe_gfm_table_shape(self):
         module = load_renderer_module()
         value = "a | b\n--- | ---\nx | y"
