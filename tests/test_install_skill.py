@@ -67,7 +67,8 @@ def call_main(module, argv):
     return code or 0, stdout.getvalue(), stderr.getvalue()
 
 
-def create_minimal_source(root, skill_text=None, include_requirements=True):
+def create_minimal_source(root, skill_text=None, include_requirements=True, omit_runtime_scripts=None):
+    omit_runtime_scripts = set(omit_runtime_scripts or ())
     root.mkdir(parents=True, exist_ok=True)
     (root / "references").mkdir()
     (root / "schemas").mkdir()
@@ -89,9 +90,14 @@ Read `references/dsl-spec.md` before writing DSL.
     if include_requirements:
         (root / "requirements.txt").write_text("jsonschema\n", encoding="utf-8")
     (root / "references/dsl-spec.md").write_text("# DSL Spec\n", encoding="utf-8")
-    (root / "scripts/validate_dsl.py").write_text("def main(argv=None):\n    return 0\n", encoding="utf-8")
-    (root / "scripts/validate_mermaid.py").write_text("def main(argv=None):\n    return 0\n", encoding="utf-8")
-    (root / "scripts/render_markdown.py").write_text("def main(argv=None):\n    return 0\n", encoding="utf-8")
+    runtime_scripts = {
+        "validate_dsl.py": "def main(argv=None):\n    return 0\n",
+        "validate_mermaid.py": "def main(argv=None):\n    return 0\n",
+        "render_markdown.py": "def main(argv=None):\n    return 0\n",
+    }
+    for name, text in runtime_scripts.items():
+        if name not in omit_runtime_scripts:
+            (root / "scripts" / name).write_text(text, encoding="utf-8")
     (root / "schemas/structure-design.schema.json").write_text("{}\n", encoding="utf-8")
     (root / "examples/minimal.dsl.json").write_text("{}\n", encoding="utf-8")
     return root
@@ -112,6 +118,24 @@ class InstallerCliTests(unittest.TestCase):
             self.assertIn(f"- {entry}", completed.stdout)
         self.assertIn("Dependency status:", completed.stdout)
         self.assertFalse(target.exists())
+
+    def test_dry_run_reports_existing_target_conflict_without_copying(self):
+        run_dir = make_run_dir("dry-run-existing-target")
+        codex_home = run_dir / "codex home"
+        target = codex_home / "skills/create-structure-md"
+        target.mkdir(parents=True)
+        marker = target / "marker.txt"
+        marker.write_text("keep me\n", encoding="utf-8")
+
+        completed = run_installer("--dry-run", "--codex-home", codex_home)
+
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertIn("DRY RUN: no files copied", completed.stdout)
+        self.assertIn("Conflict: target already exists", completed.stdout)
+        self.assertIn(str(target), completed.stdout)
+        self.assertTrue(marker.exists())
+        self.assertEqual("keep me\n", marker.read_text(encoding="utf-8"))
+        self.assertFalse((target / "SKILL.md").exists())
 
     def test_copy_install_copies_runtime_allowlist_only(self):
         run_dir = make_run_dir("copy-install")
@@ -204,6 +228,17 @@ class InstallerStructureValidationTests(unittest.TestCase):
         self.assertFalse(report.ok)
         self.assertIn("missing required file: requirements.txt", report.messages)
 
+    def test_validate_source_rejects_missing_core_script(self):
+        module = load_installer_module()
+        run_dir = make_run_dir("missing-core-script")
+        source = run_dir / "source"
+        create_minimal_source(source, omit_runtime_scripts={"validate_mermaid.py"})
+
+        report = module.validate_source(source)
+
+        self.assertFalse(report.ok)
+        self.assertIn("missing required file: scripts/validate_mermaid.py", report.messages)
+
     def test_validate_source_checks_references_named_by_skill(self):
         module = load_installer_module()
         run_dir = make_run_dir("missing-reference")
@@ -258,6 +293,31 @@ description: Test fixture.
         self.assertIn(f"Installed create-structure-md to {target}", stdout)
         report = module.validate_source(target)
         self.assertTrue(report.ok, report.messages)
+
+    def test_main_rejects_invalid_installed_target_after_copy(self):
+        module = load_installer_module()
+        run_dir = make_run_dir("invalid-installed")
+        codex_home = run_dir / "codex home"
+        target = codex_home / "skills/create-structure-md"
+
+        def copy_invalid_skill(source, target):
+            create_minimal_source(target, omit_runtime_scripts={"render_markdown.py"})
+
+        original_copy_skill = module.copy_skill
+        module.copy_skill = copy_invalid_skill
+        try:
+            code, stdout, stderr = call_main(module, ["--codex-home", str(codex_home)])
+        finally:
+            module.copy_skill = original_copy_skill
+
+        self.assertEqual(1, code)
+        self.assertIn("ERROR: installed target failed structural validation:", stderr)
+        self.assertIn("missing required file: scripts/render_markdown.py", stderr)
+        self.assertIn(
+            f"To clean invalid output, review then run: rm -r {shlex.quote(str(target))}",
+            stderr,
+        )
+        self.assertNotIn(f"Installed create-structure-md to {target}", stdout)
 
 
 class InstallerDependencyReportingTests(unittest.TestCase):

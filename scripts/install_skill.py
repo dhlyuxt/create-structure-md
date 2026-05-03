@@ -22,7 +22,13 @@ RUNTIME_ENTRIES = (
     "scripts",
     "examples",
 )
-REQUIRED_FILES = ("SKILL.md", "requirements.txt")
+REQUIRED_FILES = (
+    "SKILL.md",
+    "requirements.txt",
+    "scripts/validate_dsl.py",
+    "scripts/validate_mermaid.py",
+    "scripts/render_markdown.py",
+)
 REQUIRED_DIRS = ("references", "schemas", "scripts", "examples")
 REFERENCE_RE = re.compile(r"references/[A-Za-z0-9_.\-/]+\.md")
 
@@ -169,6 +175,8 @@ def print_plan(source: Path, codex_home: Path, target: Path, dry_run: bool) -> N
         print(f"- {entry}")
     if dry_run:
         print("DRY RUN: no files copied")
+        if target.exists():
+            print(f"Conflict: target already exists: {target}")
 
 
 def copy_skill(source: Path, target: Path) -> None:
@@ -220,6 +228,18 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(
             "Manual inspection required. "
             f"To clean partial output, review then run: {cleanup_command(target)}",
+            file=sys.stderr,
+        )
+        return 1
+
+    installed_report = validate_source(target)
+    if not installed_report.ok:
+        print("ERROR: installed target failed structural validation:", file=sys.stderr)
+        for message in installed_report.messages:
+            print(f"ERROR: {message}", file=sys.stderr)
+        print(
+            "To clean invalid output, "
+            f"review then run: {cleanup_command(target)}",
             file=sys.stderr,
         )
         return 1
