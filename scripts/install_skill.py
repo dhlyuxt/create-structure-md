@@ -9,6 +9,7 @@ import shutil
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable, List, Optional, Set
 
 
 SKILL_NAME = "create-structure-md"
@@ -28,7 +29,7 @@ REFERENCE_RE = re.compile(r"references/[A-Za-z0-9_.\-/]+\.md")
 @dataclass(frozen=True)
 class ValidationReport:
     ok: bool
-    messages: list[str]
+    messages: List[str]
 
 
 @dataclass(frozen=True)
@@ -43,7 +44,7 @@ def repository_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
-def resolve_codex_home(raw_home: str | None = None) -> Path:
+def resolve_codex_home(raw_home: Optional[str] = None) -> Path:
     if raw_home:
         return Path(raw_home).expanduser()
     env_home = os.environ.get("CODEX_HOME")
@@ -57,7 +58,7 @@ def target_for(codex_home: Path) -> Path:
 
 
 def validate_source(source: Path) -> ValidationReport:
-    messages: list[str] = []
+    messages: List[str] = []
 
     for name in REQUIRED_FILES:
         path = source / name
@@ -89,9 +90,9 @@ def _has_expected_skill_name(text: str) -> bool:
     return any(line.strip() == f"name: {SKILL_NAME}" for line in front_matter.splitlines())
 
 
-def _missing_referenced_files(source: Path, text: str) -> list[str]:
-    messages: list[str] = []
-    seen: set[str] = set()
+def _missing_referenced_files(source: Path, text: str) -> List[str]:
+    messages: List[str] = []
+    seen: Set[str] = set()
     for match in REFERENCE_RE.finditer(text):
         reference = match.group(0)
         if reference in seen:
@@ -106,7 +107,10 @@ def _missing_referenced_files(source: Path, text: str) -> list[str]:
     return messages
 
 
-def collect_dependency_status(find_spec=importlib.util.find_spec, which=shutil.which) -> list[DependencyStatus]:
+def collect_dependency_status(
+    find_spec: Callable[[str], object] = importlib.util.find_spec,
+    which: Callable[[str], Optional[str]] = shutil.which,
+) -> List[DependencyStatus]:
     jsonschema_ok = find_spec("jsonschema") is not None
     node_path = which("node")
     mmdc_path = which("mmdc")
@@ -143,7 +147,7 @@ def collect_dependency_status(find_spec=importlib.util.find_spec, which=shutil.w
     ]
 
 
-def print_dependency_status(statuses: list[DependencyStatus]) -> None:
+def print_dependency_status(statuses: List[DependencyStatus]) -> None:
     print("Dependency status:")
     for status in statuses:
         state = "OK" if status.ok else "MISSING"
@@ -181,7 +185,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: Optional[List[str]] = None) -> int:
     args = build_parser().parse_args(argv)
     source = repository_root()
     codex_home = resolve_codex_home(args.codex_home)
