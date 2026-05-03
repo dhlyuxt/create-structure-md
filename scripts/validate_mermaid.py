@@ -19,7 +19,8 @@ TYPE_PREFIXES = {
     "classDiagram": re.compile(r"^classDiagram(?=\s|$)"),
     "stateDiagram-v2": re.compile(r"^stateDiagram-v2(?=\s|$)"),
 }
-FENCE_RE = re.compile(r"^\s*(```+|~~~+)\s*([A-Za-z0-9_-]+)?\s*$")
+OPENING_FENCE_RE = re.compile(r"^ {0,3}(```+|~~~+)[ \t]*(.*?)[ \t]*$")
+CLOSING_FENCE_RE = re.compile(r"^ {0,3}(```+|~~~+)[ \t]*$")
 KNOWN_UNSUPPORTED_MARKDOWN_TYPES = {
     "erDiagram",
     "journey",
@@ -177,6 +178,21 @@ def infer_markdown_diagram_type(source):
     if token in KNOWN_UNSUPPORTED_MARKDOWN_TYPES:
         return token
     return ""
+
+
+def markdown_info_language(info_string):
+    if not info_string:
+        return ""
+    return info_string.split(None, 1)[0]
+
+
+def is_closing_fence(line, opening_marker):
+    match = CLOSING_FENCE_RE.match(line)
+    return (
+        match is not None
+        and match.group(1)[0] == opening_marker[0]
+        and len(match.group(1)) >= len(opening_marker)
+    )
 
 
 def append_diagram(diagrams, value, path):
@@ -344,13 +360,13 @@ def extract_diagrams_from_markdown(markdown_text):
     body_lines = []
 
     for line_number, line in enumerate(markdown_text.splitlines(), start=1):
-        match = FENCE_RE.match(line)
         if not in_fence:
+            match = OPENING_FENCE_RE.match(line)
             if not match:
                 continue
             fence_marker = match.group(1)
             fence_start_line = line_number
-            language = match.group(2) or ""
+            language = markdown_info_language(match.group(2))
             fence_is_mermaid = language.lower() == "mermaid"
             body_lines = []
             in_fence = True
@@ -358,11 +374,7 @@ def extract_diagrams_from_markdown(markdown_text):
                 mermaid_block_index += 1
             continue
 
-        if (
-            match
-            and match.group(1)[0] == fence_marker[0]
-            and len(match.group(1)) >= len(fence_marker)
-        ):
+        if is_closing_fence(line, fence_marker):
             if fence_is_mermaid:
                 append_markdown_diagram(
                     diagrams,

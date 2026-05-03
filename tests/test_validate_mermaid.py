@@ -580,6 +580,66 @@ stateDiagram-v2
         self.assertIn("Mermaid validation succeeded: 5 diagram(s) checked in static mode.", stdout)
         self.assertEqual("", stderr)
 
+    def test_markdown_static_ignores_non_mermaid_fence_with_info_string(self):
+        module = load_validator_module()
+        markdown = '''```python linenums="1"
+print("not mermaid")
+```
+'''
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = write_markdown(tmpdir, "python.md", markdown)
+            code, stdout, stderr = call_main(module, ["--from-markdown", str(path), "--static"])
+
+        self.assertEqual(0, code, stderr)
+        self.assertIn("Mermaid validation succeeded: 0 diagram(s) checked in static mode.", stdout)
+        self.assertEqual("", stderr)
+
+    def test_markdown_static_accepts_mermaid_fence_with_info_string(self):
+        module = load_validator_module()
+        markdown = '''```mermaid title="x"
+flowchart TD
+  A --> B
+```
+'''
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = write_markdown(tmpdir, "mermaid-info.md", markdown)
+            code, stdout, stderr = call_main(module, ["--from-markdown", str(path), "--static"])
+
+        self.assertEqual(0, code, stderr)
+        self.assertIn("Mermaid validation succeeded: 1 diagram(s) checked in static mode.", stdout)
+        self.assertEqual("", stderr)
+
+    def test_markdown_static_does_not_close_fence_on_inner_fence_with_info_string(self):
+        module = load_validator_module()
+        markdown = '''```python
+print("not mermaid")
+```js
+console.log("still inside python fence")
+```
+'''
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = write_markdown(tmpdir, "inner-info.md", markdown)
+            code, stdout, stderr = call_main(module, ["--from-markdown", str(path), "--static"])
+
+        self.assertEqual(0, code, stderr)
+        self.assertIn("Mermaid validation succeeded: 0 diagram(s) checked in static mode.", stdout)
+        self.assertEqual("", stderr)
+
+    def test_markdown_static_ignores_four_space_indented_mermaid_fence(self):
+        module = load_validator_module()
+        markdown = """    ```mermaid
+    flowchart TD
+      A --> B
+    ```
+"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = write_markdown(tmpdir, "indented.md", markdown)
+            code, stdout, stderr = call_main(module, ["--from-markdown", str(path), "--static"])
+
+        self.assertEqual(0, code, stderr)
+        self.assertIn("Mermaid validation succeeded: 0 diagram(s) checked in static mode.", stdout)
+        self.assertEqual("", stderr)
+
     def test_markdown_static_rejects_empty_mermaid_block_with_line_number(self):
         module = load_validator_module()
         markdown = "# Output\n\n```mermaid\n\n```\n"
