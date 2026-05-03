@@ -1141,5 +1141,61 @@ erDiagram
         self.assertNotIn("Traceback", stderr)
 
 
+class MermaidIntegrationRegressionTests(unittest.TestCase):
+    def test_static_validation_accepts_both_minimal_examples(self):
+        module = load_validator_module()
+        for relative_path in [
+            "examples/minimal-from-code.dsl.json",
+            "examples/minimal-from-requirements.dsl.json",
+        ]:
+            with self.subTest(relative_path=relative_path):
+                code, stdout, stderr = call_main(module, ["--from-dsl", str(ROOT / relative_path), "--static"])
+                self.assertEqual(0, code, stderr)
+                self.assertIn("Mermaid validation succeeded", stdout)
+                self.assertEqual("", stderr)
+
+    def test_static_validation_reports_four_checked_diagrams_for_minimal_examples(self):
+        module = load_validator_module()
+        for relative_path in [
+            "examples/minimal-from-code.dsl.json",
+            "examples/minimal-from-requirements.dsl.json",
+        ]:
+            with self.subTest(relative_path=relative_path):
+                code, stdout, stderr = call_main(module, ["--from-dsl", str(ROOT / relative_path), "--static"])
+                self.assertEqual(0, code, stderr)
+                self.assertIn("Mermaid validation succeeded: 4 diagram(s) checked in static mode.", stdout)
+                self.assertEqual("", stderr)
+
+    def test_requirements_remain_runtime_only(self):
+        requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
+        dependency_lines = [
+            line.strip()
+            for line in requirements.splitlines()
+            if line.strip() and not line.strip().startswith("#")
+        ]
+        self.assertEqual(["jsonschema"], dependency_lines)
+        for forbidden in ["pytest", "markdown", "mermaid", "playwright", "selenium"]:
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, requirements)
+
+    def test_mermaid_reference_rules_match_validator_supported_types(self):
+        module = load_validator_module()
+        text = (ROOT / "references/mermaid-rules.md").read_text(encoding="utf-8")
+        for diagram_type in sorted(module.SUPPORTED_TYPES):
+            with self.subTest(diagram_type=diagram_type):
+                self.assertIn(diagram_type, text)
+        self.assertIn("Graphviz", text)
+        self.assertIn("DOT", text)
+
+    def test_review_checklist_keeps_strict_or_static_acceptance_boundary_visible(self):
+        text = (ROOT / "references/review-checklist.md").read_text(encoding="utf-8")
+        self.assertIn("strict validation", text)
+        self.assertIn("static-only validation", text)
+        self.assertIn("explicit acceptance", text)
+        self.assertIn("strict validation was not performed", text)
+        self.assertIn("local Mermaid CLI tooling unavailable", text)
+        self.assertIn("user accepted static-only validation", text)
+
+
 if __name__ == "__main__":
     unittest.main()

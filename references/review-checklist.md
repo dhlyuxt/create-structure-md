@@ -15,6 +15,7 @@
 
 - Confirm DSL Mermaid sources passed strict validation, or record the user's explicit acceptance of static-only validation.
 - Confirm rendered Markdown contains Mermaid fences only where Mermaid sources exist.
+- If static-only validation was used, confirm the final report states that strict validation was not performed, local Mermaid CLI tooling unavailable was the reason, and the user accepted static-only validation for this run.
 
 ## No Repo Analysis
 
