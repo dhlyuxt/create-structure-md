@@ -65,6 +65,9 @@ REFERENCE_EXPECTATIONS = {
         "# create-structure-md Document Structure",
         "## Fixed 9-Chapter Markdown Outline",
         "## Output Filename Policy",
+        "Support data renders as compact notes",
+        "Extra table row evidence renders after the extra table",
+        "Chapter 6 empty tables render the documented empty-state sentences",
         "module- or system-specific",
         "Generic-only filenames are forbidden",
     ],
@@ -80,6 +83,10 @@ REFERENCE_EXPECTATIONS = {
         "## Final Output Path",
         "## Fixed Chapters",
         "## Mermaid Validation",
+        "## Support Data",
+        "Confirm evidence notes render near the referenced design item",
+        "Confirm traceability uses `target_type` and `target_id` as the authoritative binding",
+        "Confirm extra table evidence renders after the table",
         "## No Repo Analysis",
         "single Markdown file",
     ],
@@ -1904,7 +1911,7 @@ class RendererIntegrationTests(unittest.TestCase):
             self.assertIn("关联来源：REQ-MODULE（模块追踪。）", markdown)
             self.assertIn("支持数据（STEP-GENERATE-001 / 准备结构化 DSL JSON。）", markdown)
             self.assertIn("关联来源：REQ-STEP", markdown)
-            self.assertEqual([], document["key_flows"]["flows"][0]["traceability_refs"])
+            self.assertEqual([], document["key_flows"]["flows"][0]["steps"][0]["traceability_refs"])
             self.assertIn("````python\n```nested```\nprint('safe fence')\n````", markdown)
             self.assertIn("#### Phase 6 补充表", markdown)
             self.assertIn("#### MER-PHASE-6-EXTRA", markdown)
