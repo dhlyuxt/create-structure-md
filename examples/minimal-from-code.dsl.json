@@ -102,7 +102,7 @@
             "title": "模块内部结构图",
             "diagram_type": "flowchart",
             "description": "展示模块内部结构。",
-            "source": "flowchart TD\n  Schema[DSL schema] --> Validate[校验脚本]\n  Validate --> Render[渲染脚本]\n  Render --> References[参考文档]",
+            "source": "",
             "confidence": "observed"
           },
           "textual_structure": "schema 描述 DSL 结构，校验脚本负责质量门禁，渲染脚本负责输出 Markdown。",

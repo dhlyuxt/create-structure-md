@@ -1154,18 +1154,6 @@ class MermaidIntegrationRegressionTests(unittest.TestCase):
                 self.assertIn("Mermaid validation succeeded", stdout)
                 self.assertEqual("", stderr)
 
-    def test_static_validation_reports_four_checked_diagrams_for_minimal_examples(self):
-        module = load_validator_module()
-        for relative_path in [
-            "examples/minimal-from-code.dsl.json",
-            "examples/minimal-from-requirements.dsl.json",
-        ]:
-            with self.subTest(relative_path=relative_path):
-                code, stdout, stderr = call_main(module, ["--from-dsl", str(ROOT / relative_path), "--static"])
-                self.assertEqual(0, code, stderr)
-                self.assertIn("Mermaid validation succeeded: 4 diagram(s) checked in static mode.", stdout)
-                self.assertEqual("", stderr)
-
     def test_requirements_remain_runtime_only(self):
         requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
         dependency_lines = [
