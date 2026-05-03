@@ -105,6 +105,41 @@ FLOW_BRANCH_COLUMNS = [
     ("related_runtime_unit_ids", "关联运行单元"),
 ]
 
+RISK_COLUMNS = [
+    ("description", "风险"),
+    ("impact", "影响"),
+    ("mitigation", "缓解措施"),
+    ("confidence", "置信度"),
+]
+
+ASSUMPTION_COLUMNS = [
+    ("description", "假设"),
+    ("rationale", "依据"),
+    ("validation_suggestion", "验证建议"),
+    ("confidence", "置信度"),
+]
+
+LOW_CONFIDENCE_COLUMNS = [
+    ("path", "路径"),
+    ("label", "项目"),
+    ("confidence", "置信度"),
+]
+
+LOW_CONFIDENCE_LABEL_KEYS = [
+    "module_name",
+    "name",
+    "capability_name",
+    "unit_name",
+    "config_name",
+    "artifact_name",
+    "dependency_name",
+    "scenario",
+    "flow_name",
+    "description",
+    "condition",
+    "summary",
+]
+
 
 class RenderError(Exception):
     exit_code = 1
@@ -671,6 +706,88 @@ def render_chapter_8(document, module_display_names, runtime_unit_display_names)
     return "\n\n".join(part for part in parts if part != "")
 
 
+def low_confidence_item_label(item):
+    for key in LOW_CONFIDENCE_LABEL_KEYS:
+        value = stringify_markdown_value(item.get(key, "")).strip()
+        if value:
+            return value
+    item_id = stringify_markdown_value(item.get("id", "")).strip()
+    if item_id:
+        return item_id
+    return "未命名项目"
+
+
+def collect_low_confidence_items(document):
+    items = []
+
+    def add_item(path, item):
+        if item.get("confidence") == "unknown":
+            items.append(
+                {
+                    "path": path,
+                    "label": low_confidence_item_label(item),
+                    "confidence": item.get("confidence", ""),
+                }
+            )
+
+    for index, row in enumerate(document.get("architecture_views", {}).get("module_intro", {}).get("rows", [])):
+        add_item(f"$.architecture_views.module_intro.rows[{index}]", row)
+
+    for module_index, module in enumerate(document.get("module_design", {}).get("modules", [])):
+        add_item(f"$.module_design.modules[{module_index}]", module)
+        capability_rows = (
+            module.get("external_capability_details", {}).get("provided_capabilities", {}).get("rows", [])
+        )
+        for row_index, row in enumerate(capability_rows):
+            add_item(
+                "$.module_design.modules"
+                f"[{module_index}].external_capability_details.provided_capabilities.rows[{row_index}]",
+                row,
+            )
+
+    for index, row in enumerate(document.get("runtime_view", {}).get("runtime_units", {}).get("rows", [])):
+        add_item(f"$.runtime_view.runtime_units.rows[{index}]", row)
+
+    configuration = document.get("configuration_data_dependencies", {})
+    for collection_name in ("configuration_items", "structural_data_artifacts", "dependencies"):
+        for index, row in enumerate(configuration.get(collection_name, {}).get("rows", [])):
+            add_item(f"$.configuration_data_dependencies.{collection_name}.rows[{index}]", row)
+
+    collaboration = document.get("cross_module_collaboration", {})
+    for index, row in enumerate(collaboration.get("collaboration_scenarios", {}).get("rows", [])):
+        add_item(f"$.cross_module_collaboration.collaboration_scenarios.rows[{index}]", row)
+
+    for flow_index, flow in enumerate(document.get("key_flows", {}).get("flows", [])):
+        add_item(f"$.key_flows.flows[{flow_index}]", flow)
+        for step_index, step in enumerate(flow.get("steps", [])):
+            add_item(f"$.key_flows.flows[{flow_index}].steps[{step_index}]", step)
+        for branch_index, branch in enumerate(flow.get("branches_or_exceptions", [])):
+            add_item(f"$.key_flows.flows[{flow_index}].branches_or_exceptions[{branch_index}]", branch)
+
+    return items
+
+
+def render_chapter_9(document):
+    parts = [chapter_heading(9, "结构问题与改进建议")]
+    free_form_text = stringify_markdown_value(document.get("structure_issues_and_suggestions", "")).strip()
+    risks = document.get("risks", [])
+    assumptions = document.get("assumptions", [])
+    low_confidence_items = collect_low_confidence_items(document)
+
+    if free_form_text:
+        parts.append(escape_plain_text(free_form_text))
+    if risks:
+        parts.extend(["### 风险", render_fixed_table(risks, RISK_COLUMNS)])
+    if assumptions:
+        parts.extend(["### 假设", render_fixed_table(assumptions, ASSUMPTION_COLUMNS)])
+    if low_confidence_items:
+        parts.extend(["### 低置信度项", render_fixed_table(low_confidence_items, LOW_CONFIDENCE_COLUMNS)])
+    if len(parts) == 1:
+        parts.append("未识别到明确的结构问题与改进建议。")
+
+    return "\n\n".join(parts)
+
+
 def build_parser():
     parser = argparse.ArgumentParser(description="Render create-structure-md DSL JSON to Markdown.")
     parser.add_argument("dsl_file", help="Path to structure DSL JSON.")
@@ -768,6 +885,7 @@ def render_markdown(document):
         render_chapter_6(document),
         render_chapter_7(document, module_display_names),
         render_chapter_8(document, module_display_names, runtime_unit_display_names),
+        render_chapter_9(document),
     ]
     return "\n\n".join(parts) + "\n"
 

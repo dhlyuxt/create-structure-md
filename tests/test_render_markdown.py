@@ -1104,5 +1104,86 @@ class ChapterFiveToEightRenderingTests(unittest.TestCase):
             module.render_markdown(document)
 
 
+class ChapterNineRenderingTests(unittest.TestCase):
+    def test_chapter_9_empty_state_appears_only_when_all_sources_are_empty(self):
+        module = load_renderer_module()
+        markdown = module.render_markdown(valid_document())
+        section = markdown[markdown.index("## 9. 结构问题与改进建议") :]
+        self.assertIn("未识别到明确的结构问题与改进建议。", section)
+        self.assertNotIn("### 风险", section)
+        self.assertNotIn("### 假设", section)
+        self.assertNotIn("### 低置信度项", section)
+
+    def test_free_form_chapter_9_text_is_escaped_and_cannot_create_headings(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["structure_issues_and_suggestions"] = "# 伪造标题\n<script>alert(1)</script>\n- 保留为普通建议"
+        markdown = module.render_markdown(document)
+        section = markdown[markdown.index("## 9. 结构问题与改进建议") :]
+        self.assertNotIn("\n# 伪造标题", section)
+        self.assertIn("\\# 伪造标题", section)
+        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", section)
+        self.assertNotIn("未识别到明确的结构问题与改进建议。", section)
+
+    def test_risks_and_assumptions_render_under_owned_headings_without_empty_state(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["risks"] = [
+            {
+                "id": "RISK-001",
+                "description": "输出覆盖策略被误用。",
+                "impact": "可能覆盖人工修改的文档。",
+                "mitigation": "默认拒绝覆盖，显式使用 --overwrite 或 --backup。",
+                "confidence": "inferred",
+                "evidence_refs": [],
+                "traceability_refs": [],
+                "source_snippet_refs": [],
+            }
+        ]
+        document["assumptions"] = [
+            {
+                "id": "ASM-001",
+                "description": "调用方已先执行 DSL 校验。",
+                "rationale": "Renderer 只做防御性检查。",
+                "validation_suggestion": "在工作流中保留 validate_dsl.py。",
+                "confidence": "unknown",
+                "evidence_refs": [],
+                "traceability_refs": [],
+                "source_snippet_refs": [],
+            }
+        ]
+        markdown = module.render_markdown(document)
+        section = markdown[markdown.index("## 9. 结构问题与改进建议") :]
+        self.assertNotIn("未识别到明确的结构问题与改进建议。", section)
+        assert_in_order(self, section, ["### 风险", "输出覆盖策略被误用。", "### 假设", "调用方已先执行 DSL 校验。"])
+
+    def test_low_confidence_items_are_collected_from_whitelisted_design_items(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["architecture_views"]["module_intro"]["rows"][0]["confidence"] = "unknown"
+        document["module_design"]["modules"][0]["external_capability_details"]["provided_capabilities"]["rows"][0]["confidence"] = "unknown"
+        document["key_flows"]["flows"][0]["steps"][0]["confidence"] = "unknown"
+        markdown = module.render_markdown(document)
+        section = markdown[markdown.index("## 9. 结构问题与改进建议") :]
+        self.assertIn("### 低置信度项", section)
+        self.assertIn("$.architecture_views.module_intro.rows[0]", section)
+        self.assertIn("$.module_design.modules[0].external_capability_details.provided_capabilities.rows[0]", section)
+        self.assertIn("$.key_flows.flows[0].steps[0]", section)
+        self.assertIn("技能文档生成模块", section)
+        self.assertIn("文档 DSL 处理", section)
+        self.assertIn("准备结构化 DSL JSON。", section)
+        self.assertNotIn("未识别到明确的结构问题与改进建议。", section)
+
+    def test_metadata_stays_hidden_from_normal_chapters_but_can_appear_in_chapter_9_summary(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["architecture_views"]["module_intro"]["rows"][0]["confidence"] = "unknown"
+        markdown = module.render_markdown(document)
+        chapter_3_table = section_between(markdown, "### 3.2 各模块介绍", "### 3.3 模块关系图")
+        chapter_9 = markdown[markdown.index("## 9. 结构问题与改进建议") :]
+        self.assertNotIn("unknown", chapter_3_table)
+        self.assertIn("unknown", chapter_9)
+
+
 if __name__ == "__main__":
     unittest.main()
