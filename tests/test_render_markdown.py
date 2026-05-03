@@ -56,7 +56,7 @@ REFERENCE_EXPECTATIONS = {
     "references/dsl-spec.md": [
         "# create-structure-md DSL Spec",
         "## DSL Purpose",
-        "## Top-Level Fields",
+        "## DSL Top-Level Fields",
         "## Chapter Fields",
         "## Support Data",
         "does not analyze repositories",
@@ -74,8 +74,8 @@ REFERENCE_EXPECTATIONS = {
     "references/mermaid-rules.md": [
         "# create-structure-md Mermaid Rules",
         "## Supported MVP Diagram Types",
-        "## Strict And Static Validation",
-        "## No Graphviz",
+        "## Strict/Static Validation Difference",
+        "## Graphviz/DOT Rejection",
         "Mermaid code blocks",
     ],
     "references/review-checklist.md": [
