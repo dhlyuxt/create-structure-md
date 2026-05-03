@@ -42,13 +42,7 @@ JSON_SCAFFOLD_FILES = [
     "examples/minimal-from-requirements.dsl.json",
 ]
 
-SCRIPT_CASES = [
-    (
-        "scripts/render_markdown.py",
-        ["structure.dsl.json", "--output-dir", "."],
-        "Markdown rendering is not implemented in Phase 1",
-    ),
-]
+SCRIPT_CASES = []
 
 SCHEMA_PATH = ROOT / "schemas/structure-design.schema.json"
 EXAMPLE_PATHS = [
