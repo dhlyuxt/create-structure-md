@@ -135,6 +135,23 @@ class RendererCliAndFilenameTests(unittest.TestCase):
             self.assertIn("invalid JSON", completed.stderr)
             self.assertEqual([], list(Path(tmpdir).glob("*.md")))
 
+    def test_directory_dsl_path_fails_as_input_error_without_traceback(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dsl_dir = Path(tmpdir) / "directory.dsl.json"
+            dsl_dir.mkdir()
+            completed = subprocess.run(
+                [PYTHON, str(RENDERER), str(dsl_dir), "--output-dir", tmpdir],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(2, completed.returncode)
+            self.assertIn("ERROR:", completed.stderr)
+            self.assertIn("unable to read", completed.stderr)
+            self.assertNotIn("Traceback", completed.stderr)
+            self.assertEqual([], list(Path(tmpdir).glob("*.md")))
+
     def test_missing_document_output_file_fails_defensively(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             document = valid_document()

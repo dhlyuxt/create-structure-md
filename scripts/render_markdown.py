@@ -55,6 +55,10 @@ def load_json_file(path):
         return json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
         raise InputError(f"file not found: {path}")
+    except OSError as exc:
+        raise InputError(f"unable to read {path}: {exc}")
+    except UnicodeDecodeError as exc:
+        raise InputError(f"unable to read {path}: {exc}")
     except json.JSONDecodeError as exc:
         raise InputError(f"invalid JSON in {path}: line {exc.lineno}, column {exc.colno}: {exc.msg}")
 
