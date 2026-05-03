@@ -2,7 +2,9 @@
 import argparse
 import json
 import re
+import shutil
 import sys
+from datetime import datetime
 from pathlib import Path
 
 
@@ -127,12 +129,36 @@ def render_markdown(document):
     return "# 软件结构设计说明书\n"
 
 
+def backup_timestamp():
+    return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+
+def backup_path_for(output_path):
+    output_path = Path(output_path)
+    return output_path.with_name(f"{output_path.name}.bak-{backup_timestamp()}")
+
+
 def write_output(output_path, markdown, overwrite=False, backup=False):
     output_path = Path(output_path)
+    backup_path = None
+
+    if output_path.exists() and not overwrite and not backup:
+        raise RenderError(f"output file already exists: {output_path}; use --overwrite or --backup")
+
+    if output_path.exists() and backup:
+        backup_path = backup_path_for(output_path)
+        if backup_path.exists():
+            raise RenderError(f"backup path already exists: {backup_path}; retry later")
+        try:
+            shutil.copy2(output_path, backup_path)
+        except OSError as exc:
+            raise RenderError(f"failed to write output file {backup_path}: {exc}")
+
     try:
         output_path.write_text(markdown, encoding="utf-8")
     except OSError as exc:
         raise RenderError(f"failed to write output file {output_path}: {exc}")
+    return backup_path
 
 
 def main(argv=None):
@@ -144,7 +170,7 @@ def main(argv=None):
         output_file = validate_output_filename(document)
         output_path = resolve_output_path(args.output_dir, output_file)
         markdown = render_markdown(document)
-        write_output(output_path, markdown, overwrite=args.overwrite, backup=args.backup)
+        backup_path = write_output(output_path, markdown, overwrite=args.overwrite, backup=args.backup)
     except InputError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return exc.exit_code
@@ -152,6 +178,8 @@ def main(argv=None):
         print(f"ERROR: {exc}", file=sys.stderr)
         return exc.exit_code
 
+    if backup_path is not None:
+        print(f"Backup written: {backup_path}")
     print(f"Markdown rendered: {output_path}")
     return 0
 

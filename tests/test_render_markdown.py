@@ -287,7 +287,7 @@ class RendererCliAndFilenameTests(unittest.TestCase):
             (Path(tmpdir) / output_file).mkdir()
             dsl_path = write_json(tmpdir, "write-failure.dsl.json", document)
             completed = subprocess.run(
-                [PYTHON, str(RENDERER), str(dsl_path), "--output-dir", tmpdir],
+                [PYTHON, str(RENDERER), str(dsl_path), "--output-dir", tmpdir, "--overwrite"],
                 cwd=ROOT,
                 text=True,
                 capture_output=True,
@@ -298,7 +298,7 @@ class RendererCliAndFilenameTests(unittest.TestCase):
             self.assertIn("failed to write", completed.stderr)
             self.assertNotIn("Traceback", completed.stderr)
 
-    def test_existing_output_policy_is_deferred_to_later_tasks(self):
+    def test_existing_output_policy_refuses_to_overwrite_by_default(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             document = valid_document()
             output_file = document["document"]["output_file"]
@@ -312,8 +312,9 @@ class RendererCliAndFilenameTests(unittest.TestCase):
                 capture_output=True,
                 check=False,
             )
-            self.assertEqual(0, completed.returncode, completed.stderr)
-            self.assertEqual("# 软件结构设计说明书\n", output_path.read_text(encoding="utf-8"))
+            self.assertEqual(1, completed.returncode)
+            self.assertIn("already exists", completed.stderr)
+            self.assertEqual("old content", output_path.read_text(encoding="utf-8"))
 
     def test_spaces_are_written_exactly_without_silent_rename(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -371,6 +372,101 @@ class RendererCliAndFilenameTests(unittest.TestCase):
                         self.assertTrue((Path(tmpdir) / output_file).is_file())
                     else:
                         self.assertIn(renderer_error, renderer_result.stderr)
+
+
+class RendererOutputSafetyTests(unittest.TestCase):
+    def test_default_render_refuses_to_overwrite_existing_output(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            dsl_path = write_json(tmpdir, "structure.dsl.json", document)
+            output_path = Path(tmpdir) / document["document"]["output_file"]
+            output_path.write_text("existing content", encoding="utf-8")
+
+            completed = subprocess.run(
+                [PYTHON, str(RENDERER), str(dsl_path), "--output-dir", tmpdir],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(1, completed.returncode)
+            self.assertIn("already exists", completed.stderr)
+            self.assertIn("--overwrite", completed.stderr)
+            self.assertIn("--backup", completed.stderr)
+            self.assertEqual("existing content", output_path.read_text(encoding="utf-8"))
+
+    def test_overwrite_replaces_existing_output_without_creating_backup(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            dsl_path = write_json(tmpdir, "structure.dsl.json", document)
+            output_path = Path(tmpdir) / document["document"]["output_file"]
+            output_path.write_text("existing content", encoding="utf-8")
+
+            completed = subprocess.run(
+                [PYTHON, str(RENDERER), str(dsl_path), "--output-dir", tmpdir, "--overwrite"],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            self.assertNotEqual("existing content", output_path.read_text(encoding="utf-8"))
+            self.assertEqual([], list(Path(tmpdir).glob("*.bak-*")))
+
+    def test_backup_preserves_existing_output_before_writing_new_output(self):
+        module = load_renderer_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            dsl_path = write_json(tmpdir, "structure.dsl.json", document)
+            output_path = Path(tmpdir) / document["document"]["output_file"]
+            output_path.write_text("existing content", encoding="utf-8")
+
+            with mock.patch.object(module, "backup_timestamp", return_value="20260503_123456"):
+                code, stdout, stderr = call_main(
+                    module,
+                    [str(dsl_path), "--output-dir", tmpdir, "--backup"],
+                )
+
+            backup_path = Path(tmpdir) / "create-structure-md_STRUCTURE_DESIGN.md.bak-20260503_123456"
+            self.assertEqual(0, code, stderr)
+            self.assertIn("Backup written:", stdout)
+            self.assertEqual("existing content", backup_path.read_text(encoding="utf-8"))
+            self.assertNotEqual("existing content", output_path.read_text(encoding="utf-8"))
+
+    def test_backup_fails_when_timestamped_backup_path_already_exists(self):
+        module = load_renderer_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            dsl_path = write_json(tmpdir, "structure.dsl.json", document)
+            output_path = Path(tmpdir) / document["document"]["output_file"]
+            backup_path = Path(tmpdir) / "create-structure-md_STRUCTURE_DESIGN.md.bak-20260503_123456"
+            output_path.write_text("existing content", encoding="utf-8")
+            backup_path.write_text("old backup", encoding="utf-8")
+
+            with mock.patch.object(module, "backup_timestamp", return_value="20260503_123456"):
+                code, stdout, stderr = call_main(
+                    module,
+                    [str(dsl_path), "--output-dir", tmpdir, "--backup"],
+                )
+
+            self.assertEqual(1, code)
+            self.assertEqual("", stdout)
+            self.assertIn("backup path already exists", stderr)
+            self.assertEqual("existing content", output_path.read_text(encoding="utf-8"))
+            self.assertEqual("old backup", backup_path.read_text(encoding="utf-8"))
+
+    def test_overwrite_and_backup_are_mutually_exclusive(self):
+        completed = subprocess.run(
+            [PYTHON, str(RENDERER), str(FIXTURE), "--output-dir", ".", "--overwrite", "--backup"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(2, completed.returncode)
+        self.assertIn("not allowed with argument", completed.stderr)
 
 
 if __name__ == "__main__":
