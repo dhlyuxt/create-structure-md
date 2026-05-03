@@ -143,7 +143,10 @@
         "capability_id": { "$ref": "#/$defs/nonEmptyString" },
         "name": { "$ref": "#/$defs/nonEmptyString" },
         "description": { "$ref": "#/$defs/nonEmptyString" },
-        "confidence": { "$ref": "#/$defs/confidence" }
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" },
+        "traceability_refs": { "$ref": "#/$defs/referenceArray" },
+        "source_snippet_refs": { "$ref": "#/$defs/referenceArray" }
       }
     },
     "systemOverview": {

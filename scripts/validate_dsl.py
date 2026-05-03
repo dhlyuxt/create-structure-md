@@ -35,6 +35,13 @@ GENERIC_OUTPUT_TOKENS = {
     "说明书",
 }
 
+RESERVED_EXTRA_TABLE_COLUMN_KEYS = {
+    "evidence_refs",
+    "traceability_refs",
+    "source_snippet_refs",
+    "confidence",
+}
+
 DOCUMENT_REQUIRED_TEXT_FIELDS = [
     "title",
     "project_name",
@@ -688,6 +695,12 @@ def check_extra_tables(document, context):
         column_keys = [column["key"] for column in value["columns"]]
         seen_column_keys = set()
         for i, key in enumerate(column_keys):
+            if key in RESERVED_EXTRA_TABLE_COLUMN_KEYS:
+                context.report.error(
+                    f"{path}.columns[{i}].key",
+                    f"reserved support metadata key {key}",
+                    "Use a domain-specific column key that does not shadow support metadata",
+                )
             if key in seen_column_keys:
                 context.report.error(
                     f"{path}.columns[{i}].key",

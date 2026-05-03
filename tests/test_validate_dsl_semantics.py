@@ -605,6 +605,24 @@ class ChapterSevenAndEightTests(unittest.TestCase):
 
 
 class ExtraTableAndTraceabilityTests(unittest.TestCase):
+    def test_extra_table_column_keys_reject_support_metadata_names(self):
+        reserved_keys = ["evidence_refs", "traceability_refs", "source_snippet_refs", "confidence"]
+        for key in reserved_keys:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                document = valid_document()
+                document["architecture_views"]["extra_tables"] = [{
+                    "id": "TBL-RESERVED-KEY",
+                    "title": "补充表",
+                    "columns": [{"key": key, "title": "保留字段"}],
+                    "rows": [{}],
+                }]
+                path = write_json(tmpdir, f"extra-table-reserved-{key}.dsl.json", document)
+                completed = run_validator(path)
+            with self.subTest(key=key):
+                self.assertEqual(1, completed.returncode)
+                self.assertIn("$.architecture_views.extra_tables[0].columns[0].key", completed.stderr)
+                self.assertIn("reserved support metadata key", completed.stderr)
+
     def test_extra_table_rows_reject_unknown_keys_but_allow_missing_declared_keys(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             document = valid_document()
@@ -721,6 +739,106 @@ class ExtraTableAndTraceabilityTests(unittest.TestCase):
             completed = run_validator(path)
         self.assertEqual(0, completed.returncode, completed.stderr)
 
+    def test_authoritative_traceability_can_target_module_without_local_backlink_regression(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["traceability"] = [{
+                "id": "TR-MODULE-AUTH",
+                "source_external_id": "REQ-AUTH",
+                "source_type": "requirement",
+                "target_type": "module",
+                "target_id": "MOD-SKILL",
+                "description": "authoritative target only",
+            }]
+            document["architecture_views"]["module_intro"]["rows"][0]["traceability_refs"] = []
+            document["module_design"]["modules"][0]["traceability_refs"] = []
+            path = write_json(tmpdir, "trace-authoritative-only.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertIn("Validation succeeded", completed.stdout)
+
+    def test_local_traceability_backlinks_cover_all_targetable_nodes(self):
+        def risk_node(document):
+            document["risks"] = [{
+                "id": "RISK-TRACE",
+                "description": "可追踪风险。",
+                "impact": "",
+                "mitigation": "",
+                "confidence": "inferred",
+                "evidence_refs": [],
+                "traceability_refs": [],
+                "source_snippet_refs": [],
+            }]
+            return document["risks"][0]
+
+        def assumption_node(document):
+            document["assumptions"] = [{
+                "id": "ASM-TRACE",
+                "description": "可追踪假设。",
+                "rationale": "",
+                "validation_suggestion": "",
+                "confidence": "unknown",
+                "evidence_refs": [],
+                "traceability_refs": [],
+                "source_snippet_refs": [],
+            }]
+            return document["assumptions"][0]
+
+        cases = [
+            ("module", "MOD-SKILL", lambda document: document["module_design"]["modules"][0]),
+            ("core_capability", "CAP-001", lambda document: document["system_overview"]["core_capabilities"][0]),
+            ("provided_capability", "CAP-MOD-SKILL-001", lambda document: document["module_design"]["modules"][0]["external_capability_details"]["provided_capabilities"]["rows"][0]),
+            ("runtime_unit", "RUN-GENERATE", lambda document: document["runtime_view"]["runtime_units"]["rows"][0]),
+            ("configuration_item", "CFG-001", lambda document: document["configuration_data_dependencies"]["configuration_items"]["rows"][0]),
+            ("data_artifact", "DATA-001", lambda document: document["configuration_data_dependencies"]["structural_data_artifacts"]["rows"][0]),
+            ("dependency", "DEP-001", lambda document: document["configuration_data_dependencies"]["dependencies"]["rows"][0]),
+            ("collaboration", "COL-001", lambda document: document["cross_module_collaboration"]["collaboration_scenarios"]["rows"][0]),
+            ("flow", "FLOW-GENERATE", lambda document: document["key_flows"]["flows"][0]),
+            ("flow_step", "STEP-GENERATE-001", lambda document: document["key_flows"]["flows"][0]["steps"][0]),
+            ("flow_branch", "BR-GENERATE-001", lambda document: document["key_flows"]["flows"][0]["branches_or_exceptions"][0]),
+            ("risk", "RISK-TRACE", risk_node),
+            ("assumption", "ASM-TRACE", assumption_node),
+        ]
+        # Intentionally excludes key_flows.flow_index.rows[] because flow index rows are index-only
+        # and must not carry local traceability_refs.
+
+        for target_type, target_id, get_node in cases:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                document = valid_document()
+                document["traceability"] = [{
+                    "id": "TR-VALID",
+                    "source_external_id": f"REQ-{target_type}",
+                    "source_type": "requirement",
+                    "target_type": target_type,
+                    "target_id": target_id,
+                    "description": "valid local backlink",
+                }]
+                get_node(document)["traceability_refs"] = ["TR-VALID"]
+                path = write_json(tmpdir, f"{target_type}-trace-valid.dsl.json", document)
+                completed = run_validator(path)
+            with self.subTest(target_type=target_type, mode="valid"):
+                self.assertEqual(0, completed.returncode, completed.stderr)
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                document = valid_document()
+                wrong_target_type = "runtime_unit" if target_type == "module" else "module"
+                wrong_target_id = "RUN-GENERATE" if target_type == "module" else "MOD-SKILL"
+                document["traceability"] = [{
+                    "id": "TR-WRONG",
+                    "source_external_id": f"REQ-WRONG-{target_type}",
+                    "source_type": "requirement",
+                    "target_type": wrong_target_type,
+                    "target_id": wrong_target_id,
+                    "description": "wrong local backlink",
+                }]
+                get_node(document)["traceability_refs"] = ["TR-WRONG"]
+                path = write_json(tmpdir, f"{target_type}-trace-wrong.dsl.json", document)
+                completed = run_validator(path)
+            with self.subTest(target_type=target_type, mode="wrong"):
+                self.assertEqual(1, completed.returncode)
+                self.assertIn("traceability_refs[0]", completed.stderr)
+                self.assertIn(f"instead of {target_type} {target_id}", completed.stderr)
+
     def test_traceability_flow_branch_target_resolves(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             document = valid_document()
@@ -767,6 +885,41 @@ class ExtraTableAndTraceabilityTests(unittest.TestCase):
 
 
 class SourceSnippetValidationTests(unittest.TestCase):
+    def test_source_snippet_may_be_referenced_from_fixed_table_row_and_flow_step_regression(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["source_snippets"] = [{
+                "id": "SNIP-ROW",
+                "path": "scripts/render_markdown.py",
+                "line_start": 1,
+                "line_end": 2,
+                "language": "python",
+                "purpose": "固定表格行证据",
+                "content": "print('row')",
+                "confidence": "observed",
+            }]
+            document["runtime_view"]["runtime_units"]["rows"][0]["source_snippet_refs"] = ["SNIP-ROW"]
+            path = write_json(tmpdir, "snippet-row-ref.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["source_snippets"] = [{
+                "id": "SNIP-STEP",
+                "path": "scripts/render_markdown.py",
+                "line_start": 3,
+                "line_end": 4,
+                "language": "python",
+                "purpose": "流程步骤证据",
+                "content": "print('step')",
+                "confidence": "observed",
+            }]
+            document["key_flows"]["flows"][0]["steps"][0]["source_snippet_refs"] = ["SNIP-STEP"]
+            path = write_json(tmpdir, "snippet-step-ref.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+
     def test_line_range_must_be_valid(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             document = valid_document()

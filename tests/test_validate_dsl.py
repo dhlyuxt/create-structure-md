@@ -389,6 +389,39 @@ class SchemaCommonShapeTests(unittest.TestCase):
                     expected_path=["rows", 0],
                 )
 
+    def test_extra_table_column_key_and_title_must_be_non_empty(self):
+        for field_name in ["key", "title"]:
+            extra_table = {
+                "id": "TBL-ARCH-001",
+                "title": "补充表格",
+                "columns": [{"key": "name", "title": "名称"}],
+                "rows": [{"name": "示例"}],
+            }
+            extra_table["columns"][0][field_name] = ""
+            with self.subTest(field_name=field_name):
+                assert_invalid_def(
+                    self,
+                    "extraTable",
+                    extra_table,
+                    "should be non-empty",
+                    expected_validator="minLength",
+                    expected_path=["columns", 0, field_name],
+                )
+
+    def test_extra_diagram_empty_source_is_schema_valid_and_semantically_checked_later(self):
+        document = valid_example()
+        document["architecture_views"]["extra_diagrams"] = [{
+            "id": "MER-ARCH-EXTRA",
+            "kind": "extra",
+            "title": "补充图",
+            "diagram_type": "flowchart",
+            "description": "补充图。",
+            "source": "",
+            "confidence": "observed",
+        }]
+        # Schema allows string shape; semantic validator owns non-empty source.
+        validator().validate(document)
+
 
 class SchemaChapterTwoThroughFourTests(unittest.TestCase):
     def test_fixture_passes_with_chapter_two_through_four_schema(self):
@@ -549,6 +582,39 @@ class SchemaChapterFiveThroughNineTests(unittest.TestCase):
 class SchemaSupportDataTests(unittest.TestCase):
     def test_fixture_passes_with_support_data_schema(self):
         validator().validate(valid_example())
+
+    def test_core_capability_accepts_optional_support_refs(self):
+        document = valid_example()
+        document["evidence"] = [
+            {"id": "EV-CAP", "kind": "note", "title": "能力证据", "location": "", "description": "", "confidence": "observed"}
+        ]
+        document["traceability"] = [
+            {
+                "id": "TR-CAP",
+                "source_external_id": "REQ-CAP",
+                "source_type": "requirement",
+                "target_type": "core_capability",
+                "target_id": "CAP-001",
+                "description": "核心能力追踪。",
+            }
+        ]
+        document["source_snippets"] = [
+            {
+                "id": "SNIP-CAP",
+                "path": "references/dsl-spec.md",
+                "line_start": 1,
+                "line_end": 1,
+                "language": "markdown",
+                "purpose": "核心能力证据。",
+                "content": "# create-structure-md DSL Spec",
+                "confidence": "observed",
+            }
+        ]
+        document["system_overview"]["core_capabilities"][0]["evidence_refs"] = ["EV-CAP"]
+        document["system_overview"]["core_capabilities"][0]["traceability_refs"] = ["TR-CAP"]
+        document["system_overview"]["core_capabilities"][0]["source_snippet_refs"] = ["SNIP-CAP"]
+
+        validator().validate(document)
 
     def test_support_data_objects_accept_valid_shapes(self):
         document = valid_example()
