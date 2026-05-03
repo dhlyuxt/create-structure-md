@@ -167,6 +167,7 @@ def stringify_markdown_value(value):
 
 def escape_table_cell(value):
     escaped = escape_html(stringify_markdown_value(value))
+    escaped = "".join(escape_markdown_heading_line(line) for line in escaped.splitlines(keepends=True))
     escaped = escaped.replace("|", "\\|")
     escaped = escaped.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "<br>")
     return escape_fence_markers(escaped)
@@ -178,7 +179,7 @@ def escape_plain_text(value):
     return "".join(escape_plain_text_line(line) for line in lines)
 
 
-def escape_plain_text_line(line):
+def escape_markdown_heading_line(line):
     newline = ""
     content = line
     if content.endswith("\r\n"):
@@ -193,9 +194,14 @@ def escape_plain_text_line(line):
 
     if re.match(r"^ {0,3}#{1,6}(?:\s+|$)", content) or re.match(r"^ {0,3}(=+|-+)\s*$", content):
         content = "\\" + content
+    return content + newline
+
+
+def escape_plain_text_line(line):
+    content = escape_markdown_heading_line(line)
     if "|" in content:
         content = content.replace("|", "\\|")
-    return content + newline
+    return content
 
 
 def render_fixed_table(rows, columns):

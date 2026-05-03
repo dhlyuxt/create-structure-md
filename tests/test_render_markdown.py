@@ -1185,5 +1185,295 @@ class ChapterNineRenderingTests(unittest.TestCase):
         self.assertIn("unknown", chapter_9)
 
 
+def collect_non_empty_mermaid_sources(document):
+    sources = []
+
+    def add_diagram(diagram):
+        if isinstance(diagram, dict) and diagram.get("source", "").strip():
+            sources.append(diagram["source"])
+
+    def add_diagram_array(diagrams):
+        for diagram in diagrams or []:
+            add_diagram(diagram)
+
+    architecture = document.get("architecture_views", {})
+    add_diagram(architecture.get("module_relationship_diagram"))
+    add_diagram_array(architecture.get("extra_diagrams"))
+
+    module_design = document.get("module_design", {})
+    for module_item in module_design.get("modules", []):
+        internal_structure = module_item.get("internal_structure", {})
+        add_diagram(internal_structure.get("diagram"))
+        external_details = module_item.get("external_capability_details", {})
+        add_diagram_array(external_details.get("extra_diagrams"))
+        add_diagram_array(module_item.get("extra_diagrams"))
+
+    runtime = document.get("runtime_view", {})
+    add_diagram(runtime.get("runtime_flow_diagram"))
+    add_diagram(runtime.get("runtime_sequence_diagram"))
+    add_diagram_array(runtime.get("extra_diagrams"))
+
+    configuration = document.get("configuration_data_dependencies", {})
+    add_diagram_array(configuration.get("extra_diagrams"))
+
+    collaboration = document.get("cross_module_collaboration", {})
+    add_diagram(collaboration.get("collaboration_relationship_diagram"))
+    add_diagram_array(collaboration.get("extra_diagrams"))
+
+    key_flows = document.get("key_flows", {})
+    for flow in key_flows.get("flows", []):
+        add_diagram(flow.get("diagram"))
+    add_diagram_array(key_flows.get("extra_diagrams"))
+    return sources
+
+
+def required_mermaid_sources(document):
+    sources = [
+        document["architecture_views"]["module_relationship_diagram"]["source"],
+        document["runtime_view"]["runtime_flow_diagram"]["source"],
+    ]
+    sources.extend(flow["diagram"]["source"] for flow in document["key_flows"]["flows"])
+    return sources
+
+
+def load_mermaid_validator_module():
+    spec = importlib.util.spec_from_file_location("validate_mermaid_for_renderer_test", VALIDATOR)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def synthetic_flowchart_source(name):
+    return f"flowchart TD\n  {name}A[{name} A] --> {name}B[{name} B]"
+
+
+def synthetic_diagram(diagram_id, source, diagram_type="flowchart"):
+    return {
+        "id": diagram_id,
+        "kind": "extra",
+        "title": diagram_id,
+        "diagram_type": diagram_type,
+        "description": f"{diagram_id} synthetic diagram.",
+        "source": source,
+        "confidence": "observed",
+    }
+
+
+class RendererIntegrationTests(unittest.TestCase):
+    def render_and_validate(self, dsl_path):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            completed = subprocess.run(
+                [PYTHON, str(RENDERER), str(dsl_path), "--output-dir", tmpdir],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            document = json.loads(Path(dsl_path).read_text(encoding="utf-8"))
+            output_path = Path(tmpdir) / document["document"]["output_file"]
+            self.assertTrue(output_path.is_file())
+            self.assertEqual([output_path], list(Path(tmpdir).glob("*.md")))
+
+            markdown = output_path.read_text(encoding="utf-8")
+            expected_mermaid_sources = collect_non_empty_mermaid_sources(document)
+            self.assertGreater(len(expected_mermaid_sources), 0)
+            self.assertEqual(len(expected_mermaid_sources), markdown.count("```mermaid"))
+            for source in required_mermaid_sources(document):
+                with self.subTest(required_source=source.splitlines()[0]):
+                    self.assertEqual(1, markdown.count(source))
+
+            mermaid = subprocess.run(
+                [PYTHON, str(VALIDATOR), "--from-markdown", str(output_path), "--static"],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(0, mermaid.returncode, mermaid.stderr)
+            self.assertIn("Mermaid validation succeeded", mermaid.stdout)
+            return markdown
+
+    def test_valid_fixture_renders_and_passes_post_render_mermaid_static_validation(self):
+        markdown = self.render_and_validate(FIXTURE)
+        assert_in_order(
+            self,
+            markdown,
+            [
+                "## 1. 文档信息",
+                "## 2. 系统概览",
+                "## 3. 架构视图",
+                "## 4. 模块设计",
+                "## 5. 运行时视图",
+                "## 6. 配置、数据与依赖关系",
+                "## 7. 跨模块协作关系",
+                "## 8. 关键流程",
+                "## 9. 结构问题与改进建议",
+            ],
+        )
+        self.assertNotIn("## 10.", markdown)
+        self.assertNotIn("```mermaid\n\n```", markdown)
+
+    def test_minimal_examples_render_and_pass_post_render_mermaid_static_validation(self):
+        for relative_path in [
+            "examples/minimal-from-code.dsl.json",
+            "examples/minimal-from-requirements.dsl.json",
+        ]:
+            with self.subTest(path=relative_path):
+                markdown = self.render_and_validate(ROOT / relative_path)
+                self.assertIn("## 9. 结构问题与改进建议", markdown)
+
+    def test_synthetic_all_known_mermaid_paths_render_inside_fences(self):
+        sources = {
+            "architecture module_relationship": synthetic_flowchart_source("ARCHREL"),
+            "architecture extra_diagrams": synthetic_flowchart_source("ARCHEXTRA"),
+            "module internal_structure.diagram": synthetic_flowchart_source("MODINTERNAL"),
+            "module external_capability_details.extra_diagrams": synthetic_flowchart_source("MODEXTERNAL"),
+            "module extra_diagrams": synthetic_flowchart_source("MODEXTRA"),
+            "runtime_flow": synthetic_flowchart_source("RUNTIMEFLOW"),
+            "runtime_sequence": "sequenceDiagram\n  participant SeqA\n  participant SeqB\n  SeqA->>SeqB: RuntimeSequence",
+            "runtime extra": synthetic_flowchart_source("RUNTIMEEXTRA"),
+            "configuration extra": synthetic_flowchart_source("CONFIGEXTRA"),
+            "collaboration relationship": synthetic_flowchart_source("COLLABREL"),
+            "collaboration extra": synthetic_flowchart_source("COLLABEXTRA"),
+            "key flow diagram": synthetic_flowchart_source("KEYFLOW"),
+            "key flow extra": synthetic_flowchart_source("KEYFLOWEXTRA"),
+        }
+        document = valid_document()
+        module_item = document["module_design"]["modules"][0]
+        flow = document["key_flows"]["flows"][0]
+
+        document["architecture_views"]["module_relationship_diagram"]["source"] = sources[
+            "architecture module_relationship"
+        ]
+        document["architecture_views"]["extra_diagrams"] = [
+            synthetic_diagram("MER-SYN-ARCH-EXTRA", sources["architecture extra_diagrams"])
+        ]
+        module_item["internal_structure"]["diagram"]["source"] = sources["module internal_structure.diagram"]
+        module_item["external_capability_details"]["extra_diagrams"] = [
+            synthetic_diagram("MER-SYN-MOD-EXTERNAL", sources["module external_capability_details.extra_diagrams"])
+        ]
+        module_item["extra_diagrams"] = [
+            synthetic_diagram("MER-SYN-MOD-EXTRA", sources["module extra_diagrams"])
+        ]
+        document["runtime_view"]["runtime_flow_diagram"]["source"] = sources["runtime_flow"]
+        document["runtime_view"]["runtime_sequence_diagram"] = synthetic_diagram(
+            "MER-SYN-RUNTIME-SEQUENCE",
+            sources["runtime_sequence"],
+            diagram_type="sequenceDiagram",
+        )
+        document["runtime_view"]["extra_diagrams"] = [
+            synthetic_diagram("MER-SYN-RUNTIME-EXTRA", sources["runtime extra"])
+        ]
+        document["configuration_data_dependencies"]["extra_diagrams"] = [
+            synthetic_diagram("MER-SYN-CONFIG-EXTRA", sources["configuration extra"])
+        ]
+        document["cross_module_collaboration"]["collaboration_relationship_diagram"] = synthetic_diagram(
+            "MER-SYN-COLLAB-REL",
+            sources["collaboration relationship"],
+        )
+        document["cross_module_collaboration"]["extra_diagrams"] = [
+            synthetic_diagram("MER-SYN-COLLAB-EXTRA", sources["collaboration extra"])
+        ]
+        flow["diagram"]["source"] = sources["key flow diagram"]
+        document["key_flows"]["extra_diagrams"] = [
+            synthetic_diagram("MER-SYN-KEY-FLOW-EXTRA", sources["key flow extra"])
+        ]
+
+        expected_sources = list(sources.values())
+        self.assertEqual(13, len(expected_sources))
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dsl_path = write_json(tmpdir, "all-known-mermaid-paths.dsl.json", document)
+            completed = subprocess.run(
+                [PYTHON, str(RENDERER), str(dsl_path), "--output-dir", tmpdir],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            output_path = Path(tmpdir) / document["document"]["output_file"]
+            markdown = output_path.read_text(encoding="utf-8")
+
+            validator_module = load_mermaid_validator_module()
+            parsed_diagrams, extraction_report = validator_module.extract_diagrams_from_markdown(markdown)
+            self.assertEqual([], extraction_report.errors)
+            parsed_sources = [diagram.source for diagram in parsed_diagrams]
+            self.assertEqual(13, len(parsed_sources))
+            self.assertCountEqual(expected_sources, parsed_sources)
+            self.assertEqual(13, markdown.count("```mermaid"))
+
+            mermaid = subprocess.run(
+                [PYTHON, str(VALIDATOR), "--from-markdown", str(output_path), "--static"],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(0, mermaid.returncode, mermaid.stderr)
+            self.assertIn("Mermaid validation succeeded", mermaid.stdout)
+
+    def test_chapters_2_to_8_escape_hostile_plain_text_in_rendered_markdown(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["system_overview"]["summary"] = "# hostile chapter 2"
+        document["architecture_views"]["summary"] = "<section>hostile chapter 3</section>"
+        document["module_design"]["modules"][0]["summary"] = "```python\nprint('bad')\n```"
+        document["runtime_view"]["summary"] = "Injected runtime heading\n---\n| fake | table |"
+        document["configuration_data_dependencies"]["configuration_items"]["rows"][0]["purpose"] = "# hostile config"
+        document["cross_module_collaboration"]["collaboration_scenarios"]["rows"][0][
+            "description"
+        ] = "<b>hostile collaboration</b>"
+        document["key_flows"]["flows"][0]["overview"] = "```bad```"
+
+        markdown = module.render_markdown(document)
+        runtime_summary = section_between(markdown, "### 5.1 运行时概述", "### 5.2 运行单元说明")
+
+        self.assertNotIn("\n# hostile chapter 2", markdown)
+        self.assertIn("\\# hostile chapter 2", markdown)
+        self.assertNotIn("<section>hostile chapter 3</section>", markdown)
+        self.assertIn("&lt;section&gt;hostile chapter 3&lt;/section&gt;", markdown)
+        self.assertNotIn("```python", markdown)
+        self.assertNotIn("```bad", markdown)
+        self.assertIn("`&#96;&#96;python", markdown)
+        self.assertIn("`&#96;&#96;bad", markdown)
+        self.assertNotIn("\n---", runtime_summary)
+        self.assertIn("\n\\---", runtime_summary)
+        self.assertNotIn("\n| fake | table |", markdown)
+        self.assertIn("\\| fake \\| table \\|", markdown)
+        self.assertNotIn("<b>hostile collaboration</b>", markdown)
+        self.assertIn("&lt;b&gt;hostile collaboration&lt;/b&gt;", markdown)
+        self.assertNotIn("\n# hostile config", markdown)
+        self.assertIn("\\# hostile config", markdown)
+
+    def test_reference_docs_describe_phase_5_renderer_contract(self):
+        document_structure = (ROOT / "references/document-structure.md").read_text(encoding="utf-8")
+        review_checklist = (ROOT / "references/review-checklist.md").read_text(encoding="utf-8")
+
+        for phrase in [
+            "1. 文档信息",
+            "5.4 运行时序图（推荐）",
+            "9. 结构问题与改进建议",
+            "fixed visible table columns",
+            "does not overwrite an existing output file by default",
+            "`--overwrite`",
+            "`--backup`",
+            "validate_mermaid.py --from-markdown",
+        ]:
+            with self.subTest(document_structure_phrase=phrase):
+                self.assertIn(phrase, document_structure)
+
+        for phrase in [
+            "generated_at",
+            "`--overwrite`",
+            "`--backup`",
+            "validate_mermaid.py --from-markdown",
+            "fixed section numbering",
+            "IDs, confidence, and refs are not visible table columns",
+        ]:
+            with self.subTest(review_checklist_phrase=phrase):
+                self.assertIn(phrase, review_checklist)
+
+
 if __name__ == "__main__":
     unittest.main()
