@@ -39,7 +39,7 @@
           "inputs": "结构化设计 DSL JSON",
           "outputs": "单个结构设计 Markdown 文档",
           "notes": "",
-          "confidence": "observed",
+          "confidence": "unknown",
           "evidence_refs": [],
           "traceability_refs": [],
           "source_snippet_refs": []
@@ -110,9 +110,9 @@
         },
         "extra_tables": [],
         "extra_diagrams": [],
-        "evidence_refs": [],
-        "traceability_refs": [],
-        "source_snippet_refs": [],
+        "evidence_refs": ["EV-REQ-INPUT"],
+        "traceability_refs": ["TR-REQ-MODULE"],
+        "source_snippet_refs": ["SNIP-WORKFLOW"],
         "notes": [],
         "confidence": "observed"
       }
@@ -228,9 +228,60 @@
     "extra_diagrams": []
   },
   "structure_issues_and_suggestions": "",
-  "evidence": [],
-  "traceability": [],
-  "risks": [],
-  "assumptions": [],
-  "source_snippets": []
+  "evidence": [
+    {
+      "id": "EV-REQ-INPUT",
+      "kind": "requirement",
+      "title": "最小需求输入",
+      "location": "Phase 7 Task 2 plan",
+      "description": "需求示例必须覆盖最小固定章节内容、支持数据引用和低置信度项。",
+      "confidence": "observed"
+    }
+  ],
+  "traceability": [
+    {
+      "id": "TR-REQ-MODULE",
+      "source_external_id": "REQ-MIN-001",
+      "source_type": "requirement",
+      "target_type": "module",
+      "target_id": "MOD-SKILL",
+      "description": "将最小需求输入映射到技能文档生成模块。"
+    }
+  ],
+  "risks": [
+    {
+      "id": "RISK-STATIC-ONLY",
+      "description": "仅执行静态 Mermaid 校验时可能无法证明 Mermaid CLI 可渲染。",
+      "impact": "输出报告需要清楚说明静态校验边界。",
+      "mitigation": "按工作流报告静态校验接受情况，并在严格校验不可用时停止确认。",
+      "confidence": "inferred",
+      "evidence_refs": ["EV-REQ-INPUT"],
+      "traceability_refs": [],
+      "source_snippet_refs": ["SNIP-WORKFLOW"]
+    }
+  ],
+  "assumptions": [
+    {
+      "id": "ASM-PREPARED-CONTENT",
+      "description": "调用方已经在写入 DSL 前准备好结构设计内容。",
+      "rationale": "技能工作流要求先完成需求或项目理解，再创建完整 DSL JSON。",
+      "validation_suggestion": "在执行示例前确认输入内容已经覆盖模块、运行时、流程和支持数据。",
+      "confidence": "unknown",
+      "evidence_refs": ["EV-REQ-INPUT"],
+      "traceability_refs": [],
+      "source_snippet_refs": []
+    }
+  ],
+  "source_snippets": [
+    {
+      "id": "SNIP-WORKFLOW",
+      "path": "SKILL.md",
+      "line_start": 34,
+      "line_end": 36,
+      "language": "markdown",
+      "purpose": "展示技能工作流前三步作为需求示例依据。",
+      "content": "1. Create a temporary work directory.\n2. Read references/dsl-spec.md before writing DSL content.\n3. Write one complete DSL JSON file.",
+      "confidence": "observed"
+    }
+  ]
 }
