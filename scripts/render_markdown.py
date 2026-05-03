@@ -654,19 +654,26 @@ def render_module_supplement(module):
     return "\n\n".join(parts)
 
 
-def render_module_design_section(module, index):
+def render_module_design_section(module, index, support_context):
     details = module.get("external_capability_details", {})
     provided = details.get("provided_capabilities", {})
+    module_support = render_node_support(
+        module,
+        support_context,
+        target_type="module",
+        target_id=module.get("module_id", ""),
+    )
     parts = [
         subchapter_heading(4, index, escape_heading_label(module.get("name", ""))),
         nested_heading(4, index, 1, "模块概述"),
         render_paragraph(module.get("summary", "")),
+        module_support,
         nested_heading(4, index, 2, "模块职责"),
         render_bullets(module.get("responsibilities", [])),
         nested_heading(4, index, 3, "对外能力说明"),
         render_external_capability_summary(module.get("external_capability_summary", {})),
         nested_heading(4, index, 4, "对外接口需求清单"),
-        render_fixed_table(
+        render_fixed_table_with_support(
             provided.get("rows", []),
             [
                 ("capability_name", "能力名称"),
@@ -676,6 +683,10 @@ def render_module_design_section(module, index):
                 ("outputs", "输出"),
                 ("notes", "备注"),
             ],
+            support_context,
+            id_key="capability_id",
+            label_key="capability_name",
+            target_type="provided_capability",
         ),
         nested_heading(4, index, 5, "模块内部结构关系图"),
         render_internal_structure(module.get("internal_structure", {})),
@@ -685,14 +696,14 @@ def render_module_design_section(module, index):
     return "\n\n".join(part for part in parts if part != "")
 
 
-def render_chapter_4(document):
+def render_chapter_4(document, support_context):
     module_design = document["module_design"]
     parts = [
         chapter_heading(4, "模块设计"),
         render_paragraph(module_design.get("summary", "")),
     ]
     for index, module in enumerate(ordered_module_designs(document), start=1):
-        parts.append(render_module_design_section(module, index))
+        parts.append(render_module_design_section(module, index, support_context))
     return "\n\n".join(part for part in parts if part != "")
 
 
@@ -809,9 +820,10 @@ def flows_by_id(key_flows):
     return {flow.get("flow_id"): flow for flow in key_flows.get("flows", [])}
 
 
-def render_key_flow_overview(flow, module_display_names, runtime_unit_display_names):
+def render_key_flow_overview(flow, module_display_names, runtime_unit_display_names, support_context):
     parts = [
         render_paragraph(flow.get("overview", "")),
+        render_node_support(flow, support_context, target_type="flow", target_id=flow.get("flow_id", "")),
         render_reference_summary("关联模块", flow.get("related_module_ids", []), module_display_names, "module"),
         render_reference_summary(
             "关联运行单元", flow.get("related_runtime_unit_ids", []), runtime_unit_display_names, "runtime unit"
@@ -820,7 +832,7 @@ def render_key_flow_overview(flow, module_display_names, runtime_unit_display_na
     return "\n\n".join(part for part in parts if part != "")
 
 
-def render_key_flow_section(flow, section_number, module_display_names, runtime_unit_display_names):
+def render_key_flow_section(flow, section_number, module_display_names, runtime_unit_display_names, support_context):
     step_rows = rows_with_display_refs(
         sorted(flow.get("steps", []), key=lambda step: step.get("order", 0)),
         module_display_names,
@@ -834,18 +846,33 @@ def render_key_flow_section(flow, section_number, module_display_names, runtime_
     parts = [
         subchapter_heading(8, section_number, escape_heading_label(flow.get("name", ""))),
         nested_heading(8, section_number, 1, "流程概述"),
-        render_key_flow_overview(flow, module_display_names, runtime_unit_display_names),
+        render_key_flow_overview(flow, module_display_names, runtime_unit_display_names, support_context),
         nested_heading(8, section_number, 2, "步骤说明"),
-        render_fixed_table(step_rows, FLOW_STEP_COLUMNS),
+        render_fixed_table_with_support(
+            step_rows,
+            FLOW_STEP_COLUMNS,
+            support_context,
+            id_key="step_id",
+            label_key="description",
+            target_type="flow_step",
+        ),
         nested_heading(8, section_number, 3, "异常/分支说明"),
-        render_fixed_table_or_empty(branch_rows, FLOW_BRANCH_COLUMNS, "未识别到异常或分支说明。"),
+        render_fixed_table_or_empty_with_support(
+            branch_rows,
+            FLOW_BRANCH_COLUMNS,
+            "未识别到异常或分支说明。",
+            support_context,
+            id_key="branch_id",
+            label_key="condition",
+            target_type="flow_branch",
+        ),
         nested_heading(8, section_number, 4, "流程图"),
         render_mermaid_block(flow.get("diagram", {})),
     ]
     return "\n\n".join(part for part in parts if part != "")
 
 
-def render_chapter_8(document, module_display_names, runtime_unit_display_names):
+def render_chapter_8(document, module_display_names, runtime_unit_display_names, support_context):
     key_flows = document["key_flows"]
     flow_index_rows = rows_with_display_refs(
         key_flows.get("flow_index", {}).get("rows", []),
@@ -871,7 +898,15 @@ def render_chapter_8(document, module_display_names, runtime_unit_display_names)
     for section_number, flow_row in enumerate(key_flows.get("flow_index", {}).get("rows", []), start=3):
         flow = detail_by_id.get(flow_row.get("flow_id"))
         if flow is not None:
-            parts.append(render_key_flow_section(flow, section_number, module_display_names, runtime_unit_display_names))
+            parts.append(
+                render_key_flow_section(
+                    flow,
+                    section_number,
+                    module_display_names,
+                    runtime_unit_display_names,
+                    support_context,
+                )
+            )
     return "\n\n".join(part for part in parts if part != "")
 
 
@@ -1050,11 +1085,11 @@ def render_markdown(document):
         render_chapter_1(document),
         render_chapter_2(document, support_context),
         render_chapter_3(document, support_context),
-        render_chapter_4(document),
+        render_chapter_4(document, support_context),
         render_chapter_5(document, module_display_names, support_context),
         render_chapter_6(document, support_context),
         render_chapter_7(document, module_display_names, support_context),
-        render_chapter_8(document, module_display_names, runtime_unit_display_names),
+        render_chapter_8(document, module_display_names, runtime_unit_display_names, support_context),
         render_chapter_9(document),
     ]
     return "\n\n".join(parts) + "\n"

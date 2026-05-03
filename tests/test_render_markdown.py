@@ -965,6 +965,64 @@ class SupportDataTablePlacementTests(unittest.TestCase):
         self.assertNotIn("| REQ-COL-AUTH |", chapter_7)
 
 
+class NodeLevelSupportPlacementTests(unittest.TestCase):
+    def test_module_design_and_provided_capability_support_render_near_nodes(self):
+        module = load_renderer_module()
+        document = valid_document()
+        module_item = document["module_design"]["modules"][0]
+        capability = module_item["external_capability_details"]["provided_capabilities"]["rows"][0]
+        module_item["evidence_refs"] = ["EV-MODULE"]
+        module_item["source_snippet_refs"] = ["SNIP-MODULE"]
+        capability["traceability_refs"] = []
+        document["evidence"] = [
+            {"id": "EV-MODULE", "kind": "analysis", "title": "模块设计依据", "location": "design note", "description": "", "confidence": "observed"},
+        ]
+        document["traceability"] = [
+            {"id": "TR-CAP", "source_external_id": "REQ-CAP", "source_type": "requirement", "target_type": "provided_capability", "target_id": "CAP-MOD-SKILL-001", "description": "能力追踪。"},
+        ]
+        document["source_snippets"] = [
+            {"id": "SNIP-MODULE", "path": "SKILL.md", "line_start": 1, "line_end": 4, "language": "markdown", "purpose": "模块说明证据。", "content": "---\nname: create-structure-md\n---", "confidence": "observed"},
+        ]
+
+        markdown = module.render_markdown(document)
+        module_section = section_between(markdown, "### 4.1 技能文档生成模块", "## 5. 运行时视图")
+
+        self.assertIn("依据：EV-MODULE（模块设计依据，design note）", module_section)
+        self.assertIn("Source: SKILL.md:1-4", module_section)
+        self.assertIn("支持数据（CAP-MOD-SKILL-001 / 文档 DSL 处理）", module_section)
+        self.assertIn("关联来源：REQ-CAP（能力追踪。）", module_section)
+        self.assertEqual([], capability["traceability_refs"])
+        capability_table = section_between(module_section, "#### 4.1.4 对外接口需求清单", "#### 4.1.5 模块内部结构关系图")
+        self.assertNotIn("| REQ-CAP |", capability_table)
+
+    def test_flow_detail_step_and_branch_support_render_near_flow_sections(self):
+        module = load_renderer_module()
+        document = valid_document()
+        flow = document["key_flows"]["flows"][0]
+        flow["evidence_refs"] = ["EV-FLOW"]
+        flow["steps"][0]["traceability_refs"] = []
+        flow["branches_or_exceptions"][0]["source_snippet_refs"] = ["SNIP-BRANCH"]
+        document["evidence"] = [
+            {"id": "EV-FLOW", "kind": "source", "title": "流程来源", "location": "workflow", "description": "", "confidence": "observed"},
+        ]
+        document["traceability"] = [
+            {"id": "TR-STEP", "source_external_id": "REQ-STEP", "source_type": "requirement", "target_type": "flow_step", "target_id": "STEP-GENERATE-001", "description": ""},
+        ]
+        document["source_snippets"] = [
+            {"id": "SNIP-BRANCH", "path": "scripts/validate_dsl.py", "line_start": 20, "line_end": 22, "language": "python", "purpose": "失败分支证据。", "content": "if errors:\n    return 1", "confidence": "observed"},
+        ]
+
+        markdown = module.render_markdown(document)
+        flow_section = section_from(markdown, "### 8.3 生成结构设计文档")
+
+        self.assertIn("依据：EV-FLOW（流程来源，workflow）", flow_section)
+        self.assertIn("支持数据（STEP-GENERATE-001 / 准备结构化 DSL JSON。）", flow_section)
+        self.assertIn("关联来源：REQ-STEP", flow_section)
+        self.assertEqual([], flow["steps"][0]["traceability_refs"])
+        self.assertIn("支持数据（BR-GENERATE-001 / DSL 校验失败）", flow_section)
+        self.assertIn("Source: scripts/validate_dsl.py:20-22", flow_section)
+
+
 def section_between(text, start_marker, end_marker):
     start = text.index(start_marker)
     end = text.index(end_marker, start)
