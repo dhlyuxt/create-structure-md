@@ -28,10 +28,22 @@ Strict validation proves the supported Mermaid sources can be parsed by local Me
 
 ## CLI Examples
 
+Check local strict-validation tooling availability:
+
+```bash
+python scripts/validate_mermaid.py --check-env
+```
+
 Validate DSL diagrams strictly before rendering:
 
 ```bash
 python scripts/validate_mermaid.py --from-dsl structure.dsl.json --strict --work-dir <temporary-work-directory>/mermaid
+```
+
+Validate DSL diagrams statically only after user acceptance of the fallback:
+
+```bash
+python scripts/validate_mermaid.py --from-dsl structure.dsl.json --static
 ```
 
 Validate rendered Markdown statically after rendering:

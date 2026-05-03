@@ -1,60 +1,86 @@
 # create-structure-md Review Checklist
 
-## Final Output Path
+## Final Report
 
+- Confirm the final report states the final output path.
+- Confirm the final report states the temporary work directory.
+- Confirm the final report includes the final output path and temporary work directory.
+- Confirm the final report lists assumptions and low-confidence items, or explicitly states that none were identified.
+- Confirm assumptions and low-confidence items are reported when present.
+- Confirm static-only Mermaid fallback reporting states the CLI renderability limitation, tooling unavailability, and user acceptance when static-only validation was used.
+- If static-only validation was used, confirm the final report states that strict validation was not performed, local Mermaid CLI tooling unavailable was the reason, and the user accepted static-only validation for this run.
+- Confirm strict Mermaid validation is the default final-generation gate unless the user accepted static-only validation.
+- Confirm the module- or system-specific output file path is reported.
+- Confirm generic filename rejection is reported when the renderer or validator refuses a generic-only filename.
+- Confirm default output overwrite protection is reported when an existing file blocks rendering.
+
+## Boundary Checks
+
+- Confirm this skill only rendered prepared design content.
+- Confirm repository analysis, requirement inference, and multi-document generation were handled outside this skill.
+- Confirm no repo analysis was performed during this skill workflow.
+- Confirm no repo analysis, requirements inference, multi-document generation, Word/PDF output, image export, Graphviz output, or Jinja2 template rendering happened inside the skill.
+- Confirm Graphviz fully removed means no final image artifacts and no `dot` or `graphviz` code fences.
+- Confirm Mermaid-only diagram output: final diagrams are Markdown Mermaid fences, not image artifacts.
+- Confirm no Jinja2 dependency, template requirement, or Jinja2 rendering path was introduced.
 - Confirm the result is a single Markdown file.
 - Confirm the filename comes from `document.output_file`.
 - Confirm `document.output_file` is the exact generated filename.
 - Confirm the filename is module- or system-specific.
 - Confirm the result is a module- or system-specific output file.
 - Confirm generic filename rejection was enforced for generic-only names.
-- Confirm the final output path is reported.
-- Confirm the temporary work directory is reported.
 - Confirm an existing output file is refused by default.
 - Confirm default output overwrite protection is active.
 - Confirm `--overwrite` is used only for intentional replacement.
 - Confirm `--backup` preserves the previous file before writing the new output.
 - Confirm `generated_at` is filled in the rendered output without mutating the DSL.
 
-## Fixed Chapters
+## DSL Policy Checks
+
+- Confirm validation policy outside DSL: validation behavior is enforced by scripts and workflow references, not embedded as design prose.
+- Confirm DSL instances do not contain `empty_allowed`, `required`, `min_rows`, or similar schema policy fields.
+- Confirm common metadata, canonical module IDs, traceability target mappings, and ID reference rules were checked.
+- Confirm traceability uses `target_type` and `target_id` as the authoritative binding and duplicates render once.
+- Confirm optional, required, and extra diagram rules were checked.
+- Confirm fixed table columns are owned by renderer/schema/reference docs, not DSL instances.
+- Confirm extra table evidence renders after the table, support metadata names are not visible column keys, and extra diagrams render only when non-empty.
+
+## Mermaid Validation
+
+- Confirm Mermaid-only diagram output: every final diagram is a Markdown Mermaid code block.
+- Confirm supported MVP core Mermaid diagram types only are used.
+- Confirm required Mermaid diagrams are present.
+- Confirm DSL Mermaid sources passed strict validation, or record the user's explicit acceptance of static-only validation.
+- Confirm strict Mermaid validation ran with `--work-dir` unless the user accepted the static-only fallback.
+- Confirm rendered Markdown contains Mermaid fences only where Mermaid sources exist.
+- Confirm rendered Mermaid passes `validate_mermaid.py --from-markdown <output-file> --static`.
+- Confirm post-render Markdown Mermaid validation was run.
+- Confirm Graphviz fully removed from final output.
+- Confirm no final image artifacts were produced.
+- Confirm Graphviz, DOT, SVG, PNG, PDF, and exported image deliverables are absent.
+
+## Text Safety
+
+- Confirm plain text and Markdown-capable field safety: normal design text remains prose, and Markdown-capable fields cannot break the rendered document.
+- Confirm structure-design lint for normal design text was reviewed.
+- Confirm source snippets are evidence-only exceptions to normal prose rules.
+- Confirm evidence and snippet restraint: include only necessary, minimal, safe evidence.
+- Confirm source snippets are necessary, redacted, safely fenced, and not inside table cells.
+- Confirm source snippet secret review was completed before rendering snippets.
+- Confirm source snippets do not contain obvious secrets, tokens, private keys, credentials, personal data, or unrelated code.
+
+## Rendered Structure
 
 - Confirm the rendered document uses the fixed 9-chapter structure.
 - Confirm the rendered document has fixed 9 chapters.
 - Confirm fixed section numbering remains stable when optional content is absent.
 - Confirm fixed numbering remains stable for all fixed sections.
 - Confirm optional empty sections use the documented empty-state wording.
+- Confirm table-row support data rendered outside Markdown table cells.
 - Confirm IDs, confidence, and refs are not visible table columns except in chapter 9 risks, assumptions, and low-confidence summaries.
-
-## Mermaid Validation
-
-- Confirm Mermaid-only diagram output: every final diagram is a Markdown Mermaid code block.
-- Confirm DSL Mermaid sources passed strict validation, or record the user's explicit acceptance of static-only validation.
-- Confirm strict Mermaid validation ran with `--work-dir` unless the user accepted the static-only fallback.
-- Confirm rendered Markdown contains Mermaid fences only where Mermaid sources exist.
-- Confirm rendered Mermaid passes `validate_mermaid.py --from-markdown <output-file> --static`.
-- Confirm post-render Markdown Mermaid validation was run.
-- Confirm static-only Mermaid fallback reporting states the CLI renderability limitation, tooling unavailability, and user acceptance.
-- If static-only validation was used, confirm the final report states that strict validation was not performed, local Mermaid CLI tooling unavailable was the reason, and the user accepted static-only validation for this run.
-- Confirm Graphviz fully removed from final output.
-- Confirm no final image artifacts were produced.
-- Confirm Graphviz, DOT, SVG, PNG, PDF, and exported image deliverables are absent.
-
-## Support Data
-
 - Confirm evidence notes render near the referenced design item or after the referenced table row.
 - Confirm unreferenced evidence warnings were reviewed.
-- Confirm traceability uses `target_type` and `target_id` as the authoritative binding and duplicates render once.
-- Confirm source snippets are necessary, redacted, safely fenced, and not inside table cells.
-- Confirm source snippet secret review was completed before rendering snippets.
 - Confirm risks and assumptions render in chapter 9 with support refs when present.
+- Confirm Chapter 9 risk/assumption/low-confidence visibility when those items are present.
 - Confirm low-confidence summary excludes support data and Mermaid diagram nodes.
 - Confirm low-confidence summary whitelist includes only intended design content.
-- Confirm extra table evidence renders after the table, support metadata names are not visible column keys, and extra diagrams render only when non-empty.
-- Confirm validation policy outside DSL: validation behavior is enforced by scripts and workflow references, not embedded as design prose.
-
-## No Repo Analysis
-
-- Confirm this skill only rendered prepared design content.
-- Confirm repository analysis, requirement inference, and multi-document generation were handled outside this skill.
-- Confirm no repo analysis was performed during this skill workflow.
-- Confirm no Jinja2 dependency, template requirement, or Jinja2 rendering path was introduced.

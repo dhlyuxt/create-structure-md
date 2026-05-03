@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import unittest
+import uuid
 from pathlib import Path
 from unittest import mock
 
@@ -26,7 +27,7 @@ POLICY_FIELD_NAMES = {"empty_allowed", "required", "min_rows"}
 
 def make_run_dir(name):
     safe_name = re.sub(r"[^0-9A-Za-z_.-]+", "_", name).strip("._") or "run"
-    run_dir = PHASE7_TMP_ROOT / safe_name
+    run_dir = PHASE7_TMP_ROOT / f"{safe_name}-{uuid.uuid4().hex}"
     run_dir.mkdir(parents=True, exist_ok=True)
     return run_dir
 
@@ -95,6 +96,16 @@ def non_empty_rows(document, *path):
         value = value[key]
     rows = value["rows"] if isinstance(value, dict) else value
     return [row for row in rows if row]
+
+
+def markdown_section(text, heading):
+    start = text.find(heading)
+    if start == -1:
+        return ""
+    next_heading = text.find("\n## ", start + len(heading))
+    if next_heading == -1:
+        return text[start:]
+    return text[start:next_heading]
 
 
 class Phase7ReferenceDocumentationTests(unittest.TestCase):
@@ -196,6 +207,113 @@ class Phase7ReferenceDocumentationTests(unittest.TestCase):
             for phrase in phrases:
                 with self.subTest(path=relative_path, phrase=phrase):
                     self.assertIn(phrase.casefold(), text)
+
+    def test_dsl_spec_documents_exact_id_prefix_and_support_id_contracts(self):
+        text = (ROOT / "references/dsl-spec.md").read_text(encoding="utf-8")
+        prefix_section = markdown_section(text, "## ID Prefix Conventions")
+        documented_prefixes = re.findall(r"`([A-Z]+-)`", prefix_section)
+        self.assertEqual(
+            [
+                "MOD-",
+                "CAP-",
+                "RUN-",
+                "FLOW-",
+                "CFG-",
+                "DATA-",
+                "DEP-",
+                "COL-",
+                "STEP-",
+                "BR-",
+                "MER-",
+                "TBL-",
+                "EV-",
+                "TR-",
+                "RISK-",
+                "ASM-",
+                "SNIP-",
+            ],
+            documented_prefixes,
+        )
+        for misleading_prefix in ("IF-", "RU-", "SRC-"):
+            with self.subTest(prefix=misleading_prefix):
+                self.assertNotIn(misleading_prefix, prefix_section)
+
+        for nonexistent_field in ("evidence_id", "traceability_id", "source_snippet_id"):
+            with self.subTest(field=nonexistent_field):
+                self.assertNotIn(nonexistent_field, text)
+        for support_shape in ("`evidence[].id`", "`traceability[].id`", "`source_snippets[].id`"):
+            with self.subTest(shape=support_shape):
+                self.assertIn(support_shape, text)
+        self.assertIn("`key_flows.flow_index.rows[]`", text)
+        self.assertIn("index-only references", text)
+        self.assertIn("do not carry `confidence`", text)
+
+    def test_mermaid_rules_document_required_cli_examples(self):
+        text = (ROOT / "references/mermaid-rules.md").read_text(encoding="utf-8")
+        for command in [
+            "python scripts/validate_mermaid.py --check-env",
+            "python scripts/validate_mermaid.py --from-dsl structure.dsl.json --static",
+            "python scripts/validate_mermaid.py --from-dsl structure.dsl.json --strict --work-dir <temporary-work-directory>/mermaid",
+            "python scripts/validate_mermaid.py --from-markdown <output-file> --static",
+        ]:
+            with self.subTest(command=command):
+                self.assertIn(command, text)
+
+    def test_review_checklist_documents_final_review_sections_and_safety_points(self):
+        text = (ROOT / "references/review-checklist.md").read_text(encoding="utf-8")
+        for heading in [
+            "## Final Report",
+            "## Boundary Checks",
+            "## DSL Policy Checks",
+            "## Text Safety",
+            "## Rendered Structure",
+        ]:
+            with self.subTest(heading=heading):
+                self.assertIn(heading, text)
+
+        final_report = markdown_section(text, "## Final Report")
+        for phrase in [
+            "assumptions",
+            "low-confidence",
+            "final output path",
+            "temporary work directory",
+            "default final-generation gate",
+            "module- or system-specific output file path",
+            "generic filename rejection is reported",
+            "default output overwrite protection is reported",
+        ]:
+            with self.subTest(section="Final Report", phrase=phrase):
+                self.assertIn(phrase, final_report)
+        boundary_checks = markdown_section(text, "## Boundary Checks")
+        for phrase in [
+            "requirements inference",
+            "Word/PDF output",
+            "image export",
+            "Graphviz output",
+            "Jinja2 template rendering",
+            "Markdown Mermaid fences, not image artifacts",
+        ]:
+            with self.subTest(section="Boundary Checks", phrase=phrase):
+                self.assertIn(phrase, boundary_checks)
+        for phrase in [
+            "Markdown-capable field",
+            "source snippets are evidence-only exceptions",
+            "fixed table columns are owned by renderer/schema/reference docs",
+            "required Mermaid diagrams are present",
+            "post-render Markdown Mermaid validation",
+        ]:
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, text)
+
+    def test_preserved_phase7_run_dirs_use_name_uuid_contract(self):
+        fake_uuid = mock.Mock(hex="abcdef0123456789")
+        with mock.patch.object(uuid, "uuid4", return_value=fake_uuid):
+            run_dir = make_run_dir("phase 7 sample")
+
+        self.assertEqual(PHASE7_TMP_ROOT / "phase_7_sample-abcdef0123456789", run_dir)
+        self.assertTrue(run_dir.is_dir())
+        self.assertEqual(PHASE7_TMP_ROOT, run_dir.parent)
+        self.assertIn(f"rm -r {PHASE7_TMP_ROOT}", PHASE7_TMP_CLEANUP_NOTICE)
 
     def test_skill_workflow_contains_reference_contract(self):
         text = (ROOT / "SKILL.md").read_text(encoding="utf-8").casefold()

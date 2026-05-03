@@ -24,11 +24,13 @@ Design objects may carry common support metadata: `confidence`, `evidence_refs`,
 
 ## ID Prefix Conventions
 
-IDs must be stable within one DSL file and use readable prefixes. Recommended prefixes are `MOD-` for modules, `IF-` for interface requirements, `RU-` for runtime units, `FLOW-` for key flows, `EV-` for evidence, `TR-` for traceability, `RISK-` for risks, `ASM-` for assumptions, and `SRC-` for source snippets. Prefixes help reviewers read references, but uniqueness and schema constraints remain authoritative.
+IDs must be stable within one DSL file and use readable prefixes. Recommended prefixes are exactly: `MOD-`, `CAP-`, `RUN-`, `FLOW-`, `CFG-`, `DATA-`, `DEP-`, `COL-`, `STEP-`, `BR-`, `MER-`, `TBL-`, `EV-`, `TR-`, `RISK-`, `ASM-`, `SNIP-`. In order, these cover modules, capabilities, runtime units, key flows, configuration items, structural data/artifacts, dependencies, collaboration scenarios, flow steps, flow branches or exceptions, Mermaid diagrams, extra tables, evidence, traceability, risks, assumptions, and source snippets. Prefixes help reviewers read references, but uniqueness and schema constraints remain authoritative.
 
 ## Defining ID Fields And Reference ID Fields
 
-Defining ID fields create targetable objects, such as `module_id`, `runtime_unit_id`, `flow_id`, `evidence_id`, `traceability_id`, `risk_id`, `assumption_id`, and `source_snippet_id`. Reference ID fields point at existing definitions, such as `module_refs`, `evidence_refs`, `traceability_refs`, `risk_refs`, `assumption_refs`, and `source_snippet_refs`. A reference field must not introduce a new object by implication.
+Defining ID fields create targetable objects, such as `module_id`, `capability_id`, `unit_id`, `config_id`, `artifact_id`, `dependency_id`, `collaboration_id`, `flow_id`, `step_id`, and `branch_id`. Support objects use `id`: `evidence[].id`, `traceability[].id`, `risks[].id`, `assumptions[].id`, and `source_snippets[].id`. Mermaid diagrams and extra tables also use `id`. Reference ID fields point at existing definitions, such as `related_module_ids`, `participant_module_ids`, `participant_runtime_unit_ids`, `evidence_refs`, `traceability_refs`, `risk_refs`, `assumption_refs`, and `source_snippet_refs`. A reference field must not introduce a new object by implication.
+
+`key_flows.flow_index.rows[]` are index-only references for the matching `key_flows.flows[]` detail objects. They do not carry `confidence` or support metadata; confidence and support refs belong on the matching flow detail object.
 
 ## Authoritative Field Contract
 
@@ -40,7 +42,7 @@ Fixed table rows use section-specific content fields only. Support metadata such
 
 ## Support Data Object Shapes
 
-Evidence objects record `evidence_id`, short description, optional source/location data, and confidence or notes as allowed by schema. Traceability objects record `traceability_id`, `target_type`, `target_id`, and source-to-design mapping text. Risk objects record risk text, impact, mitigation, and refs where present. Assumption objects record assumption text and review notes. Source snippet objects record `source_snippet_id`, language, source location, and snippet text that is safe to disclose.
+Evidence objects record `evidence[].id`, kind, title, location, description, and confidence. Traceability objects record `traceability[].id`, `target_type`, `target_id`, and source-to-design mapping text. Risk objects record `risks[].id`, risk text, impact, mitigation, confidence, and refs where present. Assumption objects record `assumptions[].id`, assumption text, rationale, validation suggestion, confidence, and refs where present. Source snippet objects record `source_snippets[].id`, language, source location, purpose, confidence, and snippet text that is safe to disclose.
 
 Support data strengthens nearby design content and does not create standalone chapters except for chapter 9 review summaries of risks, assumptions, and low-confidence items.
 
