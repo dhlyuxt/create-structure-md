@@ -139,14 +139,30 @@ def backup_path_for(output_path):
 
 
 def copy_backup_file(output_path, backup_path):
+    output_path = Path(output_path)
+    backup_path = Path(backup_path)
     try:
-        with Path(output_path).open("rb") as source, Path(backup_path).open("xb") as destination:
-            shutil.copyfileobj(source, destination)
+        backup_bytes = output_path.read_bytes()
+        with backup_path.open("xb") as destination:
+            destination.write(backup_bytes)
         shutil.copystat(output_path, backup_path)
     except FileExistsError:
         raise RenderError(f"backup path already exists: {backup_path}; retry later")
     except OSError as exc:
         raise RenderError(f"failed to write backup path {backup_path}: {exc}")
+
+
+def write_markdown_file(output_path, markdown, exclusive=False):
+    try:
+        if exclusive:
+            with output_path.open("x", encoding="utf-8") as output_file:
+                output_file.write(markdown)
+        else:
+            output_path.write_text(markdown, encoding="utf-8")
+    except FileExistsError:
+        raise RenderError(f"output file already exists: {output_path}; use --overwrite or --backup")
+    except OSError as exc:
+        raise RenderError(f"failed to write output file {output_path}: {exc}")
 
 
 def write_output(output_path, markdown, overwrite=False, backup=False):
@@ -162,10 +178,7 @@ def write_output(output_path, markdown, overwrite=False, backup=False):
             raise RenderError(f"backup path already exists: {backup_path}; retry later")
         copy_backup_file(output_path, backup_path)
 
-    try:
-        output_path.write_text(markdown, encoding="utf-8")
-    except OSError as exc:
-        raise RenderError(f"failed to write output file {output_path}: {exc}")
+    write_markdown_file(output_path, markdown, exclusive=not overwrite and not backup)
     return backup_path
 
 

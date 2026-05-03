@@ -396,6 +396,34 @@ class RendererOutputSafetyTests(unittest.TestCase):
             self.assertIn("--backup", completed.stderr)
             self.assertEqual("existing content", output_path.read_text(encoding="utf-8"))
 
+    def test_default_render_race_does_not_overwrite_newly_created_output(self):
+        module = load_renderer_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            dsl_path = write_json(tmpdir, "structure.dsl.json", document)
+            output_path = Path(tmpdir) / document["document"]["output_file"]
+            output_path.write_text("raced output", encoding="utf-8")
+
+            real_exists = Path.exists
+
+            def stale_output_exists(path):
+                if path == output_path:
+                    return False
+                return real_exists(path)
+
+            with mock.patch.object(module.Path, "exists", stale_output_exists):
+                code, stdout, stderr = call_main(
+                    module,
+                    [str(dsl_path), "--output-dir", tmpdir],
+                )
+
+            self.assertEqual(1, code)
+            self.assertEqual("", stdout)
+            self.assertIn("already exists", stderr)
+            self.assertIn("--overwrite", stderr)
+            self.assertIn("--backup", stderr)
+            self.assertEqual("raced output", output_path.read_text(encoding="utf-8"))
+
     def test_overwrite_replaces_existing_output_without_creating_backup(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             document = valid_document()
@@ -496,10 +524,18 @@ class RendererOutputSafetyTests(unittest.TestCase):
             dsl_path = write_json(tmpdir, "structure.dsl.json", document)
             output_path = Path(tmpdir) / document["document"]["output_file"]
             output_path.write_text("existing content", encoding="utf-8")
+            backup_path = Path(tmpdir) / "create-structure-md_STRUCTURE_DESIGN.md.bak-20260503_123456"
+
+            real_read_bytes = Path.read_bytes
+
+            def fail_reading_output(path):
+                if path == output_path:
+                    raise OSError("copy failed")
+                return real_read_bytes(path)
 
             with (
                 mock.patch.object(module, "backup_timestamp", return_value="20260503_123456"),
-                mock.patch.object(module.shutil, "copyfileobj", side_effect=OSError("copy failed")),
+                mock.patch.object(module.Path, "read_bytes", fail_reading_output),
             ):
                 code, stdout, stderr = call_main(
                     module,
@@ -510,6 +546,7 @@ class RendererOutputSafetyTests(unittest.TestCase):
             self.assertEqual("", stdout)
             self.assertIn("failed to write backup", stderr)
             self.assertEqual("existing content", output_path.read_text(encoding="utf-8"))
+            self.assertFalse(backup_path.exists())
 
     def test_overwrite_and_backup_are_mutually_exclusive(self):
         completed = subprocess.run(
