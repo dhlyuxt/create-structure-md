@@ -834,6 +834,102 @@ class SupportDataPrimitiveTests(unittest.TestCase):
         self.assertEqual("", rendered)
 
 
+class SupportDataTablePlacementTests(unittest.TestCase):
+    def test_module_intro_support_renders_after_table_grouped_by_stable_row_id(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["architecture_views"]["module_intro"]["rows"][0]["evidence_refs"] = ["EV-001"]
+        document["architecture_views"]["module_intro"]["rows"][0]["traceability_refs"] = ["TR-001"]
+        document["architecture_views"]["module_intro"]["rows"][0]["source_snippet_refs"] = ["SNIP-001"]
+        document["evidence"] = [
+            {"id": "EV-001", "kind": "source", "title": "模块表证据", "location": "schema", "description": "不内联。", "confidence": "observed"},
+        ]
+        document["traceability"] = [
+            {"id": "TR-001", "source_external_id": "REQ-MODULE", "source_type": "requirement", "target_type": "module", "target_id": "MOD-SKILL", "description": "模块追踪。"},
+        ]
+        document["source_snippets"] = [
+            {"id": "SNIP-001", "path": "scripts/render_markdown.py", "line_start": 1, "line_end": 2, "language": "python", "purpose": "表格行证据。", "content": "print('row support')", "confidence": "observed"},
+        ]
+
+        markdown = module.render_markdown(document)
+        section = section_between(markdown, "### 3.2 各模块介绍", "### 3.3 模块关系图")
+
+        self.assertIn("| 模块名称 | 职责 | 输入 | 输出 | 备注 |", section)
+        self.assertIn("支持数据（MOD-SKILL / 技能文档生成模块）", section)
+        self.assertIn("依据：EV-001（模块表证据，schema）", section)
+        self.assertIn("关联来源：REQ-MODULE（模块追踪。）", section)
+        self.assertIn("Source: scripts/render_markdown.py:1-2", section)
+        table_text = section.split("支持数据（MOD-SKILL / 技能文档生成模块）", 1)[0]
+        self.assertNotIn("EV-001", table_text)
+        self.assertNotIn("REQ-MODULE", table_text)
+        self.assertNotIn("SNIP-001", table_text)
+
+    def test_chapter_6_and_7_table_support_renders_after_tables_not_inside_cells(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["configuration_data_dependencies"]["configuration_items"]["rows"][0]["evidence_refs"] = ["EV-CFG"]
+        document["configuration_data_dependencies"]["dependencies"]["rows"][0]["traceability_refs"] = ["TR-DEP"]
+        document["cross_module_collaboration"]["collaboration_scenarios"]["rows"][0]["source_snippet_refs"] = ["SNIP-COL"]
+        document["evidence"] = [
+            {"id": "EV-CFG", "kind": "note", "title": "配置证据", "location": "", "description": "", "confidence": "observed"},
+        ]
+        document["traceability"] = [
+            {"id": "TR-DEP", "source_external_id": "REQ-DEP", "source_type": "requirement", "target_type": "dependency", "target_id": "DEP-001", "description": ""},
+        ]
+        document["source_snippets"] = [
+            {"id": "SNIP-COL", "path": "src/collab.py", "line_start": 4, "line_end": 5, "language": "python", "purpose": "协作证据。", "content": "collaborate()", "confidence": "observed"},
+        ]
+
+        markdown = module.render_markdown(document)
+        chapter_6 = section_between(markdown, "## 6. 配置、数据与依赖关系", "## 7. 跨模块协作关系")
+        chapter_7 = section_between(markdown, "## 7. 跨模块协作关系", "## 8. 关键流程")
+
+        self.assertIn("支持数据（CFG-001 / 输出目录）", chapter_6)
+        self.assertIn("依据：EV-CFG（配置证据）", chapter_6)
+        self.assertIn("支持数据（DEP-001 / jsonschema）", chapter_6)
+        self.assertIn("关联来源：REQ-DEP", chapter_6)
+        self.assertIn("支持数据（COL-001 / DSL 校验后渲染）", chapter_7)
+        self.assertIn("Source: src/collab.py:4-5", chapter_7)
+        self.assertNotIn("| EV-CFG |", chapter_6)
+        self.assertNotIn("| REQ-DEP |", chapter_6)
+        self.assertNotIn("| SNIP-COL |", chapter_7)
+
+    def test_core_capability_and_runtime_authoritative_traceability_render_without_local_backlinks(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["system_overview"]["core_capabilities"][0].pop("traceability_refs", None)
+        document["runtime_view"]["runtime_units"]["rows"][0]["traceability_refs"] = []
+        document["traceability"] = [
+            {
+                "id": "TR-CAP-AUTH",
+                "source_external_id": "REQ-CAP-AUTH",
+                "source_type": "requirement",
+                "target_type": "core_capability",
+                "target_id": "CAP-001",
+                "description": "核心能力需求。",
+            },
+            {
+                "id": "TR-RUN-AUTH",
+                "source_external_id": "REQ-RUN-AUTH",
+                "source_type": "requirement",
+                "target_type": "runtime_unit",
+                "target_id": "RUN-GENERATE",
+                "description": "运行单元需求。",
+            },
+        ]
+
+        markdown = module.render_markdown(document)
+        chapter_2 = section_between(markdown, "## 2. 系统概览", "## 3. 架构视图")
+        chapter_5 = section_between(markdown, "### 5.2 运行单元说明", "### 5.3 运行时流程图")
+
+        self.assertIn("支持数据（CAP-001 / 结构设计文档生成）", chapter_2)
+        self.assertIn("关联来源：REQ-CAP-AUTH（核心能力需求。）", chapter_2)
+        self.assertIn("支持数据（RUN-GENERATE / 文档生成命令序列）", chapter_5)
+        self.assertIn("关联来源：REQ-RUN-AUTH（运行单元需求。）", chapter_5)
+        self.assertNotIn("| REQ-CAP-AUTH |", chapter_2)
+        self.assertNotIn("| REQ-RUN-AUTH |", chapter_5)
+
+
 def section_between(text, start_marker, end_marker):
     start = text.index(start_marker)
     end = text.index(end_marker, start)

@@ -223,6 +223,46 @@ def render_fixed_table_or_empty(rows, columns, empty_text):
     return render_fixed_table(rows, columns)
 
 
+def row_display_label(row, id_key, label_key):
+    row_id = re.sub(r"\s+", " ", stringify_markdown_value(row.get(id_key, ""))).strip()
+    label = re.sub(r"\s+", " ", stringify_markdown_value(row.get(label_key, ""))).strip()
+    if row_id and label:
+        return f"{row_id} / {label}"
+    return row_id or label
+
+
+def render_table_support(rows, context, *, id_key, label_key, target_type=None):
+    parts = []
+    for row in rows or []:
+        row_id = stringify_markdown_value(row.get(id_key, "")).strip()
+        label = row_display_label(row, id_key, label_key)
+        support = render_node_support(row, context, target_type=target_type, target_id=row_id)
+        if support:
+            parts.append(f"支持数据（{escape_plain_text(label).strip()}）\n\n{support}")
+    return "\n\n".join(parts)
+
+
+def render_fixed_table_with_support(rows, columns, context, *, id_key, label_key, target_type=None):
+    table = render_fixed_table(rows, columns)
+    support = render_table_support(rows, context, id_key=id_key, label_key=label_key, target_type=target_type)
+    if support:
+        return f"{table}\n\n{support}"
+    return table
+
+
+def render_fixed_table_or_empty_with_support(rows, columns, empty_text, context, *, id_key, label_key, target_type=None):
+    if not rows:
+        return empty_text
+    return render_fixed_table_with_support(
+        rows,
+        columns,
+        context,
+        id_key=id_key,
+        label_key=label_key,
+        target_type=target_type,
+    )
+
+
 def build_module_display_names(document):
     rows = document.get("architecture_views", {}).get("module_intro", {}).get("rows", [])
     return {row.get("module_id"): row.get("module_name", "") for row in rows}
@@ -499,15 +539,19 @@ def render_chapter_1(document):
     )
 
 
-def render_chapter_2(document):
+def render_chapter_2(document, support_context):
     overview = document["system_overview"]
     parts = [
         chapter_heading(2, "系统概览"),
         render_paragraph(overview.get("summary", "")),
         render_paragraph(overview.get("purpose", "")),
-        render_fixed_table(
+        render_fixed_table_with_support(
             overview.get("core_capabilities", []),
             [("name", "能力"), ("description", "描述")],
+            support_context,
+            id_key="capability_id",
+            label_key="name",
+            target_type="core_capability",
         ),
     ]
     notes = render_bullets(overview.get("notes", []))
@@ -516,14 +560,14 @@ def render_chapter_2(document):
     return "\n\n".join(part for part in parts if part != "")
 
 
-def render_chapter_3(document):
+def render_chapter_3(document, support_context):
     architecture = document["architecture_views"]
     parts = [
         chapter_heading(3, "架构视图"),
         subchapter_heading(3, 1, "架构概述"),
         render_paragraph(architecture.get("summary", "")),
         subchapter_heading(3, 2, "各模块介绍"),
-        render_fixed_table(
+        render_fixed_table_with_support(
             architecture.get("module_intro", {}).get("rows", []),
             [
                 ("module_name", "模块名称"),
@@ -532,6 +576,10 @@ def render_chapter_3(document):
                 ("outputs", "输出"),
                 ("notes", "备注"),
             ],
+            support_context,
+            id_key="module_id",
+            label_key="module_name",
+            target_type="module",
         ),
         subchapter_heading(3, 3, "模块关系图"),
         render_mermaid_block(architecture.get("module_relationship_diagram", {}), empty_text="无模块关系图。"),
@@ -648,7 +696,7 @@ def render_chapter_4(document):
     return "\n\n".join(part for part in parts if part != "")
 
 
-def render_chapter_5(document, module_display_names):
+def render_chapter_5(document, module_display_names, support_context):
     runtime = document["runtime_view"]
     runtime_unit_rows = rows_with_display_refs(
         runtime.get("runtime_units", {}).get("rows", []),
@@ -660,7 +708,14 @@ def render_chapter_5(document, module_display_names):
         subchapter_heading(5, 1, "运行时概述"),
         render_paragraph(runtime.get("summary", "")),
         subchapter_heading(5, 2, "运行单元说明"),
-        render_fixed_table(runtime_unit_rows, RUNTIME_UNIT_COLUMNS),
+        render_fixed_table_with_support(
+            runtime_unit_rows,
+            RUNTIME_UNIT_COLUMNS,
+            support_context,
+            id_key="unit_id",
+            label_key="unit_name",
+            target_type="runtime_unit",
+        ),
         subchapter_heading(5, 3, "运行时流程图"),
         render_mermaid_block(runtime.get("runtime_flow_diagram", {})),
         subchapter_heading(5, 4, "运行时序图（推荐）"),
@@ -671,7 +726,7 @@ def render_chapter_5(document, module_display_names):
     return "\n\n".join(part for part in parts if part != "")
 
 
-def render_chapter_6(document):
+def render_chapter_6(document, support_context):
     configuration = document["configuration_data_dependencies"]
     parts = [
         chapter_heading(6, "配置、数据与依赖关系"),
@@ -682,22 +737,34 @@ def render_chapter_6(document):
     parts.extend(
         [
             subchapter_heading(6, 1, "配置项说明"),
-            render_fixed_table_or_empty(
+            render_fixed_table_or_empty_with_support(
                 configuration.get("configuration_items", {}).get("rows", []),
                 CONFIGURATION_ITEM_COLUMNS,
                 "不适用。",
+                support_context,
+                id_key="config_id",
+                label_key="config_name",
+                target_type="configuration_item",
             ),
             subchapter_heading(6, 2, "关键结构数据与产物"),
-            render_fixed_table_or_empty(
+            render_fixed_table_or_empty_with_support(
                 configuration.get("structural_data_artifacts", {}).get("rows", []),
                 STRUCTURAL_DATA_ARTIFACT_COLUMNS,
                 "未识别到需要在结构设计阶段单独说明的关键结构数据或产物。",
+                support_context,
+                id_key="artifact_id",
+                label_key="artifact_name",
+                target_type="structural_data_artifact",
             ),
             subchapter_heading(6, 3, "依赖项说明"),
-            render_fixed_table_or_empty(
+            render_fixed_table_or_empty_with_support(
                 configuration.get("dependencies", {}).get("rows", []),
                 DEPENDENCY_COLUMNS,
                 "未识别到需要在结构设计阶段单独说明的外部依赖项。",
+                support_context,
+                id_key="dependency_id",
+                label_key="dependency_name",
+                target_type="dependency",
             ),
             subchapter_heading(6, 4, "补充图表"),
             render_extras(configuration.get("extra_tables", []), configuration.get("extra_diagrams", [])),
@@ -706,7 +773,7 @@ def render_chapter_6(document):
     return "\n\n".join(part for part in parts if part != "")
 
 
-def render_chapter_7(document, module_display_names):
+def render_chapter_7(document, module_display_names, support_context):
     collaboration = document["cross_module_collaboration"]
     collaboration_rows = rows_with_display_refs(
         collaboration.get("collaboration_scenarios", {}).get("rows", []),
@@ -718,10 +785,14 @@ def render_chapter_7(document, module_display_names):
         subchapter_heading(7, 1, "协作关系概述"),
         render_paragraph(collaboration.get("summary", "")),
         subchapter_heading(7, 2, "跨模块协作说明"),
-        render_fixed_table_or_empty(
+        render_fixed_table_or_empty_with_support(
             collaboration_rows,
             COLLABORATION_COLUMNS,
             "本系统当前仅识别到一个结构模块，暂无跨模块协作关系。",
+            support_context,
+            id_key="collaboration_id",
+            label_key="scenario",
+            target_type="collaboration_scenario",
         ),
         subchapter_heading(7, 3, "跨模块协作关系图"),
         render_mermaid_block(
@@ -973,15 +1044,16 @@ def resolve_output_path(output_dir, output_file):
 def render_markdown(document):
     module_display_names = build_module_display_names(document)
     runtime_unit_display_names = build_runtime_unit_display_names(document)
+    support_context = build_support_context(document)
     parts = [
         "# 软件结构设计说明书",
         render_chapter_1(document),
-        render_chapter_2(document),
-        render_chapter_3(document),
+        render_chapter_2(document, support_context),
+        render_chapter_3(document, support_context),
         render_chapter_4(document),
-        render_chapter_5(document, module_display_names),
-        render_chapter_6(document),
-        render_chapter_7(document, module_display_names),
+        render_chapter_5(document, module_display_names, support_context),
+        render_chapter_6(document, support_context),
+        render_chapter_7(document, module_display_names, support_context),
         render_chapter_8(document, module_display_names, runtime_unit_display_names),
         render_chapter_9(document),
     ]
