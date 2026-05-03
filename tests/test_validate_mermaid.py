@@ -707,5 +707,58 @@ erDiagram
         self.assertIn("unbalanced fenced code block starting at line 3", stderr)
 
 
+class MermaidStaticBoundaryTests(unittest.TestCase):
+    def test_static_rejects_graphviz_digraph_and_rankdir(self):
+        module = load_validator_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["architecture_views"]["module_relationship_diagram"]["source"] = "digraph G {\n  rankdir=LR;\n  A -> B;\n}"
+            path = write_json(document, tmpdir, "dot.dsl.json")
+            code, stdout, stderr = call_main(module, ["--from-dsl", str(path), "--static"])
+
+        self.assertEqual(1, code)
+        self.assertEqual("", stdout)
+        self.assertIn("$.architecture_views.module_relationship_diagram", stderr)
+        self.assertIn("Graphviz/DOT syntax is not supported", stderr)
+        self.assertIn("line 1", stderr)
+
+    def test_static_allows_common_mermaid_arrows(self):
+        module = load_validator_module()
+        markdown = """```mermaid
+flowchart TD
+  A --> B
+  B --- C
+  C -->|label| D
+```
+
+```mermaid
+sequenceDiagram
+  A->>B: call
+```
+"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = write_markdown(tmpdir, "arrows.md", markdown)
+            code, stdout, stderr = call_main(module, ["--from-markdown", str(path), "--static"])
+
+        self.assertEqual(0, code, stderr)
+        self.assertIn("2 diagram(s)", stdout)
+
+    def test_static_rejects_dot_style_single_arrow_statement_without_rejecting_sequence_arrows(self):
+        module = load_validator_module()
+        markdown = """```mermaid
+flowchart TD
+  node -> other;
+```
+"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = write_markdown(tmpdir, "dot-arrow.md", markdown)
+            code, stdout, stderr = call_main(module, ["--from-markdown", str(path), "--static"])
+
+        self.assertEqual(1, code)
+        self.assertIn("Mermaid block 1 line 1", stderr)
+        self.assertIn("Graphviz/DOT syntax is not supported", stderr)
+        self.assertIn("line 2", stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

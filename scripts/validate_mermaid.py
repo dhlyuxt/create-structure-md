@@ -41,6 +41,12 @@ KNOWN_UNSUPPORTED_MARKDOWN_TYPES = {
     "packet-beta",
     "architecture-beta",
 }
+DOT_PATTERNS = [
+    re.compile(r"(?im)^\s*digraph\b"),
+    re.compile(r"(?im)^\s*rankdir\s*="),
+    re.compile(r"(?m)^\s*[A-Za-z_][\w.-]*\s*->\s*[A-Za-z_][\w.-]*\s*;?\s*$"),
+]
+DOT_SYNTAX_HINT = "Use Mermaid syntax only; final Graphviz, DOT, SVG, PNG, and image export are out of scope"
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -153,6 +159,16 @@ def first_meaningful_line(source):
         if stripped and not stripped.startswith("%%"):
             return stripped
     return ""
+
+
+def find_dot_syntax(source):
+    findings = []
+    for line_number, line in enumerate(source.splitlines(), start=1):
+        for pattern in DOT_PATTERNS:
+            if pattern.search(line):
+                findings.append((line_number, line.strip()))
+                break
+    return findings
 
 
 def infer_type_from_source(source):
@@ -417,6 +433,15 @@ def validate_static(diagrams, source_kind):
             if not diagram.source.strip():
                 report.error(location, "Mermaid block body must be non-empty")
                 continue
+            dot_findings = find_dot_syntax(diagram.source)
+            if dot_findings:
+                for line_number, line in dot_findings:
+                    report.error(
+                        location,
+                        f"Graphviz/DOT syntax is not supported at line {line_number}: {line}",
+                        DOT_SYNTAX_HINT,
+                    )
+                continue
             inferred_type = infer_type_from_source(diagram.source)
             if inferred_type:
                 continue
@@ -433,6 +458,15 @@ def validate_static(diagrams, source_kind):
             report.error(location, f"unsupported diagram_type {diagram.diagram_type}")
         if source_kind == "dsl" and "```" in diagram.source:
             report.error(location, "DSL Mermaid source must not include Markdown code fences")
+        dot_findings = find_dot_syntax(diagram.source)
+        if dot_findings:
+            for line_number, line in dot_findings:
+                report.error(
+                    location,
+                    f"Graphviz/DOT syntax is not supported at line {line_number}: {line}",
+                    DOT_SYNTAX_HINT,
+                )
+            continue
         inferred_type = infer_type_from_source(diagram.source)
         if not inferred_type:
             report.error(
