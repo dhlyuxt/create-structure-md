@@ -191,16 +191,22 @@ def build_runtime_unit_display_names(document):
     return {row.get("unit_id"): row.get("unit_name", "") for row in rows}
 
 
-def display_names_for_refs(refs, display_names):
+def display_names_for_refs(refs, display_names, reference_type):
     if refs is None:
         return ""
     if isinstance(refs, list):
-        return [display_names.get(ref, ref) for ref in refs]
-    return display_names.get(refs, refs)
+        return [display_name_for_ref(ref, display_names, reference_type) for ref in refs]
+    return display_name_for_ref(refs, display_names, reference_type)
 
 
-def render_reference_summary(label, refs, display_names):
-    names = display_names_for_refs(refs, display_names)
+def display_name_for_ref(ref, display_names, reference_type):
+    if ref in display_names and display_names[ref] != "":
+        return display_names[ref]
+    raise RenderError(f"missing display name for {reference_type} reference")
+
+
+def render_reference_summary(label, refs, display_names, reference_type):
+    names = display_names_for_refs(refs, display_names, reference_type)
     rendered_names = stringify_markdown_value(names)
     if rendered_names == "":
         return ""
@@ -213,13 +219,15 @@ def rows_with_display_refs(rows, module_display_names, runtime_unit_display_name
         mapped_row = dict(row)
         for key in ("related_module_ids", "participant_module_ids"):
             if key in mapped_row:
-                mapped_row[key] = display_names_for_refs(mapped_row[key], module_display_names)
+                mapped_row[key] = display_names_for_refs(mapped_row[key], module_display_names, "module")
         for key in ("related_runtime_unit_ids", "participant_runtime_unit_ids"):
             if key in mapped_row:
-                mapped_row[key] = display_names_for_refs(mapped_row[key], runtime_unit_display_names)
+                mapped_row[key] = display_names_for_refs(
+                    mapped_row[key], runtime_unit_display_names, "runtime unit"
+                )
         if "initiator_module_id" in mapped_row:
             mapped_row["initiator_module_id"] = display_names_for_refs(
-                mapped_row["initiator_module_id"], module_display_names
+                mapped_row["initiator_module_id"], module_display_names, "module"
             )
         mapped_rows.append(mapped_row)
     return mapped_rows
@@ -600,8 +608,10 @@ def flows_by_id(key_flows):
 def render_key_flow_overview(flow, module_display_names, runtime_unit_display_names):
     parts = [
         render_paragraph(flow.get("overview", "")),
-        render_reference_summary("关联模块", flow.get("related_module_ids", []), module_display_names),
-        render_reference_summary("关联运行单元", flow.get("related_runtime_unit_ids", []), runtime_unit_display_names),
+        render_reference_summary("关联模块", flow.get("related_module_ids", []), module_display_names, "module"),
+        render_reference_summary(
+            "关联运行单元", flow.get("related_runtime_unit_ids", []), runtime_unit_display_names, "runtime unit"
+        ),
     ]
     return "\n\n".join(part for part in parts if part != "")
 

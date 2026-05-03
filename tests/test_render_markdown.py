@@ -920,6 +920,14 @@ class ChapterFiveToEightRenderingTests(unittest.TestCase):
         self.assertIn("技能文档生成模块", section)
         self.assertNotIn("confidence", section)
 
+    def test_missing_module_display_name_raises_render_error_without_leaking_raw_id(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["runtime_view"]["runtime_units"]["rows"][0]["related_module_ids"] = ["MOD-MISSING"]
+
+        with self.assertRaisesRegex(module.RenderError, r"missing display name for module reference"):
+            module.render_markdown(document)
+
     def test_optional_runtime_sequence_diagram_renders_empty_state_without_mermaid_block(self):
         module = load_renderer_module()
         markdown = module.render_markdown(valid_document())
@@ -1086,6 +1094,14 @@ class ChapterFiveToEightRenderingTests(unittest.TestCase):
         empty_flow_section = section_from(empty_markdown, "### 8.3 生成结构设计文档")
         empty_branch_section = section_between(empty_flow_section, "#### 8.3.3 异常/分支说明", "#### 8.3.4 流程图")
         self.assertIn("未识别到异常或分支说明。", empty_branch_section)
+
+    def test_missing_runtime_display_name_raises_render_error_without_leaking_raw_id(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["key_flows"]["flow_index"]["rows"][0]["participant_runtime_unit_ids"] = ["RUN-MISSING"]
+
+        with self.assertRaisesRegex(module.RenderError, r"missing display name for runtime unit reference"):
+            module.render_markdown(document)
 
 
 if __name__ == "__main__":
