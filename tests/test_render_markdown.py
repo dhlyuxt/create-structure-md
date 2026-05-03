@@ -559,6 +559,120 @@ class RendererOutputSafetyTests(unittest.TestCase):
         self.assertEqual(2, completed.returncode)
         self.assertIn("not allowed with argument", completed.stderr)
 
+class MarkdownPrimitiveTests(unittest.TestCase):
+    def test_escape_table_cell_handles_pipe_newline_fence_and_html(self):
+        module = load_renderer_module()
+        value = "A | B\n<script>alert(1)</script>\n```mermaid\nflowchart TD\n```"
+        escaped = module.escape_table_cell(value)
+        self.assertIn("A \\| B", escaped)
+        self.assertIn("<br>", escaped)
+        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", escaped)
+        self.assertNotIn("```", escaped)
+
+    def test_escape_plain_text_preserves_prose_but_blocks_headings_html_and_fences(self):
+        module = load_renderer_module()
+        value = "# 伪造标题\nInjected heading\n---\nInjected heading 2\n===\n普通 `inline` 文本\n<div>raw</div>\n```python\nx = 1\n```"
+        escaped = module.escape_plain_text(value)
+        self.assertIn("\\# 伪造标题", escaped)
+        self.assertNotIn("\n---", escaped)
+        self.assertNotIn("\n===", escaped)
+        self.assertIn("\n\\---", escaped)
+        self.assertIn("\n\\===", escaped)
+        self.assertIn("普通 `inline` 文本", escaped)
+        self.assertIn("&lt;div&gt;raw&lt;/div&gt;", escaped)
+        self.assertNotIn("```", escaped)
+
+    def test_render_fixed_table_uses_only_visible_columns_and_escapes_cells(self):
+        module = load_renderer_module()
+        rows = [
+            {
+                "module_id": "MOD-HIDDEN",
+                "module_name": "渲染|模块",
+                "responsibility": "第一行\n第二行",
+                "inputs": "<input>",
+                "outputs": "Markdown",
+                "notes": "```bad```",
+                "confidence": "unknown",
+                "evidence_refs": ["EV-001"],
+            }
+        ]
+        table = module.render_fixed_table(
+            rows,
+            [
+                ("module_name", "模块名称"),
+                ("responsibility", "职责"),
+                ("inputs", "输入"),
+                ("outputs", "输出"),
+                ("notes", "备注"),
+            ],
+        )
+        self.assertIn("| 模块名称 | 职责 | 输入 | 输出 | 备注 |", table)
+        self.assertIn("渲染\\|模块", table)
+        self.assertIn("第一行<br>第二行", table)
+        self.assertIn("&lt;input&gt;", table)
+        self.assertNotIn("MOD-HIDDEN", table)
+        self.assertNotIn("unknown", table)
+        self.assertNotIn("EV-001", table)
+        self.assertNotIn("```bad```", table)
+
+    def test_render_extra_table_uses_declared_columns_and_hides_evidence_refs(self):
+        module = load_renderer_module()
+        table = {
+            "id": "TBL-EXTRA",
+            "title": "补充表",
+            "columns": [{"key": "name", "title": "名称"}, {"key": "note", "title": "说明"}],
+            "rows": [{"name": "A", "note": "B|C", "evidence_refs": ["EV-001"]}],
+        }
+        rendered = module.render_extra_table(table)
+        self.assertIn("#### 补充表", rendered)
+        self.assertIn("| 名称 | 说明 |", rendered)
+        self.assertIn("B\\|C", rendered)
+        self.assertNotIn("TBL-EXTRA", rendered)
+        self.assertNotIn("EV-001", rendered)
+
+    def test_render_mermaid_block_fences_raw_source_exactly_once(self):
+        module = load_renderer_module()
+        diagram = {
+            "id": "MER-TEST",
+            "title": "测试图",
+            "description": "用于测试。",
+            "source": "flowchart TD\n  A --> B",
+        }
+        rendered = module.render_mermaid_block(diagram, empty_text="无图。")
+        self.assertIn("```mermaid\nflowchart TD\n  A --> B\n```", rendered)
+        self.assertEqual(1, rendered.count("```mermaid"))
+        self.assertEqual(2, rendered.count("```"))
+
+    def test_render_mermaid_block_empty_optional_diagram_uses_empty_state(self):
+        module = load_renderer_module()
+        diagram = {"id": "MER-EMPTY", "title": "空图", "description": "", "source": ""}
+        rendered = module.render_mermaid_block(diagram, empty_text="未提供运行时序图。")
+        self.assertEqual("未提供运行时序图。", rendered.strip())
+        self.assertNotIn("```mermaid", rendered)
+
+    def test_render_mermaid_block_rejects_source_that_already_contains_fences(self):
+        module = load_renderer_module()
+        diagram = {"id": "MER-BAD", "title": "坏图", "description": "", "source": "```mermaid\nflowchart TD\n```"}
+        with self.assertRaises(module.RenderError):
+            module.render_mermaid_block(diagram, empty_text="无图。")
+
+    def test_safe_source_snippet_fence_uses_longer_fence_than_content(self):
+        module = load_renderer_module()
+        snippet = {
+            "id": "SNIP-001",
+            "path": "src/example.py",
+            "line_start": 1,
+            "line_end": 2,
+            "language": "python",
+            "purpose": "展示安全 fence。",
+            "content": "```python\nprint('nested')\n```",
+            "confidence": "observed",
+        }
+        rendered = module.render_source_snippet(snippet)
+        self.assertIn("````python", rendered)
+        self.assertIn("```python\nprint('nested')\n```", rendered)
+        self.assertTrue(rendered.rstrip().endswith("````"))
+
 
 if __name__ == "__main__":
     unittest.main()

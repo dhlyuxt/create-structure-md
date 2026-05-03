@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import html
 import json
 import re
 import shutil
@@ -39,6 +40,129 @@ class RenderError(Exception):
 
 class InputError(RenderError):
     exit_code = 2
+
+
+def escape_fence_markers(value):
+    return value.replace("```", "`&#96;&#96;").replace("~~~", "~&#126;&#126;")
+
+
+def escape_html(value):
+    return html.escape(value, quote=False)
+
+
+def stringify_markdown_value(value):
+    if value is None:
+        return ""
+    if isinstance(value, list):
+        return "、".join(str(item) for item in value)
+    return str(value)
+
+
+def escape_table_cell(value):
+    escaped = escape_html(stringify_markdown_value(value))
+    escaped = escaped.replace("|", "\\|")
+    escaped = escaped.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "<br>")
+    return escape_fence_markers(escaped)
+
+
+def escape_plain_text(value):
+    escaped = escape_fence_markers(escape_html(stringify_markdown_value(value)))
+    lines = escaped.splitlines(keepends=True)
+    return "".join(escape_plain_text_line(line) for line in lines)
+
+
+def escape_plain_text_line(line):
+    newline = ""
+    content = line
+    if content.endswith("\r\n"):
+        content = content[:-2]
+        newline = "\r\n"
+    elif content.endswith("\n"):
+        content = content[:-1]
+        newline = "\n"
+    elif content.endswith("\r"):
+        content = content[:-1]
+        newline = "\r"
+
+    if re.match(r"^ {0,3}#{1,6}\s+", content) or re.match(r"^ {0,3}(=+|-+)\s*$", content):
+        content = "\\" + content
+    if is_table_like_plain_text_line(content):
+        content = content.replace("|", "\\|")
+    return content + newline
+
+
+def is_table_like_plain_text_line(line):
+    stripped = line.strip()
+    return "|" in line and (stripped.startswith("|") or stripped.endswith("|") or line.count("|") >= 2)
+
+
+def render_fixed_table(rows, columns):
+    headers = [escape_table_cell(title) for _, title in columns]
+    rendered_rows = [
+        "| " + " | ".join(headers) + " |",
+        "| " + " | ".join("---" for _ in columns) + " |",
+    ]
+    for row in rows:
+        cells = [escape_table_cell(row.get(field_key, "")) for field_key, _ in columns]
+        rendered_rows.append("| " + " | ".join(cells) + " |")
+    return "\n".join(rendered_rows)
+
+
+def render_extra_table(table):
+    columns = table.get("columns", [])
+    rows = table.get("rows", [])
+    declared_columns = [(column.get("key", ""), column.get("title", "")) for column in columns]
+    title = escape_plain_text(table.get("title", ""))
+    return f"#### {title}\n\n{render_fixed_table(rows, declared_columns)}"
+
+
+def render_mermaid_block(diagram, empty_text=None):
+    source = ""
+    if diagram:
+        source = str(diagram.get("source") or "")
+    if source == "":
+        return empty_text or ""
+    if "```" in source or "~~~" in source:
+        raise RenderError("Mermaid source must not contain fenced code markers")
+
+    parts = []
+    title = diagram.get("title") if diagram else ""
+    description = diagram.get("description") if diagram else ""
+    if title:
+        parts.append(escape_plain_text(title))
+    if description:
+        parts.append(escape_plain_text(description))
+    parts.append(f"```mermaid\n{source}\n```")
+    return "\n\n".join(parts)
+
+
+def longest_backtick_run(content):
+    runs = re.findall(r"`+", content)
+    if not runs:
+        return 0
+    return max(len(run) for run in runs)
+
+
+def render_source_snippet(snippet):
+    content = str(snippet.get("content") or "")
+    fence = "`" * max(3, longest_backtick_run(content) + 1)
+    language = escape_plain_text(snippet.get("language", "")).strip()
+    path = escape_plain_text(snippet.get("path", "")).strip()
+    line_start = escape_plain_text(snippet.get("line_start", "")).strip()
+    line_end = escape_plain_text(snippet.get("line_end", "")).strip()
+    purpose = escape_plain_text(snippet.get("purpose", "")).strip()
+
+    details = []
+    if path:
+        if line_start or line_end:
+            details.append(f"Source: {path}:{line_start}-{line_end}")
+        else:
+            details.append(f"Source: {path}")
+    if purpose:
+        details.append(f"Purpose: {purpose}")
+
+    details.append(f"{fence}{language}\n{content}\n{fence}")
+    return "\n\n".join(details)
 
 
 def build_parser():
