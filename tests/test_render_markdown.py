@@ -457,6 +457,60 @@ class RendererOutputSafetyTests(unittest.TestCase):
             self.assertEqual("existing content", output_path.read_text(encoding="utf-8"))
             self.assertEqual("old backup", backup_path.read_text(encoding="utf-8"))
 
+    def test_backup_race_does_not_overwrite_newly_created_backup_path(self):
+        module = load_renderer_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            dsl_path = write_json(tmpdir, "structure.dsl.json", document)
+            output_path = Path(tmpdir) / document["document"]["output_file"]
+            backup_path = Path(tmpdir) / "create-structure-md_STRUCTURE_DESIGN.md.bak-20260503_123456"
+            output_path.write_text("existing content", encoding="utf-8")
+            backup_path.write_text("raced backup", encoding="utf-8")
+
+            real_exists = Path.exists
+
+            def stale_backup_exists(path):
+                if path == backup_path:
+                    return False
+                return real_exists(path)
+
+            with (
+                mock.patch.object(module, "backup_timestamp", return_value="20260503_123456"),
+                mock.patch.object(module.Path, "exists", stale_backup_exists),
+            ):
+                code, stdout, stderr = call_main(
+                    module,
+                    [str(dsl_path), "--output-dir", tmpdir, "--backup"],
+                )
+
+            self.assertEqual(1, code)
+            self.assertEqual("", stdout)
+            self.assertIn("backup path already exists", stderr)
+            self.assertEqual("existing content", output_path.read_text(encoding="utf-8"))
+            self.assertEqual("raced backup", backup_path.read_text(encoding="utf-8"))
+
+    def test_backup_copy_failure_preserves_existing_output(self):
+        module = load_renderer_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            dsl_path = write_json(tmpdir, "structure.dsl.json", document)
+            output_path = Path(tmpdir) / document["document"]["output_file"]
+            output_path.write_text("existing content", encoding="utf-8")
+
+            with (
+                mock.patch.object(module, "backup_timestamp", return_value="20260503_123456"),
+                mock.patch.object(module.shutil, "copyfileobj", side_effect=OSError("copy failed")),
+            ):
+                code, stdout, stderr = call_main(
+                    module,
+                    [str(dsl_path), "--output-dir", tmpdir, "--backup"],
+                )
+
+            self.assertEqual(1, code)
+            self.assertEqual("", stdout)
+            self.assertIn("failed to write backup", stderr)
+            self.assertEqual("existing content", output_path.read_text(encoding="utf-8"))
+
     def test_overwrite_and_backup_are_mutually_exclusive(self):
         completed = subprocess.run(
             [PYTHON, str(RENDERER), str(FIXTURE), "--output-dir", ".", "--overwrite", "--backup"],

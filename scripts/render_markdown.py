@@ -138,6 +138,17 @@ def backup_path_for(output_path):
     return output_path.with_name(f"{output_path.name}.bak-{backup_timestamp()}")
 
 
+def copy_backup_file(output_path, backup_path):
+    try:
+        with Path(output_path).open("rb") as source, Path(backup_path).open("xb") as destination:
+            shutil.copyfileobj(source, destination)
+        shutil.copystat(output_path, backup_path)
+    except FileExistsError:
+        raise RenderError(f"backup path already exists: {backup_path}; retry later")
+    except OSError as exc:
+        raise RenderError(f"failed to write backup path {backup_path}: {exc}")
+
+
 def write_output(output_path, markdown, overwrite=False, backup=False):
     output_path = Path(output_path)
     backup_path = None
@@ -149,10 +160,7 @@ def write_output(output_path, markdown, overwrite=False, backup=False):
         backup_path = backup_path_for(output_path)
         if backup_path.exists():
             raise RenderError(f"backup path already exists: {backup_path}; retry later")
-        try:
-            shutil.copy2(output_path, backup_path)
-        except OSError as exc:
-            raise RenderError(f"failed to write output file {backup_path}: {exc}")
+        copy_backup_file(output_path, backup_path)
 
     try:
         output_path.write_text(markdown, encoding="utf-8")
