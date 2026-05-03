@@ -712,5 +712,153 @@ class MarkdownPrimitiveTests(unittest.TestCase):
                 self.assertNotIn("py`thon", rendered)
 
 
+def section_between(text, start_marker, end_marker):
+    start = text.index(start_marker)
+    end = text.index(end_marker, start)
+    return text[start:end]
+
+
+def section_from(text, start_marker):
+    start = text.index(start_marker)
+    return text[start:]
+
+
+def assert_in_order(testcase, text, markers):
+    positions = []
+    for marker in markers:
+        with testcase.subTest(marker=marker):
+            positions.append(text.index(marker))
+    testcase.assertEqual(sorted(positions), positions)
+
+
+class ChapterOneToFourRenderingTests(unittest.TestCase):
+    def test_chapters_1_to_4_have_fixed_headings_and_generated_at_fill_without_mutation(self):
+        module = load_renderer_module()
+        document = valid_document()
+        original = deepcopy(document)
+
+        with mock.patch.object(module, "generated_at_value", return_value="2026-05-03T12:34:56+08:00"):
+            markdown = module.render_markdown(document)
+
+        self.assertEqual(original, document)
+        assert_in_order(
+            self,
+            markdown,
+            [
+                "# 软件结构设计说明书",
+                "## 1. 文档信息",
+                "## 2. 系统概览",
+                "## 3. 架构视图",
+                "### 3.1 架构概述",
+                "### 3.2 各模块介绍",
+                "### 3.3 模块关系图",
+                "### 3.4 补充架构图表",
+                "## 4. 模块设计",
+                "### 4.1 技能文档生成模块",
+                "#### 4.1.1 模块概述",
+                "#### 4.1.2 模块职责",
+                "#### 4.1.3 对外能力说明",
+                "#### 4.1.4 对外接口需求清单",
+                "#### 4.1.5 模块内部结构关系图",
+                "#### 4.1.6 补充说明",
+            ],
+        )
+        chapter_1 = section_between(markdown, "## 1. 文档信息", "## 2. 系统概览")
+        self.assertIn("2026-05-03T12:34:56+08:00", chapter_1)
+        self.assertEqual("", document["document"]["generated_at"])
+
+    def test_chapter_2_renders_summary_purpose_core_capabilities_and_notes(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["system_overview"]["notes"] = ["第一条概览备注", "第二条概览备注"]
+        markdown = module.render_markdown(document)
+        section = section_between(markdown, "## 2. 系统概览", "## 3. 架构视图")
+        self.assertIn("从已准备好的结构化设计内容生成单个结构设计 Markdown 文档。", section)
+        self.assertIn("提供稳定的 DSL、校验入口和渲染入口，使文档生成过程可重复。", section)
+        self.assertIn("| 能力 | 描述 |", section)
+        self.assertIn("结构设计文档生成", section)
+        self.assertIn("把完整 DSL 内容转为固定章节的 Markdown 文档。", section)
+        self.assertIn("第一条概览备注", section)
+        self.assertIn("第二条概览备注", section)
+        self.assertNotIn("CAP-001", section)
+        self.assertNotIn("observed", section)
+
+    def test_chapter_3_module_intro_table_uses_fixed_visible_columns_only(self):
+        module = load_renderer_module()
+        markdown = module.render_markdown(valid_document())
+        section = section_between(markdown, "### 3.2 各模块介绍", "### 3.3 模块关系图")
+        self.assertIn("| 模块名称 | 职责 | 输入 | 输出 | 备注 |", section)
+        self.assertNotIn("module_id", section)
+        self.assertNotIn("MOD-SKILL", section)
+        self.assertNotIn("confidence", section)
+        self.assertNotIn("observed", section)
+
+    def test_chapter_4_modules_follow_chapter_3_order(self):
+        module = load_renderer_module()
+        document = valid_document()
+        second_module = deepcopy(document["architecture_views"]["module_intro"]["rows"][0])
+        second_module["module_id"] = "MOD-SECOND"
+        second_module["module_name"] = "第二模块"
+        second_module["responsibility"] = "第二个模块职责。"
+        document["architecture_views"]["module_intro"]["rows"].append(second_module)
+
+        second_design = deepcopy(document["module_design"]["modules"][0])
+        second_design["module_id"] = "MOD-SECOND"
+        second_design["name"] = "第二模块"
+        second_design["summary"] = "第二模块概述。"
+        document["module_design"]["modules"] = [second_design, document["module_design"]["modules"][0]]
+
+        markdown = module.render_markdown(document)
+        assert_in_order(self, markdown, ["### 4.1 技能文档生成模块", "### 4.2 第二模块"])
+
+    def test_chapter_4_provided_capabilities_table_uses_fixed_visible_columns_only(self):
+        module = load_renderer_module()
+        markdown = module.render_markdown(valid_document())
+        section = section_between(markdown, "#### 4.1.4 对外接口需求清单", "#### 4.1.5 模块内部结构关系图")
+        self.assertIn("| 能力名称 | 接口风格 | 描述 | 输入 | 输出 | 备注 |", section)
+        self.assertNotIn("capability_id", section)
+        self.assertNotIn("CAP-MOD-SKILL-001", section)
+        self.assertNotIn("confidence", section)
+
+    def test_chapter_4_empty_internal_diagram_renders_textual_structure_without_mermaid_block(self):
+        module = load_renderer_module()
+        markdown = module.render_markdown(valid_document())
+        section = section_between(markdown, "#### 4.1.5 模块内部结构关系图", "#### 4.1.6 补充说明")
+        self.assertIn("schema 描述 DSL 结构", section)
+        self.assertIn("单模块示例中使用文字结构说明即可。", section)
+        self.assertNotIn("```mermaid", section)
+
+    def test_architecture_extras_render_tables_and_diagrams_without_empty_state(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["architecture_views"]["extra_tables"] = [
+            {
+                "id": "TBL-ARCH-EXTRA",
+                "title": "架构补充表",
+                "columns": [{"key": "item", "title": "项目"}, {"key": "note", "title": "说明"}],
+                "rows": [{"item": "补充项", "note": "A|B", "evidence_refs": []}],
+            }
+        ]
+        document["architecture_views"]["extra_diagrams"] = [
+            {
+                "id": "MER-ARCH-EXTRA",
+                "kind": "extra",
+                "title": "架构补充图",
+                "diagram_type": "flowchart",
+                "description": "展示补充结构。",
+                "source": "flowchart TD\n  ExtraA[补充A] --> ExtraB[补充B]",
+                "confidence": "observed",
+            }
+        ]
+        markdown = module.render_markdown(document)
+        section = section_between(markdown, "### 3.4 补充架构图表", "## 4. 模块设计")
+        self.assertIn("#### 架构补充表", section)
+        self.assertIn("| 项目 | 说明 |", section)
+        self.assertIn("A\\|B", section)
+        self.assertIn("#### 架构补充图", section)
+        self.assertIn("```mermaid\nflowchart TD\n  ExtraA[补充A] --> ExtraB[补充B]\n```", section)
+        self.assertNotIn("无补充内容。", section)
+
+
 if __name__ == "__main__":
     unittest.main()

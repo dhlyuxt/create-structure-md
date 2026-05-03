@@ -112,6 +112,24 @@ def render_extra_table(table):
     return f"#### {title}\n\n{render_fixed_table(rows, declared_columns)}"
 
 
+def render_extra_diagram(diagram):
+    title = escape_plain_text(diagram.get("title", ""))
+    untitled_diagram = dict(diagram)
+    untitled_diagram["title"] = ""
+    return f"#### {title}\n\n{render_mermaid_block(untitled_diagram)}"
+
+
+def render_extras(extra_tables, extra_diagrams, empty_text="无补充内容。"):
+    parts = []
+    for table in extra_tables or []:
+        parts.append(render_extra_table(table))
+    for diagram in extra_diagrams or []:
+        parts.append(render_extra_diagram(diagram))
+    if not parts:
+        return empty_text
+    return "\n\n".join(parts)
+
+
 def render_mermaid_block(diagram, empty_text=None):
     source = ""
     if diagram:
@@ -166,6 +184,201 @@ def safe_fence_info_string(value):
     if SAFE_FENCE_INFO_RE.fullmatch(language):
         return language
     return ""
+
+
+def generated_at_value():
+    return datetime.now().astimezone().isoformat(timespec="seconds")
+
+
+def chapter_heading(number, title):
+    return f"## {number}. {title}"
+
+
+def subchapter_heading(chapter_number, section_number, title):
+    return f"### {chapter_number}.{section_number} {title}"
+
+
+def nested_heading(chapter_number, section_number, nested_number, title):
+    return f"#### {chapter_number}.{section_number}.{nested_number} {title}"
+
+
+def render_paragraph(value, empty_text=""):
+    text = stringify_markdown_value(value)
+    if text == "":
+        return empty_text
+    return escape_plain_text(text)
+
+
+def render_bullets(items):
+    bullets = []
+    for item in items or []:
+        text = escape_plain_text(item).strip()
+        if text:
+            bullets.append(f"- {text}")
+    return "\n".join(bullets)
+
+
+def render_chapter_1(document):
+    metadata = document["document"]
+    rows = []
+    for key, value in metadata.items():
+        rendered_value = generated_at_value() if key == "generated_at" and value == "" else value
+        rows.append({"field": key, "value": rendered_value})
+    return "\n\n".join(
+        [
+            chapter_heading(1, "文档信息"),
+            render_fixed_table(rows, [("field", "字段"), ("value", "值")]),
+        ]
+    )
+
+
+def render_chapter_2(document):
+    overview = document["system_overview"]
+    parts = [
+        chapter_heading(2, "系统概览"),
+        render_paragraph(overview.get("summary", "")),
+        render_paragraph(overview.get("purpose", "")),
+        render_fixed_table(
+            overview.get("core_capabilities", []),
+            [("name", "能力"), ("description", "描述")],
+        ),
+    ]
+    notes = render_bullets(overview.get("notes", []))
+    if notes:
+        parts.append(notes)
+    return "\n\n".join(part for part in parts if part != "")
+
+
+def render_chapter_3(document):
+    architecture = document["architecture_views"]
+    parts = [
+        chapter_heading(3, "架构视图"),
+        subchapter_heading(3, 1, "架构概述"),
+        render_paragraph(architecture.get("summary", "")),
+        subchapter_heading(3, 2, "各模块介绍"),
+        render_fixed_table(
+            architecture.get("module_intro", {}).get("rows", []),
+            [
+                ("module_name", "模块名称"),
+                ("responsibility", "职责"),
+                ("inputs", "输入"),
+                ("outputs", "输出"),
+                ("notes", "备注"),
+            ],
+        ),
+        subchapter_heading(3, 3, "模块关系图"),
+        render_mermaid_block(architecture.get("module_relationship_diagram", {}), empty_text="无模块关系图。"),
+        subchapter_heading(3, 4, "补充架构图表"),
+        render_extras(architecture.get("extra_tables", []), architecture.get("extra_diagrams", [])),
+    ]
+    return "\n\n".join(part for part in parts if part != "")
+
+
+def module_designs_by_id(document):
+    modules = document.get("module_design", {}).get("modules", [])
+    return {module.get("module_id"): module for module in modules}
+
+
+def ordered_module_designs(document):
+    designs_by_id = module_designs_by_id(document)
+    ordered = []
+    seen_ids = set()
+    for row in document.get("architecture_views", {}).get("module_intro", {}).get("rows", []):
+        module_id = row.get("module_id")
+        module = designs_by_id.get(module_id)
+        if module is not None:
+            ordered.append(module)
+            seen_ids.add(module_id)
+    for module in document.get("module_design", {}).get("modules", []):
+        module_id = module.get("module_id")
+        if module_id not in seen_ids:
+            ordered.append(module)
+    return ordered
+
+
+def render_external_capability_summary(summary):
+    parts = [render_paragraph(summary.get("description", ""))]
+    consumers = render_bullets(summary.get("consumers", []))
+    if consumers:
+        parts.append("使用方：\n" + consumers)
+    interface_style = render_paragraph(summary.get("interface_style", ""))
+    if interface_style:
+        parts.append(f"接口风格：{interface_style}")
+    boundary_notes = render_bullets(summary.get("boundary_notes", []))
+    if boundary_notes:
+        parts.append("边界说明：\n" + boundary_notes)
+    return "\n\n".join(part for part in parts if part != "")
+
+
+def render_internal_structure(internal_structure):
+    diagram = internal_structure.get("diagram", {})
+    rendered_diagram = render_mermaid_block(diagram)
+    if rendered_diagram:
+        return rendered_diagram
+    parts = [
+        render_paragraph(internal_structure.get("textual_structure", "")),
+        render_paragraph(internal_structure.get("not_applicable_reason", "")),
+    ]
+    return "\n\n".join(part for part in parts if part != "")
+
+
+def render_module_supplement(module):
+    details = module.get("external_capability_details", {})
+    parts = []
+    details_extras = render_extras(details.get("extra_tables", []), details.get("extra_diagrams", []), empty_text="")
+    if details_extras:
+        parts.append(details_extras)
+    module_extras = render_extras(module.get("extra_tables", []), module.get("extra_diagrams", []), empty_text="")
+    if module_extras:
+        parts.append(module_extras)
+    notes = render_bullets(module.get("notes", []))
+    if notes:
+        parts.append(notes)
+    if not parts:
+        return "无补充内容。"
+    return "\n\n".join(parts)
+
+
+def render_module_design_section(module, index):
+    details = module.get("external_capability_details", {})
+    provided = details.get("provided_capabilities", {})
+    parts = [
+        subchapter_heading(4, index, module.get("name", "")),
+        nested_heading(4, index, 1, "模块概述"),
+        render_paragraph(module.get("summary", "")),
+        nested_heading(4, index, 2, "模块职责"),
+        render_bullets(module.get("responsibilities", [])),
+        nested_heading(4, index, 3, "对外能力说明"),
+        render_external_capability_summary(module.get("external_capability_summary", {})),
+        nested_heading(4, index, 4, "对外接口需求清单"),
+        render_fixed_table(
+            provided.get("rows", []),
+            [
+                ("capability_name", "能力名称"),
+                ("interface_style", "接口风格"),
+                ("description", "描述"),
+                ("inputs", "输入"),
+                ("outputs", "输出"),
+                ("notes", "备注"),
+            ],
+        ),
+        nested_heading(4, index, 5, "模块内部结构关系图"),
+        render_internal_structure(module.get("internal_structure", {})),
+        nested_heading(4, index, 6, "补充说明"),
+        render_module_supplement(module),
+    ]
+    return "\n\n".join(part for part in parts if part != "")
+
+
+def render_chapter_4(document):
+    module_design = document["module_design"]
+    parts = [
+        chapter_heading(4, "模块设计"),
+        render_paragraph(module_design.get("summary", "")),
+    ]
+    for index, module in enumerate(ordered_module_designs(document), start=1):
+        parts.append(render_module_design_section(module, index))
+    return "\n\n".join(part for part in parts if part != "")
 
 
 def build_parser():
@@ -253,7 +466,14 @@ def resolve_output_path(output_dir, output_file):
 
 
 def render_markdown(document):
-    return "# 软件结构设计说明书\n"
+    parts = [
+        "# 软件结构设计说明书",
+        render_chapter_1(document),
+        render_chapter_2(document),
+        render_chapter_3(document),
+        render_chapter_4(document),
+    ]
+    return "\n\n".join(parts) + "\n"
 
 
 def backup_timestamp():
