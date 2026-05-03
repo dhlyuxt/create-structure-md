@@ -97,7 +97,10 @@ def validate_output_filename(document):
     if folded in GENERIC_OUTPUT_NAMES or generic_only:
         raise InputError("generic-only output filename is not allowed for document.output_file")
 
-    concrete_tokens = documented_object_tokens(document)
+    try:
+        concrete_tokens = documented_object_tokens(document)
+    except (KeyError, TypeError) as exc:
+        raise InputError(f"DSL shape is missing required filename context: {exc}")
     contains_concrete_token = any(token in output_tokens for token in concrete_tokens)
     if not contains_concrete_token:
         raise InputError("document.output_file must include a concrete documented object name")
@@ -124,7 +127,10 @@ def write_output(output_path, markdown, overwrite=False, backup=False):
         raise RenderError(f"output file already exists: {output_path}")
     if output_path.exists() and backup:
         raise RenderError("backup behavior is not implemented yet")
-    output_path.write_text(markdown, encoding="utf-8")
+    try:
+        output_path.write_text(markdown, encoding="utf-8")
+    except OSError as exc:
+        raise RenderError(f"failed to write output file {output_path}: {exc}")
 
 
 def main(argv=None):

@@ -210,6 +210,42 @@ class RendererCliAndFilenameTests(unittest.TestCase):
             self.assertIn("documented object name", completed.stderr)
             self.assertEqual([], list(Path(tmpdir).glob("*.md")))
 
+    def test_malformed_json_shape_fails_as_input_error_without_traceback(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            del document["architecture_views"]
+            dsl_path = write_json(tmpdir, "malformed-shape.dsl.json", document)
+            completed = subprocess.run(
+                [PYTHON, str(RENDERER), str(dsl_path), "--output-dir", tmpdir],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(2, completed.returncode)
+            self.assertIn("ERROR:", completed.stderr)
+            self.assertIn("DSL shape", completed.stderr)
+            self.assertNotIn("Traceback", completed.stderr)
+            self.assertEqual([], list(Path(tmpdir).glob("*.md")))
+
+    def test_write_oserror_fails_as_render_error_without_traceback(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            output_file = document["document"]["output_file"]
+            (Path(tmpdir) / output_file).mkdir()
+            dsl_path = write_json(tmpdir, "write-failure.dsl.json", document)
+            completed = subprocess.run(
+                [PYTHON, str(RENDERER), str(dsl_path), "--output-dir", tmpdir, "--overwrite"],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(1, completed.returncode)
+            self.assertIn("ERROR:", completed.stderr)
+            self.assertIn("failed to write", completed.stderr)
+            self.assertNotIn("Traceback", completed.stderr)
+
     def test_spaces_are_written_exactly_without_silent_rename(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             document = valid_document()
