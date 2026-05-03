@@ -754,7 +754,7 @@ def render_chapter_6(document, support_context):
                 support_context,
                 id_key="artifact_id",
                 label_key="artifact_name",
-                target_type="structural_data_artifact",
+                target_type="data_artifact",
             ),
             subchapter_heading(6, 3, "依赖项说明"),
             render_fixed_table_or_empty_with_support(
@@ -792,7 +792,7 @@ def render_chapter_7(document, module_display_names, support_context):
             support_context,
             id_key="collaboration_id",
             label_key="scenario",
-            target_type="collaboration_scenario",
+            target_type="collaboration",
         ),
         subchapter_heading(7, 3, "跨模块协作关系图"),
         render_mermaid_block(

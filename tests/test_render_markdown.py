@@ -929,6 +929,41 @@ class SupportDataTablePlacementTests(unittest.TestCase):
         self.assertNotIn("| REQ-CAP-AUTH |", chapter_2)
         self.assertNotIn("| REQ-RUN-AUTH |", chapter_5)
 
+    def test_data_artifact_and_collaboration_authoritative_traceability_render_without_local_backlinks(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["configuration_data_dependencies"]["structural_data_artifacts"]["rows"][0]["traceability_refs"] = []
+        document["cross_module_collaboration"]["collaboration_scenarios"]["rows"][0]["traceability_refs"] = []
+        document["traceability"] = [
+            {
+                "id": "TR-DATA-AUTH",
+                "source_external_id": "REQ-DATA-AUTH",
+                "source_type": "requirement",
+                "target_type": "data_artifact",
+                "target_id": "DATA-001",
+                "description": "结构数据需求。",
+            },
+            {
+                "id": "TR-COL-AUTH",
+                "source_external_id": "REQ-COL-AUTH",
+                "source_type": "requirement",
+                "target_type": "collaboration",
+                "target_id": "COL-001",
+                "description": "协作需求。",
+            },
+        ]
+
+        markdown = module.render_markdown(document)
+        chapter_6 = section_between(markdown, "## 6. 配置、数据与依赖关系", "## 7. 跨模块协作关系")
+        chapter_7 = section_between(markdown, "## 7. 跨模块协作关系", "## 8. 关键流程")
+
+        self.assertIn("支持数据（DATA-001 / 结构设计 DSL）", chapter_6)
+        self.assertIn("关联来源：REQ-DATA-AUTH（结构数据需求。）", chapter_6)
+        self.assertIn("支持数据（COL-001 / DSL 校验后渲染）", chapter_7)
+        self.assertIn("关联来源：REQ-COL-AUTH（协作需求。）", chapter_7)
+        self.assertNotIn("| REQ-DATA-AUTH |", chapter_6)
+        self.assertNotIn("| REQ-COL-AUTH |", chapter_7)
+
 
 def section_between(text, start_marker, end_marker):
     start = text.index(start_marker)
