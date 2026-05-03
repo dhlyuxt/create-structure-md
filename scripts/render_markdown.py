@@ -406,10 +406,14 @@ def traceability_label(trace):
     return source
 
 
+def collapse_support_line(value):
+    return re.sub(r"\s+", " ", stringify_markdown_value(value)).strip()
+
+
 def render_support_lines(lines):
     rendered = []
     for line in lines:
-        escaped = escape_plain_text(line).strip()
+        escaped = escape_plain_text(collapse_support_line(line)).strip()
         if escaped:
             rendered.append(f"- {escaped}")
     return "\n".join(rendered)

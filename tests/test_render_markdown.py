@@ -791,6 +791,42 @@ class SupportDataPrimitiveTests(unittest.TestCase):
         self.assertIn("```python\ndef main():\n    return 0\n```", rendered)
         self.assertNotIn("很长描述不应内联", rendered)
 
+    def test_render_node_support_collapses_label_newlines_inside_bullets(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["evidence"] = [
+            {
+                "id": "EV-001",
+                "kind": "source",
+                "title": "safe\n- injected",
+                "location": "scripts/render_markdown.py:1\r\n> quote",
+                "description": "not rendered",
+                "confidence": "observed",
+            },
+        ]
+        document["traceability"] = [
+            {
+                "id": "TR-001",
+                "source_external_id": "REQ-001",
+                "source_type": "requirement",
+                "target_type": "module",
+                "target_id": "MOD-SKILL",
+                "description": "desc\n> quote\r\n- injected",
+            },
+        ]
+        node = {
+            "evidence_refs": ["EV-001"],
+            "traceability_refs": ["TR-001"],
+        }
+        context = module.build_support_context(document)
+
+        rendered = module.render_node_support(node, context, target_type="module", target_id="MOD-SKILL")
+
+        self.assertNotIn("\n- injected", rendered)
+        self.assertNotIn("\n> quote", rendered)
+        self.assertIn("- 依据：EV-001（safe - injected，scripts/render_markdown.py:1 &gt; quote）", rendered)
+        self.assertIn("- 关联来源：REQ-001（desc &gt; quote - injected）", rendered)
+
     def test_render_node_support_returns_empty_string_when_no_support_exists(self):
         module = load_renderer_module()
         context = module.build_support_context(valid_document())
