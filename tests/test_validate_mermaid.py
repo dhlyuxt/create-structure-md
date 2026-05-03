@@ -47,7 +47,7 @@ WORKFLOW_ORDER = [
     "python scripts/render_markdown.py structure.dsl.json --output-dir",
     "python scripts/validate_mermaid.py --from-markdown <output-file> --static",
     "references/review-checklist.md",
-    "Report the output path",
+    "Report output path",
 ]
 
 
@@ -286,8 +286,9 @@ class SkillBodyContractTests(unittest.TestCase):
 
     def test_mermaid_strict_and_static_acceptance_rule_is_visible(self):
         self.assertIn("Strict Mermaid validation is the default", self.text)
-        self.assertIn("Static-only Mermaid validation is allowed only when strict tooling is unavailable", self.text)
-        self.assertIn("the user explicitly accepts that limitation for the current run", self.text)
+        self.assertIn("If local Mermaid CLI tooling unavailable, stop and ask user before static-only validation", self.text)
+        self.assertIn("Mermaid diagrams were not proven renderable by Mermaid CLI", self.text)
+        self.assertIn("user explicitly accepts static-only validation", self.text)
 
     def test_output_and_temporary_directory_rules_are_visible(self):
         for phrase in [

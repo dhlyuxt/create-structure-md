@@ -4,13 +4,57 @@
 
 The DSL records document-ready structure design content prepared by Codex outside this skill. It does not analyze repositories, infer requirements, or decide what a target system means.
 
-## Top-Level Fields
+## Input Readiness Contract
 
-Later phases define the full schema for `dsl_version`, `document`, fixed chapter objects, `evidence`, `traceability`, `risks`, `assumptions`, and `source_snippets`.
+The Input Readiness Contract is the gate before any DSL JSON is written. Codex must already have prepared structure design content from an earlier project-understanding step, including module IDs, responsibilities, relationships, runtime units, configuration/data/dependency details when applicable, key flows, diagram intent, confidence levels, assumptions, risks, evidence, traceability targets, and safe source snippets. If required facts are missing, do not invent placeholders inside the DSL; stop and gather the missing design input outside this skill.
+
+## DSL Top-Level Fields
+
+The DSL top level is a single JSON object. It must include `dsl_version`, `document`, `system_overview`, `architecture_views`, `module_design`, `runtime_view`, `configuration_data_dependencies`, `cross_module_collaboration`, `key_flows`, and `structure_issues_and_suggestions`. Support arrays are `evidence`, `traceability`, `risks`, `assumptions`, and `source_snippets`.
+
+The schema owns structural validation through `required`, `min_rows`, and `empty_allowed` declarations. `required` fields must be present and meaningful. `min_rows` defines the minimum number of rows a fixed table section must contain unless the section explicitly declares `empty_allowed`. When `empty_allowed` is true, an empty array is valid and the renderer uses the documented empty-state sentence.
 
 ## Chapter Fields
 
 The DSL is organized around the fixed 9-chapter Markdown output: document metadata, system overview, architecture views, module design, runtime view, configuration/data/dependencies, cross-module collaboration, key flows, and structure issues or suggestions.
+
+## Common Metadata
+
+Design objects may carry common support metadata: `confidence`, `evidence_refs`, `traceability_refs`, `source_snippet_refs`, `risk_refs`, and `assumption_refs`. Metadata is never a visible fixed table column unless the document-structure contract explicitly allows a review-oriented chapter 9 rendering. Confidence values are for review summaries, not for replacing required design text.
+
+## ID Prefix Conventions
+
+IDs must be stable within one DSL file and use readable prefixes. Recommended prefixes are `MOD-` for modules, `IF-` for interface requirements, `RU-` for runtime units, `FLOW-` for key flows, `EV-` for evidence, `TR-` for traceability, `RISK-` for risks, `ASM-` for assumptions, and `SRC-` for source snippets. Prefixes help reviewers read references, but uniqueness and schema constraints remain authoritative.
+
+## Defining ID Fields And Reference ID Fields
+
+Defining ID fields create targetable objects, such as `module_id`, `runtime_unit_id`, `flow_id`, `evidence_id`, `traceability_id`, `risk_id`, `assumption_id`, and `source_snippet_id`. Reference ID fields point at existing definitions, such as `module_refs`, `evidence_refs`, `traceability_refs`, `risk_refs`, `assumption_refs`, and `source_snippet_refs`. A reference field must not introduce a new object by implication.
+
+## Authoritative Field Contract
+
+Where both local backlinks and authoritative target fields exist, authoritative target fields win. For example, traceability binding is authoritative through `traceability[].target_type` and `traceability[].target_id`; local `traceability_refs` only serve as optional backlinks and must point to traceability objects that target the current node. Renderers and validators should deduplicate support found through both paths.
+
+## Fixed Table Row Fields
+
+Fixed table rows use section-specific content fields only. Support metadata such as `evidence_refs`, `traceability_refs`, `source_snippet_refs`, `risk_refs`, `assumption_refs`, and `confidence` must not become visible fixed table columns. Fixed rows that are allowed to be empty use `empty_allowed`; fixed rows that must be present use `required` and `min_rows` in the schema contract.
+
+## Support Data Object Shapes
+
+Evidence objects record `evidence_id`, short description, optional source/location data, and confidence or notes as allowed by schema. Traceability objects record `traceability_id`, `target_type`, `target_id`, and source-to-design mapping text. Risk objects record risk text, impact, mitigation, and refs where present. Assumption objects record assumption text and review notes. Source snippet objects record `source_snippet_id`, language, source location, and snippet text that is safe to disclose.
+
+Support data strengthens nearby design content and does not create standalone chapters except for chapter 9 review summaries of risks, assumptions, and low-confidence items.
+
+## Traceability Target Mapping
+
+`traceability[].target_type` identifies the kind of design object being supported, and `traceability[].target_id` identifies the exact object ID. Validators should reject unknown target types, missing targets, or target IDs that do not match a defining ID field. Renderers should show the traceability note near the mapped object and avoid duplicate notes when a local backlink also references the same traceability object.
+
+## Validation Policy Outside DSL
+
+Validation policy outside DSL belongs in scripts and reference contracts, not embedded as prose inside design objects. The DSL records content and metadata. File overwrite behavior, Mermaid strict/static mode selection, output filename rejection, and repository-analysis boundaries are enforced by tooling and workflow documents.
+
+## Source Snippet Rules
+
+Source snippets must be necessary, minimal, and safe to disclose. Do not include secrets, tokens, private keys, credentials, personal data, or unrelated code. Snippets must be referenced by at least one `source_snippet_refs` field, render near the referencing node, and never render inside Markdown table cells. Fence selection must prevent snippet content from breaking the Markdown code fence.
 
 ## Support Data
 

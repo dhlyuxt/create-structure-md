@@ -32,15 +32,17 @@ If any required input is missing, stop and perform project or requirement unders
 ## Workflow
 
 1. Create a temporary work directory.
-2. Write one complete DSL JSON file, optionally after smaller staged JSON files.
-3. Run `python scripts/validate_dsl.py structure.dsl.json`.
-4. Run `python scripts/validate_mermaid.py --from-dsl structure.dsl.json --strict`.
-5. Render the document with `python scripts/render_markdown.py structure.dsl.json --output-dir ...`.
-6. Run `python scripts/validate_mermaid.py --from-markdown <output-file> --static`.
-7. Review the generated document with `references/review-checklist.md`.
-8. Report the output path, temporary work directory, assumptions, low-confidence items, and any static-only Mermaid acceptance.
+2. Read references/dsl-spec.md before writing DSL content.
+3. Write one complete DSL JSON file.
+4. Run `python scripts/validate_dsl.py structure.dsl.json`.
+5. Read references/mermaid-rules.md before creating/revising Mermaid.
+6. Run `python scripts/validate_mermaid.py --from-dsl structure.dsl.json --strict --work-dir <temporary-work-directory>/mermaid`.
+7. Render exactly one document with `python scripts/render_markdown.py structure.dsl.json --output-dir <output-dir>`.
+8. Run `python scripts/validate_mermaid.py --from-markdown <output-file> --static`.
+9. Review with references/review-checklist.md.
+10. Report output path, temporary work directory, assumptions, low-confidence items, and static-only Mermaid acceptance.
 
-Strict Mermaid validation is the default. Static-only Mermaid validation is allowed only when strict tooling is unavailable and the user explicitly accepts that limitation for the current run.
+Strict Mermaid validation is the default. If local Mermaid CLI tooling unavailable, stop and ask user before static-only validation. A final report that relies on static-only validation must say Mermaid diagrams were not proven renderable by Mermaid CLI, tooling unavailable, and user explicitly accepts static-only validation.
 
 ## Output And Temporary Files
 

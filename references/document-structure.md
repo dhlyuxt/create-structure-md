@@ -2,7 +2,7 @@
 
 ## Fixed 9-Chapter Markdown Outline
 
-The rendered document uses exactly nine fixed Chinese chapters. Optional content may render an empty-state sentence, but fixed section numbering must not shift.
+The rendered document uses exactly nine fixed Chinese chapters. This is the fixed 9-chapter outline. Optional content may render an empty-state sentence, but fixed section numbering must not shift.
 
 1. 文档信息
 2. 系统概览
@@ -39,6 +39,30 @@ The rendered document uses exactly nine fixed Chinese chapters. Optional content
    - 8.2 关键流程清单
    - 8.x 流程详情
 9. 结构问题与改进建议
+
+## Fixed Subchapter Numbering
+
+Fixed subchapter numbering is part of the rendered contract. Chapters 1, 2, and 9 render as fixed top-level chapters. Chapters 3, 5, 6, and 7 keep their listed subchapters even when optional content is absent. Chapter 4 repeats the `4.x` module block for each module without renumbering inner module sections. Chapter 8 uses fixed 8.1 and 8.2 sections, then one `8.x` detail block per key flow.
+
+## Chapter-By-Chapter Rendering Positions
+
+Chapter 1 renders document metadata from `document`. Chapter 2 renders prepared system overview content. Chapter 3 renders architecture overview, module list, module relationship Mermaid, and supplemental architecture diagrams. Chapter 4 renders each module's overview, responsibilities, external capabilities, interface requirements, internal Mermaid diagram, and supplemental notes. Chapter 5 renders runtime overview, runtime units, runtime flow Mermaid, runtime sequence Mermaid, and supplemental runtime diagrams. Chapter 6 renders configuration items, structural data/artifacts, dependencies, and supplemental diagrams. Chapter 7 renders collaboration overview, collaboration rows, collaboration Mermaid, and supplemental diagrams. Chapter 8 renders flow overview, flow list, and per-flow details. Chapter 9 renders risks, assumptions, low-confidence summaries, and improvement suggestions.
+
+## Fixed Table Visible Columns
+
+Fixed table visible columns are section-specific content columns only. IDs, confidence, evidence refs, traceability refs, source snippet refs, risk refs, and assumption refs are hidden from normal tables. They may appear only in chapter 9 review summaries when the purpose is review traceability.
+
+## Empty-State Sentences
+
+Empty-state sentences are deterministic and section-specific. A section that is `empty_allowed` renders its documented empty-state sentence instead of disappearing. Chapter 6 empty configuration, data/artifact, and dependency tables use their fixed empty wording. Single-module chapter 7 documents keep 7.1 through 7.4 and render the fixed collaboration absence text plus no-diagram text.
+
+## Table-Row Support-Data Placement
+
+Table-row support-data placement happens immediately after the relevant table. Fixed table rows keep fixed visible columns; evidence, traceability, source snippets, confidence, risks, and assumptions never become table cells. Extra table row evidence renders after the extra table using the first non-empty displayed row value as the support label.
+
+## Chapter 9 Rendering Behavior
+
+Chapter 9 rendering behavior is review-oriented. Risks render under `风险`, assumptions render under `假设`, and low-confidence summaries render only for design content that belongs in the whitelist. Evidence, traceability, source snippets, risks, assumptions, and Mermaid diagram nodes are excluded from the low-confidence summary whitelist.
 
 ## Output Filename Policy
 
