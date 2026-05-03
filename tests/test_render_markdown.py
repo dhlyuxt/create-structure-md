@@ -811,6 +811,20 @@ class ChapterOneToFourRenderingTests(unittest.TestCase):
         markdown = module.render_markdown(document)
         assert_in_order(self, markdown, ["### 4.1 技能文档生成模块", "### 4.2 第二模块"])
 
+    def test_chapter_4_module_heading_label_neutralizes_markdown_injection(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["module_design"]["modules"][0]["name"] = "安全模块\n## 注入标题\n```html\n<div>raw</div>\n```"
+
+        markdown = module.render_markdown(document)
+        section = section_between(markdown, "## 4. 模块设计", "#### 4.1.1 模块概述")
+
+        self.assertIn("### 4.1 安全模块", section)
+        self.assertNotIn("\n## 注入标题", section)
+        self.assertNotIn("```", section)
+        self.assertNotIn("```html", section)
+        self.assertNotIn("<div>raw</div>", section)
+
     def test_chapter_4_provided_capabilities_table_uses_fixed_visible_columns_only(self):
         module = load_renderer_module()
         markdown = module.render_markdown(valid_document())

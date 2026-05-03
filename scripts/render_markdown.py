@@ -108,12 +108,12 @@ def render_extra_table(table):
     columns = table.get("columns", [])
     rows = table.get("rows", [])
     declared_columns = [(column.get("key", ""), column.get("title", "")) for column in columns]
-    title = escape_plain_text(table.get("title", ""))
+    title = escape_heading_label(table.get("title", ""))
     return f"#### {title}\n\n{render_fixed_table(rows, declared_columns)}"
 
 
 def render_extra_diagram(diagram):
-    title = escape_plain_text(diagram.get("title", ""))
+    title = escape_heading_label(diagram.get("title", ""))
     untitled_diagram = dict(diagram)
     untitled_diagram["title"] = ""
     return f"#### {title}\n\n{render_mermaid_block(untitled_diagram)}"
@@ -200,6 +200,11 @@ def subchapter_heading(chapter_number, section_number, title):
 
 def nested_heading(chapter_number, section_number, nested_number, title):
     return f"#### {chapter_number}.{section_number}.{nested_number} {title}"
+
+
+def escape_heading_label(value):
+    escaped = escape_plain_text(value)
+    return re.sub(r"\s+", " ", escaped).strip()
 
 
 def render_paragraph(value, empty_text=""):
@@ -343,7 +348,7 @@ def render_module_design_section(module, index):
     details = module.get("external_capability_details", {})
     provided = details.get("provided_capabilities", {})
     parts = [
-        subchapter_heading(4, index, module.get("name", "")),
+        subchapter_heading(4, index, escape_heading_label(module.get("name", ""))),
         nested_heading(4, index, 1, "模块概述"),
         render_paragraph(module.get("summary", "")),
         nested_heading(4, index, 2, "模块职责"),
