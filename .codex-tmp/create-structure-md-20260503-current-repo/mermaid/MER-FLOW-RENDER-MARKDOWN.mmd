@@ -1,0 +1,9 @@
+flowchart TD
+  A["Load DSL"] --> B["Validate output filename"]
+  B --> C["Resolve output path"]
+  C --> D["Build support context"]
+  D --> E["Render 9 chapters"]
+  E --> F["Apply write policy"]
+  F --> G["Markdown rendered"]
+  B -->|invalid| X["Input error"]
+  F -->|exists without policy| Y["Write error"]

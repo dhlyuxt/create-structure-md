@@ -1,0 +1,12 @@
+{
+  "headless": true,
+  "executablePath": "/home/hyx/.cache/puppeteer/chrome-headless-shell/linux-147.0.7727.57/chrome-headless-shell-linux64/chrome-headless-shell",
+  "args": [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-crash-reporter",
+    "--disable-breakpad",
+    "--disable-features=Crashpad"
+  ]
+}

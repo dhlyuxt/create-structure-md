@@ -1,0 +1,7 @@
+flowchart TD
+  A["Run unittest discover"] --> B["Load test modules"]
+  B --> C["Load examples and fixtures"]
+  C --> D["Exercise scripts"]
+  D --> E["Assert contracts"]
+  E --> F["Report result"]
+  E -->|failure| X["Locate regression"]

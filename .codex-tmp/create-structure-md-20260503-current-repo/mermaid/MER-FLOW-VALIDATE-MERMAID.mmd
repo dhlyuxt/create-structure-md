@@ -1,0 +1,10 @@
+flowchart TD
+  A["Select source"] --> B["Extract diagrams"]
+  B --> C["Static validation"]
+  C --> D{"Strict mode"}
+  D -->|yes| E["Check node and mmdc"]
+  E --> F["Write mmd files"]
+  F --> G["Run mmdc"]
+  D -->|no| H["Static result"]
+  C -->|error| X["Report static errors"]
+  E -->|missing tool| Y["Report tooling unavailable"]

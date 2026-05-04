@@ -1,0 +1,9 @@
+flowchart TD
+  A["Parse args"] --> B["Load JSON"]
+  B --> C["Schema validation"]
+  C --> D["Build ValidationContext"]
+  D --> E["Check references"]
+  E --> F["Check chapters and safety"]
+  F --> G["Print result"]
+  C -->|schema error| X["Return shape error"]
+  F -->|semantic error| Y["Return validation report"]

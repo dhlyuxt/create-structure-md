@@ -1,0 +1,9 @@
+flowchart TD
+  A["Prepare DSL"] --> B["Validate DSL"]
+  B --> C["Strict validate Mermaid"]
+  C --> D["Render Markdown"]
+  D --> E["Static validate rendered Markdown"]
+  E --> F["Review checklist"]
+  B -->|fail| X["Revise DSL"]
+  C -->|fail| Y["Revise Mermaid"]
+  D -->|output exists| Z["Choose write policy"]

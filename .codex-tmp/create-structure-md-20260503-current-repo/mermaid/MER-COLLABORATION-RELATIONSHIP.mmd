@@ -1,0 +1,16 @@
+flowchart TD
+  CONTRACT["技能契约"] --> SCHEMA["DSL Schema"]
+  CONTRACT --> DSLVAL["DSL 校验器"]
+  SCHEMA --> DSLVAL
+  DSLVAL --> MERVAL["Mermaid 校验器"]
+  MERVAL --> RENDER["Markdown 渲染器"]
+  INSTALL["安装器"] --> CONTRACT
+  INSTALL --> SCHEMA
+  INSTALL --> DSLVAL
+  INSTALL --> MERVAL
+  INSTALL --> RENDER
+  TESTS["示例与测试"] --> SCHEMA
+  TESTS --> DSLVAL
+  TESTS --> MERVAL
+  TESTS --> RENDER
+  TESTS --> INSTALL

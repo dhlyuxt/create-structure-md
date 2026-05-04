@@ -1,0 +1,6 @@
+flowchart TD
+  ARGS["source selector"] --> EXTRACT["extract diagrams"]
+  EXTRACT --> STATIC["static validation"]
+  STATIC --> ENV["check node and mmdc"]
+  ENV --> MMDC["run mmdc"]
+  MMDC --> RESULT["report result"]

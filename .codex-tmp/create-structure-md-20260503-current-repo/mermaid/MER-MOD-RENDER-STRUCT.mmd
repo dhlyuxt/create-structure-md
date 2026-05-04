@@ -1,0 +1,6 @@
+flowchart TD
+  LOAD["load DSL"] --> FILENAME["validate output filename"]
+  FILENAME --> SUPPORT["build support context"]
+  SUPPORT --> CHAPTERS["render 9 chapters"]
+  CHAPTERS --> ESCAPE["escape Markdown content"]
+  ESCAPE --> WRITE["write output file"]

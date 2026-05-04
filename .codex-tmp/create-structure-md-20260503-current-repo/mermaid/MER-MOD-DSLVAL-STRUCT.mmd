@@ -1,0 +1,7 @@
+flowchart TD
+  CLI["CLI parser"] --> LOAD["load JSON"]
+  LOAD --> SCHEMA["schema_errors"]
+  SCHEMA --> CTX["ValidationContext"]
+  CTX --> CHAPTER["chapter checks"]
+  CHAPTER --> SUPPORT["support and safety checks"]
+  SUPPORT --> REPORT["report result"]

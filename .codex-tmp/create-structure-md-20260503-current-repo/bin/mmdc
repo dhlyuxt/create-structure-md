@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+exec /home/hyx/.local/bin/mmdc -p /home/hyx/create-structure-md/.codex-tmp/create-structure-md-20260503-current-repo/puppeteer-config.json "$@"

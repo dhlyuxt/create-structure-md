@@ -1,0 +1,8 @@
+flowchart TD
+  EXAMPLES["examples DSL"] --> VALIDATOR["validator tests"]
+  FIXTURE["tests fixtures"] --> VALIDATOR
+  FIXTURE --> RENDER["renderer tests"]
+  TESTS["test modules"] --> DSLVAL["DSL validator"]
+  TESTS --> MERVAL["Mermaid validator"]
+  TESTS --> INSTALL["installer"]
+  TESTS --> E2E["end to end workflow"]

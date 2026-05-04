@@ -1,0 +1,7 @@
+flowchart TD
+  ROOT["Root object"] --> DOC["document"]
+  ROOT --> CHAPTERS["chapter definitions"]
+  ROOT --> SUPPORT["support data definitions"]
+  ROOT --> COMMON["common definitions"]
+  COMMON --> FILENAME["safeMarkdownFilename"]
+  COMMON --> DIAGRAM["diagram"]

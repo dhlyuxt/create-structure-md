@@ -1,0 +1,6 @@
+flowchart TD
+  PREP["Codex prepares DSL"] --> DSLVAL["RUN-VALIDATE-DSL"]
+  DSLVAL --> MERVAL["RUN-VALIDATE-MERMAID strict"]
+  MERVAL --> RENDER["RUN-RENDER-MARKDOWN"]
+  RENDER --> POST["RUN-VALIDATE-MERMAID static from Markdown"]
+  POST --> REVIEW["review checklist"]

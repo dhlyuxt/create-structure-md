@@ -1,0 +1,11 @@
+flowchart TD
+  A["Parse install args"] --> B["Resolve target"]
+  B --> C["Validate source"]
+  C --> D["Print plan and dependencies"]
+  D --> E{"Dry run"}
+  E -->|yes| F["Exit without copy"]
+  E -->|no| G{"Target exists"}
+  G -->|yes| X["Fail with cleanup command"]
+  G -->|no| H["Copy runtime entries"]
+  H --> I["Validate installed target"]
+  I --> J["Report installed path"]

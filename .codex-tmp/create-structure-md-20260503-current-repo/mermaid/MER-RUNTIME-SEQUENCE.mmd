@@ -1,0 +1,13 @@
+sequenceDiagram
+  participant C as Codex
+  participant D as DSL Validator
+  participant M as Mermaid Validator
+  participant R as Markdown Renderer
+  C->>D: validate structure.dsl.json
+  D-->>C: validation result
+  C->>M: strict validate DSL diagrams
+  M-->>C: Mermaid result
+  C->>R: render Markdown
+  R-->>C: output Markdown path
+  C->>M: static validate rendered Markdown
+  M-->>C: static result

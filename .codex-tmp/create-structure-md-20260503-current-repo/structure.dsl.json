@@ -1,0 +1,1950 @@
+{
+  "dsl_version": "0.1.0",
+  "document": {
+    "title": "软件结构设计说明书",
+    "project_name": "create-structure-md",
+    "project_version": "",
+    "document_version": "0.1.0",
+    "status": "draft",
+    "generated_at": "",
+    "generated_by": "Codex",
+    "language": "zh-CN",
+    "source_type": "code",
+    "scope_summary": "当前仓库 create-structure-md 的技能契约、DSL schema、校验脚本、Markdown 渲染器、安装器、示例与测试结构说明。",
+    "not_applicable_policy": "固定 9 章输出；仓库未涉及服务端、数据库或常驻进程时，以空表或文字说明表达不适用内容。",
+    "output_file": "create-structure-md_STRUCTURE_DESIGN.md"
+  },
+  "system_overview": {
+    "summary": "create-structure-md 是一个本地 Codex 技能仓库，用于把已经准备好的结构设计 DSL JSON 校验并渲染为单个模块或系统专属 Markdown 结构设计说明书。",
+    "purpose": "通过明确的技能边界、JSON Schema、语义校验、Mermaid 校验和确定性 Markdown 渲染，保证结构设计文档生成过程可重复、可审查、可验证。",
+    "core_capabilities": [
+      {
+        "capability_id": "CAP-SYS-DOC-GENERATION",
+        "name": "结构设计文档生成",
+        "description": "把完整 DSL JSON 渲染为固定 9 章的 Markdown 文档，并由输出文件名策略保证文档面向具体模块或系统。",
+        "confidence": "observed",
+        "evidence_refs": ["EV-SKILL-CONTRACT", "EV-RENDERER"],
+        "traceability_refs": [],
+        "source_snippet_refs": []
+      },
+      {
+        "capability_id": "CAP-SYS-DSL-QUALITY",
+        "name": "DSL 结构与语义质量门禁",
+        "description": "结合 Draft 2020-12 JSON Schema 和语义规则检查必填章节、ID 前缀、引用一致性、输出文件名、安全文本和低置信度项。",
+        "confidence": "observed",
+        "evidence_refs": ["EV-SCHEMA", "EV-DSL-VALIDATOR"],
+        "traceability_refs": [],
+        "source_snippet_refs": []
+      },
+      {
+        "capability_id": "CAP-SYS-MERMAID-QUALITY",
+        "name": "Mermaid 图校验",
+        "description": "从 DSL 或已渲染 Markdown 中提取 Mermaid 图，执行静态规则检查，并在严格模式下调用本地 Mermaid CLI 验证可渲染性。",
+        "confidence": "observed",
+        "evidence_refs": ["EV-MERMAID-VALIDATOR"],
+        "traceability_refs": [],
+        "source_snippet_refs": []
+      },
+      {
+        "capability_id": "CAP-SYS-INSTALLATION",
+        "name": "本地技能安装",
+        "description": "提供 copy-only 安装器，将运行时所需文件复制到 Codex skills 目录，并避免覆盖已有安装。",
+        "confidence": "observed",
+        "evidence_refs": ["EV-INSTALLER", "EV-INSTALL-DOC"],
+        "traceability_refs": [],
+        "source_snippet_refs": []
+      },
+      {
+        "capability_id": "CAP-SYS-CONTRACT-TESTS",
+        "name": "契约测试与示例",
+        "description": "通过 unittest 测试和最小 DSL 示例覆盖 schema、语义校验、Mermaid 校验、渲染、安装和端到端工作流。",
+        "confidence": "observed",
+        "evidence_refs": ["EV-TESTS", "EV-EXAMPLES"],
+        "traceability_refs": [],
+        "source_snippet_refs": []
+      }
+    ],
+    "notes": []
+  },
+  "architecture_views": {
+    "summary": "仓库按技能运行时能力拆分为契约文档、DSL schema、DSL 校验、Mermaid 校验、Markdown 渲染、安装和质量保障模块。技能契约规定边界与流程，schema 与校验器负责输入质量，渲染器生成最终 Markdown，安装器发布运行时文件，示例与测试保护这些契约。",
+    "notes": [],
+    "module_intro": {
+      "rows": [
+        {
+          "module_id": "MOD-SKILL-CONTRACT",
+          "module_name": "技能契约与参考文档模块",
+          "responsibility": "定义技能用途、边界、输入就绪条件、固定文档结构、Mermaid 规则和最终复核清单。",
+          "inputs": "用户已准备的结构设计内容、仓库理解结果、参考文档规则",
+          "outputs": "Codex 执行技能时遵循的工作流和文档契约",
+          "notes": "主要由 SKILL.md 与 references 目录承载。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-SKILL-CONTRACT", "EV-DSL-SPEC"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "module_id": "MOD-DSL-SCHEMA",
+          "module_name": "DSL Schema 模块",
+          "responsibility": "用 JSON Schema 描述结构设计 DSL 的固定章节、字段形状、枚举、文件名和支持数据结构。",
+          "inputs": "结构设计 DSL 字段契约",
+          "outputs": "schemas/structure-design.schema.json",
+          "notes": "Schema 负责结构形状，语义规则由校验脚本补充。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-SCHEMA"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "module_id": "MOD-DSL-VALIDATOR",
+          "module_name": "DSL 校验器模块",
+          "responsibility": "读取 DSL JSON，先执行 schema 校验，再执行 ID、引用、章节、输出文件名、Markdown 安全和支持数据语义校验。",
+          "inputs": "structure.dsl.json、schemas/structure-design.schema.json",
+          "outputs": "校验成功消息、错误或警告报告",
+          "notes": "入口为 scripts/validate_dsl.py。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-DSL-VALIDATOR"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "module_id": "MOD-MERMAID-VALIDATOR",
+          "module_name": "Mermaid 校验器模块",
+          "responsibility": "从 DSL 或 Markdown 中提取 Mermaid 图，拒绝不支持的图类型和 DOT 语法，并在严格模式下调用 mmdc。",
+          "inputs": "DSL JSON 或渲染后的 Markdown、Mermaid CLI 环境",
+          "outputs": "Mermaid 静态或严格校验报告、严格模式临时 mmd/svg 产物",
+          "notes": "入口为 scripts/validate_mermaid.py。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-MERMAID-VALIDATOR", "EV-MERMAID-RULES"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "module_id": "MOD-MARKDOWN-RENDERER",
+          "module_name": "Markdown 渲染器模块",
+          "responsibility": "把通过校验的 DSL 渲染为固定 9 章 Markdown，处理表格、Mermaid 代码块、支持数据、转义和输出文件写入策略。",
+          "inputs": "通过校验的结构设计 DSL JSON、输出目录参数",
+          "outputs": "document.output_file 指定的单个 Markdown 文件",
+          "notes": "入口为 scripts/render_markdown.py。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-RENDERER"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "module_id": "MOD-INSTALLER",
+          "module_name": "安装器模块",
+          "responsibility": "把运行时技能文件复制到 Codex skills 目录，执行安装前后结构检查和依赖状态报告。",
+          "inputs": "仓库运行时文件、--codex-home 参数或 CODEX_HOME 环境变量",
+          "outputs": "本地 Codex 技能目录中的 create-structure-md 安装副本",
+          "notes": "安装器不覆盖已有目标，也不安装依赖。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-INSTALLER", "EV-INSTALL-DOC"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "module_id": "MOD-EXAMPLES-TESTS",
+          "module_name": "示例与测试模块",
+          "responsibility": "提供最小 DSL 示例、fixture 和 unittest 契约测试，覆盖校验器、渲染器、Mermaid 校验、安装器和端到端流程。",
+          "inputs": "examples 目录 DSL、tests 目录测试用例、脚本入口",
+          "outputs": "测试结果、回归保护和可参考 DSL 样例",
+          "notes": "测试使用 Python 标准库 unittest。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-TESTS", "EV-EXAMPLES"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        }
+      ]
+    },
+    "module_relationship_diagram": {
+      "id": "MER-ARCH-MODULES",
+      "kind": "module_relationship",
+      "title": "模块关系图",
+      "diagram_type": "flowchart",
+      "description": "展示 create-structure-md 仓库的主要模块依赖和数据流。",
+      "source": "flowchart TD\n  CONTRACT[\"MOD-SKILL-CONTRACT 技能契约\"]\n  SCHEMA[\"MOD-DSL-SCHEMA DSL Schema\"]\n  DSLVAL[\"MOD-DSL-VALIDATOR DSL 校验器\"]\n  MERVAL[\"MOD-MERMAID-VALIDATOR Mermaid 校验器\"]\n  RENDER[\"MOD-MARKDOWN-RENDERER Markdown 渲染器\"]\n  INSTALL[\"MOD-INSTALLER 安装器\"]\n  TESTS[\"MOD-EXAMPLES-TESTS 示例与测试\"]\n  CONTRACT --> SCHEMA\n  CONTRACT --> DSLVAL\n  CONTRACT --> MERVAL\n  CONTRACT --> RENDER\n  SCHEMA --> DSLVAL\n  DSLVAL --> MERVAL\n  DSLVAL --> RENDER\n  MERVAL --> RENDER\n  INSTALL --> CONTRACT\n  TESTS --> SCHEMA\n  TESTS --> DSLVAL\n  TESTS --> MERVAL\n  TESTS --> RENDER\n  TESTS --> INSTALL",
+      "confidence": "observed"
+    },
+    "extra_tables": [],
+    "extra_diagrams": []
+  },
+  "module_design": {
+    "summary": "各模块围绕单一职责组织：契约模块定义规则，schema 模块描述 DSL 结构，校验模块检查 DSL 与 Mermaid，渲染模块输出 Markdown，安装模块发布运行时文件，测试模块维护回归保护。",
+    "notes": [],
+    "modules": [
+      {
+        "module_id": "MOD-SKILL-CONTRACT",
+        "name": "技能契约与参考文档模块",
+        "summary": "该模块是技能的行为入口和规则来源，明确 create-structure-md 只负责把已准备好的结构设计内容渲染成单个 Markdown 文档。",
+        "responsibilities": [
+          "定义技能边界和输入就绪条件",
+          "规定固定 9 章 Markdown 输出结构",
+          "规定 Mermaid-only 图表边界和严格校验优先级",
+          "提供最终报告与复核清单"
+        ],
+        "external_capability_summary": {
+          "description": "为 Codex 执行结构设计文档生成任务提供操作契约和复核标准。",
+          "consumers": ["Codex", "仓库维护者"],
+          "interface_style": "Markdown 技能说明和 references 目录参考文档",
+          "boundary_notes": [
+            "不分析仓库或推理需求",
+            "不生成 Word、PDF 或图片",
+            "不自动删除临时产物"
+          ]
+        },
+        "external_capability_details": {
+          "provided_capabilities": {
+            "rows": [
+              {
+                "capability_id": "CAP-CONTRACT-WORKFLOW",
+                "capability_name": "技能工作流约束",
+                "interface_style": "SKILL.md 工作流步骤",
+                "description": "规定创建临时目录、读取参考、写 DSL、校验 DSL、严格校验 Mermaid、渲染 Markdown 和复核报告的顺序。",
+                "inputs": "用户请求和已准备好的结构设计内容",
+                "outputs": "Codex 可执行的固定流程",
+                "notes": "严格 Mermaid 校验不可用时必须先获得用户接受 static-only。",
+                "confidence": "observed",
+                "evidence_refs": ["EV-SKILL-CONTRACT"],
+                "traceability_refs": [],
+                "source_snippet_refs": []
+              },
+              {
+                "capability_id": "CAP-CONTRACT-REFERENCES",
+                "capability_name": "参考文档契约",
+                "interface_style": "references/*.md",
+                "description": "用 dsl-spec、document-structure、mermaid-rules 和 review-checklist 分别说明 DSL、章节、图表和复核要求。",
+                "inputs": "技能维护者编写的规则文档",
+                "outputs": "生成 DSL 和复核 Markdown 的依据",
+                "notes": "",
+                "confidence": "observed",
+                "evidence_refs": ["EV-DSL-SPEC", "EV-DOCUMENT-STRUCTURE", "EV-MERMAID-RULES"],
+                "traceability_refs": [],
+                "source_snippet_refs": []
+              }
+            ]
+          },
+          "extra_tables": [],
+          "extra_diagrams": []
+        },
+        "internal_structure": {
+          "summary": "技能契约由 SKILL.md 和 references 目录组成，SKILL.md 给出触发边界和流程，references 拆分为 DSL 规范、文档结构、Mermaid 规则与复核清单。",
+          "diagram": {
+            "id": "MER-MOD-CONTRACT-STRUCT",
+            "kind": "internal_structure",
+            "title": "技能契约内部结构",
+            "diagram_type": "flowchart",
+            "description": "展示技能契约模块内部文件关系。",
+            "source": "flowchart TD\n  SKILL[\"SKILL.md\"] --> DSLREF[\"references dsl spec\"]\n  SKILL --> DOCREF[\"references document structure\"]\n  SKILL --> MERREF[\"references mermaid rules\"]\n  SKILL --> REVIEW[\"references review checklist\"]",
+            "confidence": "observed"
+          },
+          "textual_structure": "",
+          "not_applicable_reason": ""
+        },
+        "extra_tables": [],
+        "extra_diagrams": [],
+        "evidence_refs": ["EV-SKILL-CONTRACT", "EV-DSL-SPEC", "EV-DOCUMENT-STRUCTURE", "EV-MERMAID-RULES"],
+        "traceability_refs": [],
+        "source_snippet_refs": [],
+        "notes": [],
+        "confidence": "observed"
+      },
+      {
+        "module_id": "MOD-DSL-SCHEMA",
+        "name": "DSL Schema 模块",
+        "summary": "该模块用 JSON Schema 固化 DSL 的顶层章节、重复表格、图表对象、支持数据和安全文件名形状。",
+        "responsibilities": [
+          "声明 DSL 顶层字段和固定章节结构",
+          "定义模块、运行单元、配置、依赖、协作和关键流程对象形状",
+          "定义 evidence、traceability、risk、assumption 和 source_snippet 支持数据形状",
+          "限制 diagram_type、confidence、source_type 等枚举值"
+        ],
+        "external_capability_summary": {
+          "description": "为 DSL 校验器提供结构层面的权威 schema。",
+          "consumers": ["DSL 校验器模块", "测试模块", "维护者"],
+          "interface_style": "Draft 2020-12 JSON Schema 文件",
+          "boundary_notes": [
+            "结构规则在 schema 内表达",
+            "跨字段语义仍由 validate_dsl.py 负责"
+          ]
+        },
+        "external_capability_details": {
+          "provided_capabilities": {
+            "rows": [
+              {
+                "capability_id": "CAP-SCHEMA-ROOT",
+                "capability_name": "DSL 根结构定义",
+                "interface_style": "JSON Schema required 和 properties",
+                "description": "要求 DSL 包含 document、system_overview、architecture_views、module_design、runtime_view、configuration_data_dependencies、cross_module_collaboration、key_flows 和支持数据数组。",
+                "inputs": "结构设计 DSL JSON",
+                "outputs": "根对象结构验证结果",
+                "notes": "",
+                "confidence": "observed",
+                "evidence_refs": ["EV-SCHEMA"],
+                "traceability_refs": [],
+                "source_snippet_refs": []
+              },
+              {
+                "capability_id": "CAP-SCHEMA-SUPPORT",
+                "capability_name": "支持数据结构定义",
+                "interface_style": "JSON Schema definitions",
+                "description": "定义证据、追踪、风险、假设和源码片段的字段形状，供渲染器和校验器引用。",
+                "inputs": "support arrays",
+                "outputs": "可被引用和渲染的支持数据对象",
+                "notes": "",
+                "confidence": "observed",
+                "evidence_refs": ["EV-SCHEMA"],
+                "traceability_refs": [],
+                "source_snippet_refs": []
+              }
+            ]
+          },
+          "extra_tables": [],
+          "extra_diagrams": []
+        },
+        "internal_structure": {
+          "summary": "Schema 以顶层章节 definition、共享 definition 和安全文件名规则组成，供 jsonschema Draft202012Validator 加载。",
+          "diagram": {
+            "id": "MER-MOD-SCHEMA-STRUCT",
+            "kind": "internal_structure",
+            "title": "DSL Schema 内部结构",
+            "diagram_type": "flowchart",
+            "description": "展示 schema 的主要定义分组。",
+            "source": "flowchart TD\n  ROOT[\"Root object\"] --> DOC[\"document\"]\n  ROOT --> CHAPTERS[\"chapter definitions\"]\n  ROOT --> SUPPORT[\"support data definitions\"]\n  ROOT --> COMMON[\"common definitions\"]\n  COMMON --> FILENAME[\"safeMarkdownFilename\"]\n  COMMON --> DIAGRAM[\"diagram\"]",
+            "confidence": "observed"
+          },
+          "textual_structure": "",
+          "not_applicable_reason": ""
+        },
+        "extra_tables": [],
+        "extra_diagrams": [],
+        "evidence_refs": ["EV-SCHEMA"],
+        "traceability_refs": [],
+        "source_snippet_refs": [],
+        "notes": [],
+        "confidence": "observed"
+      },
+      {
+        "module_id": "MOD-DSL-VALIDATOR",
+        "name": "DSL 校验器模块",
+        "summary": "该模块是 DSL 的质量门禁，先用 schema 检查结构，再用语义检查确保章节内容、ID、引用、支持数据和 Markdown 安全符合契约。",
+        "responsibilities": [
+          "加载 DSL JSON 和 schema",
+          "执行 JSON Schema 校验",
+          "注册并检查各类 ID 和引用",
+          "执行章节级必填内容检查",
+          "检查输出文件名、源码片段安全和低置信度项"
+        ],
+        "external_capability_summary": {
+          "description": "为 DSL 文件提供命令行校验入口，阻止不完整或不安全的结构设计内容进入渲染阶段。",
+          "consumers": ["Codex", "Markdown 渲染器前置流程", "测试模块"],
+          "interface_style": "CLI 脚本",
+          "boundary_notes": [
+            "不渲染 Markdown",
+            "不解析 Mermaid 可渲染性",
+            "不推理仓库含义"
+          ]
+        },
+        "external_capability_details": {
+          "provided_capabilities": {
+            "rows": [
+              {
+                "capability_id": "CAP-DSLVAL-SCHEMA",
+                "capability_name": "Schema 校验",
+                "interface_style": "python scripts/validate_dsl.py structure.dsl.json",
+                "description": "通过 jsonschema Draft202012Validator 校验 DSL 结构。",
+                "inputs": "DSL JSON 文件",
+                "outputs": "schema validation failed 或进入语义校验",
+                "notes": "",
+                "confidence": "observed",
+                "evidence_refs": ["EV-DSL-VALIDATOR", "EV-SCHEMA"],
+                "traceability_refs": [],
+                "source_snippet_refs": []
+              },
+              {
+                "capability_id": "CAP-DSLVAL-SEMANTICS",
+                "capability_name": "语义校验",
+                "interface_style": "内部 ValidationContext 和章节检查函数",
+                "description": "检查 ID 前缀、重复 ID、引用解析、章节规则、文件名具体性、支持数据引用和低置信度项。",
+                "inputs": "schema 通过后的 DSL 对象",
+                "outputs": "错误、警告或 Validation succeeded",
+                "notes": "",
+                "confidence": "observed",
+                "evidence_refs": ["EV-DSL-VALIDATOR"],
+                "traceability_refs": [],
+                "source_snippet_refs": []
+              }
+            ]
+          },
+          "extra_tables": [],
+          "extra_diagrams": []
+        },
+        "internal_structure": {
+          "summary": "校验器由 CLI 解析、JSON 加载、schema 校验、ValidationContext ID 注册与引用检查、章节规则、安全检查和最终报告组成。",
+          "diagram": {
+            "id": "MER-MOD-DSLVAL-STRUCT",
+            "kind": "internal_structure",
+            "title": "DSL 校验器内部结构",
+            "diagram_type": "flowchart",
+            "description": "展示 DSL 校验器的内部处理阶段。",
+            "source": "flowchart TD\n  CLI[\"CLI parser\"] --> LOAD[\"load JSON\"]\n  LOAD --> SCHEMA[\"schema_errors\"]\n  SCHEMA --> CTX[\"ValidationContext\"]\n  CTX --> CHAPTER[\"chapter checks\"]\n  CHAPTER --> SUPPORT[\"support and safety checks\"]\n  SUPPORT --> REPORT[\"report result\"]",
+            "confidence": "observed"
+          },
+          "textual_structure": "",
+          "not_applicable_reason": ""
+        },
+        "extra_tables": [],
+        "extra_diagrams": [],
+        "evidence_refs": ["EV-DSL-VALIDATOR"],
+        "traceability_refs": [],
+        "source_snippet_refs": [],
+        "notes": [],
+        "confidence": "observed"
+      },
+      {
+        "module_id": "MOD-MERMAID-VALIDATOR",
+        "name": "Mermaid 校验器模块",
+        "summary": "该模块独立校验 DSL 或 Markdown 中的 Mermaid 图，确保最终输出只包含支持的 Mermaid 图类型，并在严格模式下证明本地 CLI 可解析。",
+        "responsibilities": [
+          "从 DSL 图对象和 Markdown fenced code block 中提取 Mermaid 源",
+          "执行图类型、空内容、DOT 语法和 fence 规则检查",
+          "检查 node 和 mmdc 环境",
+          "严格模式下写入临时 mmd 文件并调用 mmdc 输出 svg"
+        ],
+        "external_capability_summary": {
+          "description": "为结构设计文档中的 Mermaid 图提供静态和严格两级校验入口。",
+          "consumers": ["Codex", "Markdown 渲染流程", "测试模块"],
+          "interface_style": "CLI 脚本",
+          "boundary_notes": [
+            "最终交付仍是 Markdown Mermaid 代码块",
+            "严格校验产物只是临时验证文件"
+          ]
+        },
+        "external_capability_details": {
+          "provided_capabilities": {
+            "rows": [
+              {
+                "capability_id": "CAP-MERVAL-STATIC",
+                "capability_name": "Mermaid 静态检查",
+                "interface_style": "python scripts/validate_mermaid.py --from-dsl 或 --from-markdown --static",
+                "description": "检查支持类型、图源非空、Markdown fence、DOT 语法拒绝和图源类型一致性。",
+                "inputs": "DSL JSON 或 Markdown 文件",
+                "outputs": "静态校验错误或成功状态",
+                "notes": "",
+                "confidence": "observed",
+                "evidence_refs": ["EV-MERMAID-VALIDATOR"],
+                "traceability_refs": [],
+                "source_snippet_refs": []
+              },
+              {
+                "capability_id": "CAP-MERVAL-STRICT",
+                "capability_name": "Mermaid 严格检查",
+                "interface_style": "python scripts/validate_mermaid.py --from-dsl structure.dsl.json --strict --work-dir 指定目录",
+                "description": "在静态检查通过后调用 mmdc，把每个 Mermaid 源写成临时文件并尝试渲染为 svg。",
+                "inputs": "Mermaid diagram source、node、mmdc、严格校验工作目录",
+                "outputs": "严格校验成功消息或 mmdc 错误",
+                "notes": "",
+                "confidence": "observed",
+                "evidence_refs": ["EV-MERMAID-VALIDATOR", "EV-MERMAID-RULES"],
+                "traceability_refs": [],
+                "source_snippet_refs": []
+              }
+            ]
+          },
+          "extra_tables": [],
+          "extra_diagrams": []
+        },
+        "internal_structure": {
+          "summary": "Mermaid 校验器由参数模式、图提取器、静态规则、环境检查和严格模式 mmdc 调用组成。",
+          "diagram": {
+            "id": "MER-MOD-MERVAL-STRUCT",
+            "kind": "internal_structure",
+            "title": "Mermaid 校验器内部结构",
+            "diagram_type": "flowchart",
+            "description": "展示 Mermaid 校验器的内部处理阶段。",
+            "source": "flowchart TD\n  ARGS[\"source selector\"] --> EXTRACT[\"extract diagrams\"]\n  EXTRACT --> STATIC[\"static validation\"]\n  STATIC --> ENV[\"check node and mmdc\"]\n  ENV --> MMDC[\"run mmdc\"]\n  MMDC --> RESULT[\"report result\"]",
+            "confidence": "observed"
+          },
+          "textual_structure": "",
+          "not_applicable_reason": ""
+        },
+        "extra_tables": [],
+        "extra_diagrams": [],
+        "evidence_refs": ["EV-MERMAID-VALIDATOR"],
+        "traceability_refs": [],
+        "source_snippet_refs": [],
+        "notes": [],
+        "confidence": "observed"
+      },
+      {
+        "module_id": "MOD-MARKDOWN-RENDERER",
+        "name": "Markdown 渲染器模块",
+        "summary": "该模块把 DSL 转为固定 9 章 Markdown，负责所有可见表格、章节编号、Mermaid code fence、支持数据位置、转义和文件写入策略。",
+        "responsibilities": [
+          "渲染文档信息、系统概览、架构、模块、运行时、配置依赖、协作、关键流程和第 9 章",
+          "把模块和运行单元 ID 转换为显示名称",
+          "把证据、追踪和源码片段渲染到相关节点附近",
+          "对表格、普通文本、标题和代码 fence 进行转义",
+          "执行输出文件名、默认不覆盖、overwrite 和 backup 写入策略"
+        ],
+        "external_capability_summary": {
+          "description": "为通过校验的 DSL 提供单 Markdown 文件输出能力。",
+          "consumers": ["Codex", "仓库维护者", "技能使用者"],
+          "interface_style": "CLI 脚本",
+          "boundary_notes": [
+            "不执行 DSL schema 校验",
+            "不直接调用 Mermaid CLI",
+            "默认不覆盖已有输出文件"
+          ]
+        },
+        "external_capability_details": {
+          "provided_capabilities": {
+            "rows": [
+              {
+                "capability_id": "CAP-RENDER-CHAPTERS",
+                "capability_name": "固定章节渲染",
+                "interface_style": "render_chapter_1 至 render_chapter_9",
+                "description": "按照固定 9 章结构渲染各章节和模块重复节。",
+                "inputs": "DSL document object",
+                "outputs": "Markdown 字符串",
+                "notes": "",
+                "confidence": "observed",
+                "evidence_refs": ["EV-RENDERER"],
+                "traceability_refs": [],
+                "source_snippet_refs": []
+              },
+              {
+                "capability_id": "CAP-RENDER-SAFE-WRITE",
+                "capability_name": "安全写入",
+                "interface_style": "python scripts/render_markdown.py structure.dsl.json --output-dir 指定目录",
+                "description": "校验输出文件名必须具体且安全，并在默认模式下拒绝覆盖已有文件。",
+                "inputs": "output_dir、document.output_file、overwrite 或 backup 参数",
+                "outputs": "Markdown 文件或写入错误",
+                "notes": "",
+                "confidence": "observed",
+                "evidence_refs": ["EV-RENDERER"],
+                "traceability_refs": [],
+                "source_snippet_refs": []
+              }
+            ]
+          },
+          "extra_tables": [],
+          "extra_diagrams": []
+        },
+        "internal_structure": {
+          "summary": "渲染器由 Markdown 转义基础函数、固定表格渲染、支持数据上下文、章节渲染函数、文件名校验和写入策略组成。",
+          "diagram": {
+            "id": "MER-MOD-RENDER-STRUCT",
+            "kind": "internal_structure",
+            "title": "Markdown 渲染器内部结构",
+            "diagram_type": "flowchart",
+            "description": "展示 Markdown 渲染器的内部处理阶段。",
+            "source": "flowchart TD\n  LOAD[\"load DSL\"] --> FILENAME[\"validate output filename\"]\n  FILENAME --> SUPPORT[\"build support context\"]\n  SUPPORT --> CHAPTERS[\"render 9 chapters\"]\n  CHAPTERS --> ESCAPE[\"escape Markdown content\"]\n  ESCAPE --> WRITE[\"write output file\"]",
+            "confidence": "observed"
+          },
+          "textual_structure": "",
+          "not_applicable_reason": ""
+        },
+        "extra_tables": [],
+        "extra_diagrams": [],
+        "evidence_refs": ["EV-RENDERER"],
+        "traceability_refs": [],
+        "source_snippet_refs": [],
+        "notes": [],
+        "confidence": "observed"
+      },
+      {
+        "module_id": "MOD-INSTALLER",
+        "name": "安装器模块",
+        "summary": "该模块提供保守的 copy-only 安装流程，复制运行时技能文件到 Codex skills 目录，同时报告 Python、jsonschema、node 和 mmdc 状态。",
+        "responsibilities": [
+          "解析 Codex home 和目标技能路径",
+          "验证源仓库运行时文件和引用文档存在",
+          "打印 dry-run 安装计划和依赖状态",
+          "复制运行时文件且拒绝覆盖已有目标",
+          "安装后再次验证目标目录结构"
+        ],
+        "external_capability_summary": {
+          "description": "为本地使用 create-structure-md 技能提供安装入口。",
+          "consumers": ["仓库维护者", "Codex 使用者"],
+          "interface_style": "CLI 脚本",
+          "boundary_notes": [
+            "不安装依赖",
+            "不提供 --force",
+            "不覆盖或删除已有安装"
+          ]
+        },
+        "external_capability_details": {
+          "provided_capabilities": {
+            "rows": [
+              {
+                "capability_id": "CAP-INSTALL-PLAN",
+                "capability_name": "安装计划与依赖报告",
+                "interface_style": "python scripts/install_skill.py --dry-run",
+                "description": "打印源路径、Codex home、目标路径、复制条目和依赖状态。",
+                "inputs": "可选 --codex-home 参数和当前环境",
+                "outputs": "dry-run 安装计划",
+                "notes": "",
+                "confidence": "observed",
+                "evidence_refs": ["EV-INSTALLER", "EV-INSTALL-DOC"],
+                "traceability_refs": [],
+                "source_snippet_refs": []
+              },
+              {
+                "capability_id": "CAP-INSTALL-COPY",
+                "capability_name": "运行时文件复制",
+                "interface_style": "python scripts/install_skill.py",
+                "description": "复制 SKILL.md、requirements.txt、references、schemas、scripts 和 examples 到目标技能目录。",
+                "inputs": "源仓库运行时文件和目标 Codex skills 路径",
+                "outputs": "安装后的 create-structure-md 技能目录",
+                "notes": "docs 和 tests 不属于安装复制范围。",
+                "confidence": "observed",
+                "evidence_refs": ["EV-INSTALLER", "EV-INSTALL-DOC"],
+                "traceability_refs": [],
+                "source_snippet_refs": []
+              }
+            ]
+          },
+          "extra_tables": [],
+          "extra_diagrams": []
+        },
+        "internal_structure": {
+          "summary": "安装器由源验证、Codex home 解析、依赖状态收集、安装计划打印、copytree/copy2 复制和安装后验证组成。",
+          "diagram": {
+            "id": "MER-MOD-INSTALL-STRUCT",
+            "kind": "internal_structure",
+            "title": "安装器内部结构",
+            "diagram_type": "flowchart",
+            "description": "展示安装器的内部处理阶段。",
+            "source": "flowchart TD\n  ARGS[\"parse args\"] --> SOURCE[\"validate source\"]\n  SOURCE --> HOME[\"resolve Codex home\"]\n  HOME --> PLAN[\"print plan and dependencies\"]\n  PLAN --> CHECK[\"target exists check\"]\n  CHECK --> COPY[\"copy runtime entries\"]\n  COPY --> VERIFY[\"validate installed target\"]",
+            "confidence": "observed"
+          },
+          "textual_structure": "",
+          "not_applicable_reason": ""
+        },
+        "extra_tables": [],
+        "extra_diagrams": [],
+        "evidence_refs": ["EV-INSTALLER", "EV-INSTALL-DOC"],
+        "traceability_refs": [],
+        "source_snippet_refs": [],
+        "notes": [],
+        "confidence": "observed"
+      },
+      {
+        "module_id": "MOD-EXAMPLES-TESTS",
+        "name": "示例与测试模块",
+        "summary": "该模块通过示例 DSL 和 unittest 测试保证技能契约可被真实脚本执行，覆盖各阶段的结构、语义、Mermaid、渲染、安装和端到端流程。",
+        "responsibilities": [
+          "提供 from-code 和 from-requirements 最小 DSL 示例",
+          "提供 valid-phase2 fixture 作为 schema 与渲染测试基础",
+          "测试 DSL schema 和语义校验行为",
+          "测试 Mermaid 静态和严格校验边界",
+          "测试 Markdown 渲染章节、转义和支持数据位置",
+          "测试安装器 copy-only 行为和端到端工作流"
+        ],
+        "external_capability_summary": {
+          "description": "为仓库维护提供可执行回归保护和示例输入。",
+          "consumers": ["仓库维护者", "Codex", "CI 或本地测试运行者"],
+          "interface_style": "examples/*.dsl.json 与 python -m unittest discover",
+          "boundary_notes": [
+            "测试不属于安装后的运行时复制范围",
+            "示例用于说明 DSL 形状而不是分析真实业务系统"
+          ]
+        },
+        "external_capability_details": {
+          "provided_capabilities": {
+            "rows": [
+              {
+                "capability_id": "CAP-TESTS-REGRESSION",
+                "capability_name": "回归测试",
+                "interface_style": "python -m unittest discover -s tests -v",
+                "description": "运行 unittest 测试集，覆盖校验、渲染、安装和端到端流程。",
+                "inputs": "tests 目录和仓库脚本",
+                "outputs": "测试通过或失败报告",
+                "notes": "",
+                "confidence": "observed",
+                "evidence_refs": ["EV-TESTS", "EV-INSTALL-DOC"],
+                "traceability_refs": [],
+                "source_snippet_refs": []
+              },
+              {
+                "capability_id": "CAP-EXAMPLES-MINIMAL",
+                "capability_name": "最小 DSL 示例",
+                "interface_style": "examples/*.dsl.json",
+                "description": "提供从代码来源和需求来源生成结构设计文档的最小 DSL 样例。",
+                "inputs": "示例结构设计内容",
+                "outputs": "可被校验器和渲染器处理的示例 DSL",
+                "notes": "",
+                "confidence": "observed",
+                "evidence_refs": ["EV-EXAMPLES"],
+                "traceability_refs": [],
+                "source_snippet_refs": []
+              }
+            ]
+          },
+          "extra_tables": [],
+          "extra_diagrams": []
+        },
+        "internal_structure": {
+          "summary": "示例与测试模块由 examples 目录、tests/fixtures 和多个 test_*.py 文件组成，分别覆盖 schema、语义、Mermaid、渲染、安装和端到端场景。",
+          "diagram": {
+            "id": "MER-MOD-TESTS-STRUCT",
+            "kind": "internal_structure",
+            "title": "示例与测试内部结构",
+            "diagram_type": "flowchart",
+            "description": "展示示例和测试的内部关系。",
+            "source": "flowchart TD\n  EXAMPLES[\"examples DSL\"] --> VALIDATOR[\"validator tests\"]\n  FIXTURE[\"tests fixtures\"] --> VALIDATOR\n  FIXTURE --> RENDER[\"renderer tests\"]\n  TESTS[\"test modules\"] --> DSLVAL[\"DSL validator\"]\n  TESTS --> MERVAL[\"Mermaid validator\"]\n  TESTS --> INSTALL[\"installer\"]\n  TESTS --> E2E[\"end to end workflow\"]",
+            "confidence": "observed"
+          },
+          "textual_structure": "",
+          "not_applicable_reason": ""
+        },
+        "extra_tables": [],
+        "extra_diagrams": [],
+        "evidence_refs": ["EV-TESTS", "EV-EXAMPLES"],
+        "traceability_refs": [],
+        "source_snippet_refs": [],
+        "notes": [],
+        "confidence": "observed"
+      }
+    ]
+  },
+  "runtime_view": {
+    "summary": "仓库没有常驻服务进程，运行时以命令行脚本和 unittest 命令为主。典型生成流程由 Codex 先准备 DSL，再依次调用 DSL 校验、Mermaid 严格校验、Markdown 渲染和渲染后 Mermaid 静态校验。",
+    "notes": [],
+    "runtime_units": {
+      "rows": [
+        {
+          "unit_id": "RUN-VALIDATE-DSL",
+          "unit_name": "DSL 校验命令",
+          "unit_type": "CLI script",
+          "entrypoint": "/home/hyx/miniconda3/envs/agent/bin/python scripts/validate_dsl.py",
+          "entrypoint_not_applicable_reason": "",
+          "responsibility": "对 structure.dsl.json 执行 schema 和语义校验。",
+          "related_module_ids": ["MOD-DSL-SCHEMA", "MOD-DSL-VALIDATOR"],
+          "external_environment_reason": "",
+          "notes": "依赖 jsonschema。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-DSL-VALIDATOR", "EV-SCHEMA"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "unit_id": "RUN-VALIDATE-MERMAID",
+          "unit_name": "Mermaid 校验命令",
+          "unit_type": "CLI script",
+          "entrypoint": "/home/hyx/miniconda3/envs/agent/bin/python scripts/validate_mermaid.py",
+          "entrypoint_not_applicable_reason": "",
+          "responsibility": "对 DSL 或 Markdown 中 Mermaid 图执行静态或严格校验。",
+          "related_module_ids": ["MOD-MERMAID-VALIDATOR"],
+          "external_environment_reason": "",
+          "notes": "严格模式依赖 node 和 mmdc。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-MERMAID-VALIDATOR"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "unit_id": "RUN-RENDER-MARKDOWN",
+          "unit_name": "Markdown 渲染命令",
+          "unit_type": "CLI script",
+          "entrypoint": "/home/hyx/miniconda3/envs/agent/bin/python scripts/render_markdown.py",
+          "entrypoint_not_applicable_reason": "",
+          "responsibility": "把 DSL 渲染到 document.output_file 指定的 Markdown 文件。",
+          "related_module_ids": ["MOD-MARKDOWN-RENDERER"],
+          "external_environment_reason": "",
+          "notes": "默认拒绝覆盖已有输出文件。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-RENDERER"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "unit_id": "RUN-INSTALL-SKILL",
+          "unit_name": "技能安装命令",
+          "unit_type": "CLI script",
+          "entrypoint": "/home/hyx/miniconda3/envs/agent/bin/python scripts/install_skill.py",
+          "entrypoint_not_applicable_reason": "",
+          "responsibility": "执行 copy-only 本地技能安装或 dry-run 计划检查。",
+          "related_module_ids": ["MOD-INSTALLER", "MOD-SKILL-CONTRACT"],
+          "external_environment_reason": "",
+          "notes": "目标已存在时失败并给出用户自行清理命令。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-INSTALLER", "EV-INSTALL-DOC"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "unit_id": "RUN-TEST-SUITE",
+          "unit_name": "unittest 测试命令",
+          "unit_type": "CLI command",
+          "entrypoint": "/home/hyx/miniconda3/envs/agent/bin/python -m unittest discover -s tests -v",
+          "entrypoint_not_applicable_reason": "",
+          "responsibility": "运行仓库回归测试，验证 schema、脚本和端到端契约。",
+          "related_module_ids": ["MOD-EXAMPLES-TESTS", "MOD-DSL-VALIDATOR", "MOD-MERMAID-VALIDATOR", "MOD-MARKDOWN-RENDERER", "MOD-INSTALLER"],
+          "external_environment_reason": "",
+          "notes": "使用 Python 标准库 unittest。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-TESTS", "EV-INSTALL-DOC"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        }
+      ]
+    },
+    "runtime_flow_diagram": {
+      "id": "MER-RUNTIME-FLOW",
+      "kind": "runtime_flow",
+      "title": "运行时流程图",
+      "diagram_type": "flowchart",
+      "description": "展示结构设计文档生成的主运行时流程。",
+      "source": "flowchart TD\n  PREP[\"Codex prepares DSL\"] --> DSLVAL[\"RUN-VALIDATE-DSL\"]\n  DSLVAL --> MERVAL[\"RUN-VALIDATE-MERMAID strict\"]\n  MERVAL --> RENDER[\"RUN-RENDER-MARKDOWN\"]\n  RENDER --> POST[\"RUN-VALIDATE-MERMAID static from Markdown\"]\n  POST --> REVIEW[\"review checklist\"]",
+      "confidence": "observed"
+    },
+    "runtime_sequence_diagram": {
+      "id": "MER-RUNTIME-SEQUENCE",
+      "kind": "runtime_sequence",
+      "title": "运行时时序图",
+      "diagram_type": "sequenceDiagram",
+      "description": "展示 Codex、校验器和渲染器的调用顺序。",
+      "source": "sequenceDiagram\n  participant C as Codex\n  participant D as DSL Validator\n  participant M as Mermaid Validator\n  participant R as Markdown Renderer\n  C->>D: validate structure.dsl.json\n  D-->>C: validation result\n  C->>M: strict validate DSL diagrams\n  M-->>C: Mermaid result\n  C->>R: render Markdown\n  R-->>C: output Markdown path\n  C->>M: static validate rendered Markdown\n  M-->>C: static result",
+      "confidence": "observed"
+    },
+    "extra_tables": [],
+    "extra_diagrams": []
+  },
+  "configuration_data_dependencies": {
+    "summary": "仓库配置主要来自 CLI 参数、环境变量和 requirements.txt；结构数据主要是 DSL JSON、schema、Markdown 输出和安装目标目录；外部依赖保持精简，严格 Mermaid 校验另需 node 与 mmdc。",
+    "notes": [],
+    "configuration_items": {
+      "rows": [
+        {
+          "config_id": "CFG-OUTPUT-DIR",
+          "config_name": "Markdown 输出目录",
+          "source": "render_markdown.py --output-dir",
+          "used_by": "Markdown 渲染器",
+          "purpose": "指定最终 Markdown 文件写入目录。",
+          "notes": "默认值为当前目录。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-RENDERER"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "config_id": "CFG-OUTPUT-WRITE-MODE",
+          "config_name": "输出写入模式",
+          "source": "render_markdown.py --overwrite 或 --backup",
+          "used_by": "Markdown 渲染器",
+          "purpose": "控制已有输出文件的替换或备份策略。",
+          "notes": "默认拒绝覆盖。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-RENDERER"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "config_id": "CFG-MERMAID-MODE",
+          "config_name": "Mermaid 校验模式",
+          "source": "validate_mermaid.py --strict 或 --static",
+          "used_by": "Mermaid 校验器",
+          "purpose": "决定执行严格 CLI 渲染验证还是仅执行静态检查。",
+          "notes": "技能流程默认要求严格模式。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-MERMAID-VALIDATOR", "EV-MERMAID-RULES"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "config_id": "CFG-MERMAID-WORK-DIR",
+          "config_name": "Mermaid 严格校验工作目录",
+          "source": "validate_mermaid.py --work-dir",
+          "used_by": "Mermaid 校验器",
+          "purpose": "保存严格模式写出的 mmd 和 svg 临时验证产物。",
+          "notes": "该目录中的产物不是最终交付。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-MERMAID-VALIDATOR", "EV-MERMAID-RULES"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "config_id": "CFG-CODEX-HOME",
+          "config_name": "Codex home",
+          "source": "install_skill.py --codex-home、CODEX_HOME 或 ~/.codex",
+          "used_by": "安装器",
+          "purpose": "确定本地技能安装目标目录。",
+          "notes": "解析顺序由安装脚本和安装文档说明。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-INSTALLER", "EV-INSTALL-DOC"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "config_id": "CFG-PYTHON-DEPS",
+          "config_name": "Python 依赖清单",
+          "source": "requirements.txt",
+          "used_by": "DSL 校验器和安装文档",
+          "purpose": "声明运行时 Python 依赖 jsonschema。",
+          "notes": "测试使用标准库 unittest。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-REQUIREMENTS", "EV-INSTALL-DOC"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        }
+      ]
+    },
+    "structural_data_artifacts": {
+      "rows": [
+        {
+          "artifact_id": "DATA-DSL-JSON",
+          "artifact_name": "结构设计 DSL 文件",
+          "artifact_type": "JSON",
+          "owner": "技能契约与参考文档模块",
+          "producer": "Codex",
+          "consumer": "DSL 校验器、Mermaid 校验器、Markdown 渲染器",
+          "notes": "通常命名为 structure.dsl.json，位于技能临时目录。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-SKILL-CONTRACT", "EV-DSL-SPEC"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "artifact_id": "DATA-SCHEMA",
+          "artifact_name": "DSL Schema",
+          "artifact_type": "JSON Schema",
+          "owner": "DSL Schema 模块",
+          "producer": "仓库维护者",
+          "consumer": "DSL 校验器、测试模块",
+          "notes": "路径为 schemas/structure-design.schema.json。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-SCHEMA"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "artifact_id": "DATA-RENDERED-MD",
+          "artifact_name": "结构设计 Markdown 输出",
+          "artifact_type": "Markdown",
+          "owner": "Markdown 渲染器模块",
+          "producer": "render_markdown.py",
+          "consumer": "用户、渲染后 Mermaid 静态校验",
+          "notes": "文件名由 document.output_file 决定。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-RENDERER", "EV-DOCUMENT-STRUCTURE"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "artifact_id": "DATA-MERMAID-ARTIFACTS",
+          "artifact_name": "Mermaid 严格校验临时产物",
+          "artifact_type": "mmd/svg temporary files",
+          "owner": "Mermaid 校验器模块",
+          "producer": "validate_mermaid.py strict mode",
+          "consumer": "严格校验流程",
+          "notes": "不是最终交付物。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-MERMAID-VALIDATOR"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "artifact_id": "DATA-INSTALLED-SKILL",
+          "artifact_name": "已安装技能目录",
+          "artifact_type": "directory",
+          "owner": "安装器模块",
+          "producer": "install_skill.py",
+          "consumer": "Codex",
+          "notes": "目标为 $CODEX_HOME/skills/create-structure-md。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-INSTALLER", "EV-INSTALL-DOC"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "artifact_id": "DATA-EXAMPLES",
+          "artifact_name": "最小 DSL 示例与 fixture",
+          "artifact_type": "JSON",
+          "owner": "示例与测试模块",
+          "producer": "仓库维护者",
+          "consumer": "用户、测试模块、Codex",
+          "notes": "位于 examples 和 tests/fixtures。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-EXAMPLES", "EV-TESTS"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        }
+      ]
+    },
+    "dependencies": {
+      "rows": [
+        {
+          "dependency_id": "DEP-PYTHON",
+          "dependency_name": "Python 3",
+          "dependency_type": "runtime",
+          "used_by": "所有 scripts/*.py 和 unittest",
+          "purpose": "运行校验器、渲染器、安装器和测试。",
+          "notes": "当前工作流使用 /home/hyx/miniconda3/envs/agent/bin/python。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-INSTALL-DOC"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "dependency_id": "DEP-JSONSCHEMA",
+          "dependency_name": "jsonschema",
+          "dependency_type": "Python package",
+          "used_by": "DSL 校验器",
+          "purpose": "执行 Draft 2020-12 JSON Schema 校验。",
+          "notes": "requirements.txt 中唯一运行时 Python 依赖。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-REQUIREMENTS", "EV-DSL-VALIDATOR"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "dependency_id": "DEP-NODE",
+          "dependency_name": "Node.js",
+          "dependency_type": "optional runtime",
+          "used_by": "Mermaid 严格校验",
+          "purpose": "运行 Mermaid CLI。",
+          "notes": "静态校验不需要 Node。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-MERMAID-VALIDATOR", "EV-INSTALL-DOC"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "dependency_id": "DEP-MMDC",
+          "dependency_name": "mmdc",
+          "dependency_type": "optional runtime CLI",
+          "used_by": "Mermaid 严格校验",
+          "purpose": "把 Mermaid 源渲染为临时 svg，以证明图源可被 Mermaid CLI 解析。",
+          "notes": "必须在 PATH 上才可执行严格校验。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-MERMAID-VALIDATOR", "EV-INSTALL-DOC"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "dependency_id": "DEP-UNITTEST",
+          "dependency_name": "unittest",
+          "dependency_type": "Python standard library",
+          "used_by": "示例与测试模块",
+          "purpose": "运行仓库测试集。",
+          "notes": "不需要第三方测试框架。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-TESTS", "EV-INSTALL-DOC"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "dependency_id": "DEP-FILESYSTEM",
+          "dependency_name": "本地文件系统",
+          "dependency_type": "runtime environment",
+          "used_by": "安装器、渲染器、校验器",
+          "purpose": "读取 DSL、schema、参考文件，写入 Markdown、安装目标和 Mermaid 严格校验临时产物。",
+          "notes": "",
+          "confidence": "observed",
+          "evidence_refs": ["EV-INSTALLER", "EV-RENDERER", "EV-MERMAID-VALIDATOR"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        }
+      ]
+    },
+    "extra_tables": [],
+    "extra_diagrams": []
+  },
+  "cross_module_collaboration": {
+    "summary": "多模块协作以顺序命令和共享数据契约为主。技能契约规定流程，schema 和 DSL 校验器先保证内容结构，再由 Mermaid 校验器验证图，Markdown 渲染器输出最终文档，安装器只复制运行时集合，测试模块持续验证所有边界。",
+    "notes": [],
+    "collaboration_scenarios": {
+      "rows": [
+        {
+          "collaboration_id": "COL-CONTRACT-SCHEMA",
+          "scenario": "契约驱动 DSL 结构",
+          "initiator_module_id": "MOD-SKILL-CONTRACT",
+          "participant_module_ids": ["MOD-DSL-SCHEMA", "MOD-DSL-VALIDATOR", "MOD-MARKDOWN-RENDERER"],
+          "collaboration_method": "共享参考文档和 DSL 字段契约",
+          "description": "技能契约和参考文档定义 DSL 与输出章节，schema、校验器和渲染器分别落实结构、质量和呈现。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-SKILL-CONTRACT", "EV-DSL-SPEC", "EV-DOCUMENT-STRUCTURE"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "collaboration_id": "COL-SCHEMA-DSLVAL",
+          "scenario": "DSL schema 与语义校验协作",
+          "initiator_module_id": "MOD-DSL-VALIDATOR",
+          "participant_module_ids": ["MOD-DSL-SCHEMA"],
+          "collaboration_method": "validate_dsl.py 加载 schema 后追加语义规则",
+          "description": "schema 先拒绝字段形状错误，语义校验随后检查跨字段引用、章节内容和安全文本。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-SCHEMA", "EV-DSL-VALIDATOR"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "collaboration_id": "COL-DSLVAL-MERVAL-RENDER",
+          "scenario": "生成文档质量门禁",
+          "initiator_module_id": "MOD-DSL-VALIDATOR",
+          "participant_module_ids": ["MOD-MERMAID-VALIDATOR", "MOD-MARKDOWN-RENDERER"],
+          "collaboration_method": "顺序 CLI 调用",
+          "description": "DSL 校验通过后，Mermaid 校验器严格检查图源，随后渲染器生成 Markdown，并对渲染后的 Mermaid fence 做静态复核。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-SKILL-CONTRACT", "EV-MERMAID-VALIDATOR", "EV-RENDERER"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "collaboration_id": "COL-INSTALL-RUNTIME",
+          "scenario": "安装运行时集合",
+          "initiator_module_id": "MOD-INSTALLER",
+          "participant_module_ids": ["MOD-SKILL-CONTRACT", "MOD-DSL-SCHEMA", "MOD-DSL-VALIDATOR", "MOD-MERMAID-VALIDATOR", "MOD-MARKDOWN-RENDERER"],
+          "collaboration_method": "复制白名单运行时条目",
+          "description": "安装器只复制 SKILL.md、requirements.txt、references、schemas、scripts 和 examples，形成可用的本地技能目录。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-INSTALLER", "EV-INSTALL-DOC"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        },
+        {
+          "collaboration_id": "COL-TESTS-CONTRACTS",
+          "scenario": "测试覆盖模块契约",
+          "initiator_module_id": "MOD-EXAMPLES-TESTS",
+          "participant_module_ids": ["MOD-DSL-SCHEMA", "MOD-DSL-VALIDATOR", "MOD-MERMAID-VALIDATOR", "MOD-MARKDOWN-RENDERER", "MOD-INSTALLER"],
+          "collaboration_method": "unittest 调用脚本和示例 fixture",
+          "description": "测试模块通过 fixtures、示例和脚本入口验证结构、语义、Mermaid、渲染、安装和端到端行为。",
+          "confidence": "observed",
+          "evidence_refs": ["EV-TESTS", "EV-EXAMPLES"],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        }
+      ]
+    },
+    "collaboration_relationship_diagram": {
+      "id": "MER-COLLABORATION-RELATIONSHIP",
+      "kind": "collaboration_relationship",
+      "title": "跨模块协作关系图",
+      "diagram_type": "flowchart",
+      "description": "展示核心模块在生成、安装和测试场景中的协作关系。",
+      "source": "flowchart TD\n  CONTRACT[\"技能契约\"] --> SCHEMA[\"DSL Schema\"]\n  CONTRACT --> DSLVAL[\"DSL 校验器\"]\n  SCHEMA --> DSLVAL\n  DSLVAL --> MERVAL[\"Mermaid 校验器\"]\n  MERVAL --> RENDER[\"Markdown 渲染器\"]\n  INSTALL[\"安装器\"] --> CONTRACT\n  INSTALL --> SCHEMA\n  INSTALL --> DSLVAL\n  INSTALL --> MERVAL\n  INSTALL --> RENDER\n  TESTS[\"示例与测试\"] --> SCHEMA\n  TESTS --> DSLVAL\n  TESTS --> MERVAL\n  TESTS --> RENDER\n  TESTS --> INSTALL",
+      "confidence": "observed"
+    },
+    "extra_tables": [],
+    "extra_diagrams": []
+  },
+  "key_flows": {
+    "summary": "关键流程覆盖结构设计文档生成、DSL 校验、Mermaid 校验、Markdown 渲染、技能安装和测试回归。每个流程都以 CLI 或 Codex 操作串联仓库模块。",
+    "notes": [],
+    "flow_index": {
+      "rows": [
+        {
+          "flow_id": "FLOW-GENERATE-DOCUMENT",
+          "flow_name": "生成结构设计文档",
+          "trigger_condition": "Codex 已在技能外完成仓库理解并准备完整 DSL 内容。",
+          "participant_module_ids": ["MOD-SKILL-CONTRACT", "MOD-DSL-VALIDATOR", "MOD-MERMAID-VALIDATOR", "MOD-MARKDOWN-RENDERER"],
+          "participant_runtime_unit_ids": ["RUN-VALIDATE-DSL", "RUN-VALIDATE-MERMAID", "RUN-RENDER-MARKDOWN"],
+          "main_steps": "写入 DSL、校验 DSL、严格校验 Mermaid、渲染 Markdown、静态复核渲染后 Mermaid、按清单复核。",
+          "output_result": "create-structure-md_STRUCTURE_DESIGN.md",
+          "notes": ""
+        },
+        {
+          "flow_id": "FLOW-VALIDATE-DSL",
+          "flow_name": "校验 DSL",
+          "trigger_condition": "structure.dsl.json 已存在。",
+          "participant_module_ids": ["MOD-DSL-SCHEMA", "MOD-DSL-VALIDATOR"],
+          "participant_runtime_unit_ids": ["RUN-VALIDATE-DSL"],
+          "main_steps": "加载 JSON、执行 schema 校验、注册 ID、检查引用和章节语义、输出结果。",
+          "output_result": "Validation succeeded 或错误警告报告。",
+          "notes": ""
+        },
+        {
+          "flow_id": "FLOW-VALIDATE-MERMAID",
+          "flow_name": "校验 Mermaid",
+          "trigger_condition": "DSL 或 Markdown 中包含 Mermaid 图源。",
+          "participant_module_ids": ["MOD-MERMAID-VALIDATOR"],
+          "participant_runtime_unit_ids": ["RUN-VALIDATE-MERMAID"],
+          "main_steps": "提取图源、静态检查、检查环境、严格模式调用 mmdc。",
+          "output_result": "Mermaid validation succeeded 或错误报告。",
+          "notes": ""
+        },
+        {
+          "flow_id": "FLOW-RENDER-MARKDOWN",
+          "flow_name": "渲染 Markdown",
+          "trigger_condition": "DSL 和 Mermaid 校验已通过。",
+          "participant_module_ids": ["MOD-MARKDOWN-RENDERER"],
+          "participant_runtime_unit_ids": ["RUN-RENDER-MARKDOWN"],
+          "main_steps": "加载 DSL、校验输出文件名、构建支持数据上下文、渲染 9 章、写入文件。",
+          "output_result": "document.output_file 指定的 Markdown 文件。",
+          "notes": ""
+        },
+        {
+          "flow_id": "FLOW-INSTALL-SKILL",
+          "flow_name": "安装本地技能",
+          "trigger_condition": "用户运行安装脚本。",
+          "participant_module_ids": ["MOD-INSTALLER", "MOD-SKILL-CONTRACT", "MOD-DSL-SCHEMA", "MOD-DSL-VALIDATOR", "MOD-MERMAID-VALIDATOR", "MOD-MARKDOWN-RENDERER"],
+          "participant_runtime_unit_ids": ["RUN-INSTALL-SKILL"],
+          "main_steps": "解析目标、验证源、打印计划和依赖、检查目标不存在、复制运行时条目、验证安装结果。",
+          "output_result": "$CODEX_HOME/skills/create-structure-md 目录。",
+          "notes": ""
+        },
+        {
+          "flow_id": "FLOW-RUN-TESTS",
+          "flow_name": "运行回归测试",
+          "trigger_condition": "维护者需要验证仓库行为。",
+          "participant_module_ids": ["MOD-EXAMPLES-TESTS", "MOD-DSL-SCHEMA", "MOD-DSL-VALIDATOR", "MOD-MERMAID-VALIDATOR", "MOD-MARKDOWN-RENDERER", "MOD-INSTALLER"],
+          "participant_runtime_unit_ids": ["RUN-TEST-SUITE"],
+          "main_steps": "发现 tests 目录、加载 fixtures 和脚本模块、执行 unittest 用例、报告失败或通过。",
+          "output_result": "unittest 测试结果。",
+          "notes": ""
+        }
+      ]
+    },
+    "flows": [
+      {
+        "flow_id": "FLOW-GENERATE-DOCUMENT",
+        "name": "生成结构设计文档",
+        "overview": "该流程是技能主路径，把已准备好的 DSL 内容转化为单个结构设计 Markdown 文件。",
+        "steps": [
+          {
+            "step_id": "STEP-GENERATE-001",
+            "order": 1,
+            "description": "在技能外完成仓库理解并把结构信息写入临时目录中的 structure.dsl.json。",
+            "actor": "Codex",
+            "related_module_ids": ["MOD-SKILL-CONTRACT"],
+            "related_runtime_unit_ids": [],
+            "input": "仓库结构信息和技能参考规则",
+            "output": "structure.dsl.json",
+            "confidence": "observed",
+            "evidence_refs": ["EV-SKILL-CONTRACT", "EV-DSL-SPEC"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          },
+          {
+            "step_id": "STEP-GENERATE-002",
+            "order": 2,
+            "description": "调用 DSL 校验命令检查 schema 和语义。",
+            "actor": "Codex",
+            "related_module_ids": ["MOD-DSL-VALIDATOR", "MOD-DSL-SCHEMA"],
+            "related_runtime_unit_ids": ["RUN-VALIDATE-DSL"],
+            "input": "structure.dsl.json",
+            "output": "DSL 校验结果",
+            "confidence": "observed",
+            "evidence_refs": ["EV-DSL-VALIDATOR"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          },
+          {
+            "step_id": "STEP-GENERATE-003",
+            "order": 3,
+            "description": "调用 Mermaid 校验命令以严格模式检查 DSL 中的图。",
+            "actor": "Codex",
+            "related_module_ids": ["MOD-MERMAID-VALIDATOR"],
+            "related_runtime_unit_ids": ["RUN-VALIDATE-MERMAID"],
+            "input": "structure.dsl.json 和 Mermaid work-dir",
+            "output": "严格 Mermaid 校验结果",
+            "confidence": "observed",
+            "evidence_refs": ["EV-MERMAID-VALIDATOR", "EV-MERMAID-RULES"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          },
+          {
+            "step_id": "STEP-GENERATE-004",
+            "order": 4,
+            "description": "调用 Markdown 渲染命令写出 document.output_file。",
+            "actor": "Codex",
+            "related_module_ids": ["MOD-MARKDOWN-RENDERER"],
+            "related_runtime_unit_ids": ["RUN-RENDER-MARKDOWN"],
+            "input": "校验通过的 structure.dsl.json",
+            "output": "create-structure-md_STRUCTURE_DESIGN.md",
+            "confidence": "observed",
+            "evidence_refs": ["EV-RENDERER"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          },
+          {
+            "step_id": "STEP-GENERATE-005",
+            "order": 5,
+            "description": "对渲染后的 Markdown 执行 Mermaid 静态校验并按复核清单检查结果。",
+            "actor": "Codex",
+            "related_module_ids": ["MOD-MERMAID-VALIDATOR", "MOD-SKILL-CONTRACT"],
+            "related_runtime_unit_ids": ["RUN-VALIDATE-MERMAID"],
+            "input": "渲染后的 Markdown 文件",
+            "output": "最终报告依据",
+            "confidence": "observed",
+            "evidence_refs": ["EV-SKILL-CONTRACT", "EV-REVIEW-CHECKLIST"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          }
+        ],
+        "branches_or_exceptions": [
+          {
+            "branch_id": "BR-GENERATE-VALIDATION-FAIL",
+            "condition": "DSL 或 Mermaid 校验失败",
+            "handling": "停止渲染或停止完成报告，修正 DSL 或图源后重新执行相应校验。",
+            "related_module_ids": ["MOD-DSL-VALIDATOR", "MOD-MERMAID-VALIDATOR"],
+            "related_runtime_unit_ids": ["RUN-VALIDATE-DSL", "RUN-VALIDATE-MERMAID"],
+            "confidence": "observed",
+            "evidence_refs": ["EV-SKILL-CONTRACT"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          },
+          {
+            "branch_id": "BR-GENERATE-OUTPUT-EXISTS",
+            "condition": "目标 Markdown 文件已存在且未指定 overwrite 或 backup",
+            "handling": "渲染器拒绝写入并提示使用明确写入策略。",
+            "related_module_ids": ["MOD-MARKDOWN-RENDERER"],
+            "related_runtime_unit_ids": ["RUN-RENDER-MARKDOWN"],
+            "confidence": "observed",
+            "evidence_refs": ["EV-RENDERER"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          }
+        ],
+        "related_module_ids": ["MOD-SKILL-CONTRACT", "MOD-DSL-VALIDATOR", "MOD-MERMAID-VALIDATOR", "MOD-MARKDOWN-RENDERER"],
+        "related_runtime_unit_ids": ["RUN-VALIDATE-DSL", "RUN-VALIDATE-MERMAID", "RUN-RENDER-MARKDOWN"],
+        "confidence": "observed",
+        "evidence_refs": ["EV-SKILL-CONTRACT"],
+        "traceability_refs": [],
+        "source_snippet_refs": [],
+        "diagram": {
+          "id": "MER-FLOW-GENERATE-DOCUMENT",
+          "kind": "key_flow",
+          "title": "生成结构设计文档流程图",
+          "diagram_type": "flowchart",
+          "description": "展示从 DSL 准备到最终复核的主流程。",
+          "source": "flowchart TD\n  A[\"Prepare DSL\"] --> B[\"Validate DSL\"]\n  B --> C[\"Strict validate Mermaid\"]\n  C --> D[\"Render Markdown\"]\n  D --> E[\"Static validate rendered Markdown\"]\n  E --> F[\"Review checklist\"]\n  B -->|fail| X[\"Revise DSL\"]\n  C -->|fail| Y[\"Revise Mermaid\"]\n  D -->|output exists| Z[\"Choose write policy\"]",
+          "confidence": "observed"
+        }
+      },
+      {
+        "flow_id": "FLOW-VALIDATE-DSL",
+        "name": "校验 DSL",
+        "overview": "该流程保证 DSL JSON 在结构、引用和语义上足以安全渲染。",
+        "steps": [
+          {
+            "step_id": "STEP-DSLVAL-001",
+            "order": 1,
+            "description": "解析命令行参数并读取 DSL JSON。",
+            "actor": "DSL 校验器",
+            "related_module_ids": ["MOD-DSL-VALIDATOR"],
+            "related_runtime_unit_ids": ["RUN-VALIDATE-DSL"],
+            "input": "DSL 文件路径",
+            "output": "Python dict 对象或读取错误",
+            "confidence": "observed",
+            "evidence_refs": ["EV-DSL-VALIDATOR"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          },
+          {
+            "step_id": "STEP-DSLVAL-002",
+            "order": 2,
+            "description": "加载 schema 并执行 Draft 2020-12 schema 校验。",
+            "actor": "DSL 校验器",
+            "related_module_ids": ["MOD-DSL-VALIDATOR", "MOD-DSL-SCHEMA"],
+            "related_runtime_unit_ids": ["RUN-VALIDATE-DSL"],
+            "input": "DSL 对象和 schema 文件",
+            "output": "schema 错误或进入语义校验",
+            "confidence": "observed",
+            "evidence_refs": ["EV-DSL-VALIDATOR", "EV-SCHEMA"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          },
+          {
+            "step_id": "STEP-DSLVAL-003",
+            "order": 3,
+            "description": "构建 ValidationContext 并注册所有定义型 ID。",
+            "actor": "DSL 校验器",
+            "related_module_ids": ["MOD-DSL-VALIDATOR"],
+            "related_runtime_unit_ids": ["RUN-VALIDATE-DSL"],
+            "input": "schema 通过后的 DSL 对象",
+            "output": "按 kind 组织的 ID 注册表",
+            "confidence": "observed",
+            "evidence_refs": ["EV-DSL-VALIDATOR"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          },
+          {
+            "step_id": "STEP-DSLVAL-004",
+            "order": 4,
+            "description": "执行章节规则、引用解析、支持数据、源码片段和 Markdown 安全检查。",
+            "actor": "DSL 校验器",
+            "related_module_ids": ["MOD-DSL-VALIDATOR"],
+            "related_runtime_unit_ids": ["RUN-VALIDATE-DSL"],
+            "input": "ValidationContext 和 DSL 对象",
+            "output": "错误、警告或成功状态",
+            "confidence": "observed",
+            "evidence_refs": ["EV-DSL-VALIDATOR"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          }
+        ],
+        "branches_or_exceptions": [
+          {
+            "branch_id": "BR-DSLVAL-SCHEMA-FAIL",
+            "condition": "schema 校验失败",
+            "handling": "返回错误码并提示先修复 DSL 形状。",
+            "related_module_ids": ["MOD-DSL-VALIDATOR", "MOD-DSL-SCHEMA"],
+            "related_runtime_unit_ids": ["RUN-VALIDATE-DSL"],
+            "confidence": "observed",
+            "evidence_refs": ["EV-DSL-VALIDATOR"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          }
+        ],
+        "related_module_ids": ["MOD-DSL-SCHEMA", "MOD-DSL-VALIDATOR"],
+        "related_runtime_unit_ids": ["RUN-VALIDATE-DSL"],
+        "confidence": "observed",
+        "evidence_refs": ["EV-DSL-VALIDATOR"],
+        "traceability_refs": [],
+        "source_snippet_refs": [],
+        "diagram": {
+          "id": "MER-FLOW-VALIDATE-DSL",
+          "kind": "key_flow",
+          "title": "DSL 校验流程图",
+          "diagram_type": "flowchart",
+          "description": "展示 DSL 校验器的处理流程。",
+          "source": "flowchart TD\n  A[\"Parse args\"] --> B[\"Load JSON\"]\n  B --> C[\"Schema validation\"]\n  C --> D[\"Build ValidationContext\"]\n  D --> E[\"Check references\"]\n  E --> F[\"Check chapters and safety\"]\n  F --> G[\"Print result\"]\n  C -->|schema error| X[\"Return shape error\"]\n  F -->|semantic error| Y[\"Return validation report\"]",
+          "confidence": "observed"
+        }
+      },
+      {
+        "flow_id": "FLOW-VALIDATE-MERMAID",
+        "name": "校验 Mermaid",
+        "overview": "该流程保证 DSL 或 Markdown 中的图只使用支持的 Mermaid 语法，并在严格模式下由本地 mmdc 验证。",
+        "steps": [
+          {
+            "step_id": "STEP-MERVAL-001",
+            "order": 1,
+            "description": "解析数据来源参数，从 DSL 或 Markdown 中抽取 Mermaid 图。",
+            "actor": "Mermaid 校验器",
+            "related_module_ids": ["MOD-MERMAID-VALIDATOR"],
+            "related_runtime_unit_ids": ["RUN-VALIDATE-MERMAID"],
+            "input": "--from-dsl 或 --from-markdown",
+            "output": "MermaidDiagram 列表",
+            "confidence": "observed",
+            "evidence_refs": ["EV-MERMAID-VALIDATOR"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          },
+          {
+            "step_id": "STEP-MERVAL-002",
+            "order": 2,
+            "description": "执行静态检查，包括图类型、空内容、DOT 语法和 fence 规则。",
+            "actor": "Mermaid 校验器",
+            "related_module_ids": ["MOD-MERMAID-VALIDATOR"],
+            "related_runtime_unit_ids": ["RUN-VALIDATE-MERMAID"],
+            "input": "MermaidDiagram 列表",
+            "output": "静态检查结果",
+            "confidence": "observed",
+            "evidence_refs": ["EV-MERMAID-VALIDATOR"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          },
+          {
+            "step_id": "STEP-MERVAL-003",
+            "order": 3,
+            "description": "严格模式下检查 node 和 mmdc，并准备工作目录。",
+            "actor": "Mermaid 校验器",
+            "related_module_ids": ["MOD-MERMAID-VALIDATOR"],
+            "related_runtime_unit_ids": ["RUN-VALIDATE-MERMAID"],
+            "input": "--strict 和可选 --work-dir",
+            "output": "严格校验环境或工具缺失错误",
+            "confidence": "observed",
+            "evidence_refs": ["EV-MERMAID-VALIDATOR", "EV-MERMAID-RULES"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          },
+          {
+            "step_id": "STEP-MERVAL-004",
+            "order": 4,
+            "description": "逐个写入 mmd 临时文件并调用 mmdc 输出 svg。",
+            "actor": "Mermaid 校验器",
+            "related_module_ids": ["MOD-MERMAID-VALIDATOR"],
+            "related_runtime_unit_ids": ["RUN-VALIDATE-MERMAID"],
+            "input": "Mermaid source",
+            "output": "svg 临时产物和严格校验结果",
+            "confidence": "observed",
+            "evidence_refs": ["EV-MERMAID-VALIDATOR"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          }
+        ],
+        "branches_or_exceptions": [
+          {
+            "branch_id": "BR-MERVAL-TOOLING-MISSING",
+            "condition": "严格模式缺少 node 或 mmdc",
+            "handling": "报告严格校验未执行，按技能规则需要用户明确接受 static-only 才能继续。",
+            "related_module_ids": ["MOD-MERMAID-VALIDATOR", "MOD-SKILL-CONTRACT"],
+            "related_runtime_unit_ids": ["RUN-VALIDATE-MERMAID"],
+            "confidence": "observed",
+            "evidence_refs": ["EV-SKILL-CONTRACT", "EV-MERMAID-VALIDATOR"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          },
+          {
+            "branch_id": "BR-MERVAL-UNSUPPORTED",
+            "condition": "图源使用不支持的图类型或 DOT 语法",
+            "handling": "返回错误并要求改为支持的 Mermaid MVP 类型。",
+            "related_module_ids": ["MOD-MERMAID-VALIDATOR"],
+            "related_runtime_unit_ids": ["RUN-VALIDATE-MERMAID"],
+            "confidence": "observed",
+            "evidence_refs": ["EV-MERMAID-VALIDATOR", "EV-MERMAID-RULES"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          }
+        ],
+        "related_module_ids": ["MOD-MERMAID-VALIDATOR"],
+        "related_runtime_unit_ids": ["RUN-VALIDATE-MERMAID"],
+        "confidence": "observed",
+        "evidence_refs": ["EV-MERMAID-VALIDATOR"],
+        "traceability_refs": [],
+        "source_snippet_refs": [],
+        "diagram": {
+          "id": "MER-FLOW-VALIDATE-MERMAID",
+          "kind": "key_flow",
+          "title": "Mermaid 校验流程图",
+          "diagram_type": "flowchart",
+          "description": "展示 Mermaid 校验器静态和严格模式流程。",
+          "source": "flowchart TD\n  A[\"Select source\"] --> B[\"Extract diagrams\"]\n  B --> C[\"Static validation\"]\n  C --> D{\"Strict mode\"}\n  D -->|yes| E[\"Check node and mmdc\"]\n  E --> F[\"Write mmd files\"]\n  F --> G[\"Run mmdc\"]\n  D -->|no| H[\"Static result\"]\n  C -->|error| X[\"Report static errors\"]\n  E -->|missing tool| Y[\"Report tooling unavailable\"]",
+          "confidence": "observed"
+        }
+      },
+      {
+        "flow_id": "FLOW-RENDER-MARKDOWN",
+        "name": "渲染 Markdown",
+        "overview": "该流程把 DSL 内容确定性地渲染为固定 9 章 Markdown，并控制输出文件安全。",
+        "steps": [
+          {
+            "step_id": "STEP-RENDER-001",
+            "order": 1,
+            "description": "读取 DSL JSON 并校验 document.output_file 是安全且具体的 Markdown 文件名。",
+            "actor": "Markdown 渲染器",
+            "related_module_ids": ["MOD-MARKDOWN-RENDERER"],
+            "related_runtime_unit_ids": ["RUN-RENDER-MARKDOWN"],
+            "input": "DSL 文件路径和 output_dir",
+            "output": "输出文件路径或输入错误",
+            "confidence": "observed",
+            "evidence_refs": ["EV-RENDERER"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          },
+          {
+            "step_id": "STEP-RENDER-002",
+            "order": 2,
+            "description": "构建模块和运行单元显示名，以及 evidence、traceability 和 source snippet 支持数据上下文。",
+            "actor": "Markdown 渲染器",
+            "related_module_ids": ["MOD-MARKDOWN-RENDERER"],
+            "related_runtime_unit_ids": ["RUN-RENDER-MARKDOWN"],
+            "input": "DSL 支持数据数组",
+            "output": "渲染上下文",
+            "confidence": "observed",
+            "evidence_refs": ["EV-RENDERER"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          },
+          {
+            "step_id": "STEP-RENDER-003",
+            "order": 3,
+            "description": "依次渲染文档信息、系统概览、架构视图、模块设计、运行时、配置依赖、协作、关键流程和第 9 章。",
+            "actor": "Markdown 渲染器",
+            "related_module_ids": ["MOD-MARKDOWN-RENDERER"],
+            "related_runtime_unit_ids": ["RUN-RENDER-MARKDOWN"],
+            "input": "DSL document object",
+            "output": "Markdown 字符串",
+            "confidence": "observed",
+            "evidence_refs": ["EV-RENDERER", "EV-DOCUMENT-STRUCTURE"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          },
+          {
+            "step_id": "STEP-RENDER-004",
+            "order": 4,
+            "description": "按默认不覆盖、overwrite 或 backup 策略写入输出文件。",
+            "actor": "Markdown 渲染器",
+            "related_module_ids": ["MOD-MARKDOWN-RENDERER"],
+            "related_runtime_unit_ids": ["RUN-RENDER-MARKDOWN"],
+            "input": "Markdown 字符串和输出路径",
+            "output": "Markdown 文件或写入错误",
+            "confidence": "observed",
+            "evidence_refs": ["EV-RENDERER"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          }
+        ],
+        "branches_or_exceptions": [
+          {
+            "branch_id": "BR-RENDER-FILENAME",
+            "condition": "document.output_file 泛化、含路径片段或不以 .md 结尾",
+            "handling": "返回输入错误，不写入文件。",
+            "related_module_ids": ["MOD-MARKDOWN-RENDERER"],
+            "related_runtime_unit_ids": ["RUN-RENDER-MARKDOWN"],
+            "confidence": "observed",
+            "evidence_refs": ["EV-RENDERER"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          },
+          {
+            "branch_id": "BR-RENDER-BACKUP",
+            "condition": "目标文件存在且用户选择 backup",
+            "handling": "先写入带时间戳的备份文件，再写入新 Markdown。",
+            "related_module_ids": ["MOD-MARKDOWN-RENDERER"],
+            "related_runtime_unit_ids": ["RUN-RENDER-MARKDOWN"],
+            "confidence": "observed",
+            "evidence_refs": ["EV-RENDERER"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          }
+        ],
+        "related_module_ids": ["MOD-MARKDOWN-RENDERER"],
+        "related_runtime_unit_ids": ["RUN-RENDER-MARKDOWN"],
+        "confidence": "observed",
+        "evidence_refs": ["EV-RENDERER"],
+        "traceability_refs": [],
+        "source_snippet_refs": [],
+        "diagram": {
+          "id": "MER-FLOW-RENDER-MARKDOWN",
+          "kind": "key_flow",
+          "title": "Markdown 渲染流程图",
+          "diagram_type": "flowchart",
+          "description": "展示 Markdown 渲染器的核心流程。",
+          "source": "flowchart TD\n  A[\"Load DSL\"] --> B[\"Validate output filename\"]\n  B --> C[\"Resolve output path\"]\n  C --> D[\"Build support context\"]\n  D --> E[\"Render 9 chapters\"]\n  E --> F[\"Apply write policy\"]\n  F --> G[\"Markdown rendered\"]\n  B -->|invalid| X[\"Input error\"]\n  F -->|exists without policy| Y[\"Write error\"]",
+          "confidence": "observed"
+        }
+      },
+      {
+        "flow_id": "FLOW-INSTALL-SKILL",
+        "name": "安装本地技能",
+        "overview": "该流程把仓库中的运行时技能文件复制到 Codex skills 目录，采用保守策略避免覆盖已有安装。",
+        "steps": [
+          {
+            "step_id": "STEP-INSTALL-001",
+            "order": 1,
+            "description": "解析 --codex-home 和 dry-run 参数，并定位源仓库和目标技能路径。",
+            "actor": "安装器",
+            "related_module_ids": ["MOD-INSTALLER"],
+            "related_runtime_unit_ids": ["RUN-INSTALL-SKILL"],
+            "input": "命令行参数和环境变量",
+            "output": "source、codex_home 和 target",
+            "confidence": "observed",
+            "evidence_refs": ["EV-INSTALLER"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          },
+          {
+            "step_id": "STEP-INSTALL-002",
+            "order": 2,
+            "description": "验证源仓库包含必需文件、目录和 SKILL.md 参考文件。",
+            "actor": "安装器",
+            "related_module_ids": ["MOD-INSTALLER", "MOD-SKILL-CONTRACT"],
+            "related_runtime_unit_ids": ["RUN-INSTALL-SKILL"],
+            "input": "源仓库路径",
+            "output": "源结构验证结果",
+            "confidence": "observed",
+            "evidence_refs": ["EV-INSTALLER"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          },
+          {
+            "step_id": "STEP-INSTALL-003",
+            "order": 3,
+            "description": "打印计划和依赖状态；dry-run 模式到此结束。",
+            "actor": "安装器",
+            "related_module_ids": ["MOD-INSTALLER"],
+            "related_runtime_unit_ids": ["RUN-INSTALL-SKILL"],
+            "input": "源路径、目标路径、当前环境",
+            "output": "安装计划和依赖状态",
+            "confidence": "observed",
+            "evidence_refs": ["EV-INSTALLER", "EV-INSTALL-DOC"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          },
+          {
+            "step_id": "STEP-INSTALL-004",
+            "order": 4,
+            "description": "目标不存在时创建目录并复制运行时白名单条目。",
+            "actor": "安装器",
+            "related_module_ids": ["MOD-INSTALLER", "MOD-SKILL-CONTRACT", "MOD-DSL-SCHEMA", "MOD-DSL-VALIDATOR", "MOD-MERMAID-VALIDATOR", "MOD-MARKDOWN-RENDERER"],
+            "related_runtime_unit_ids": ["RUN-INSTALL-SKILL"],
+            "input": "运行时文件和目标路径",
+            "output": "安装目录",
+            "confidence": "observed",
+            "evidence_refs": ["EV-INSTALLER", "EV-INSTALL-DOC"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          },
+          {
+            "step_id": "STEP-INSTALL-005",
+            "order": 5,
+            "description": "对安装后的目标目录再次执行结构验证并报告安装成功。",
+            "actor": "安装器",
+            "related_module_ids": ["MOD-INSTALLER"],
+            "related_runtime_unit_ids": ["RUN-INSTALL-SKILL"],
+            "input": "安装目标路径",
+            "output": "Installed create-structure-md to target",
+            "confidence": "observed",
+            "evidence_refs": ["EV-INSTALLER"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          }
+        ],
+        "branches_or_exceptions": [
+          {
+            "branch_id": "BR-INSTALL-TARGET-EXISTS",
+            "condition": "目标技能目录已经存在",
+            "handling": "安装器失败退出，并打印用户可自行执行的清理命令。",
+            "related_module_ids": ["MOD-INSTALLER"],
+            "related_runtime_unit_ids": ["RUN-INSTALL-SKILL"],
+            "confidence": "observed",
+            "evidence_refs": ["EV-INSTALLER", "EV-INSTALL-DOC"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          },
+          {
+            "branch_id": "BR-INSTALL-PARTIAL",
+            "condition": "复制过程中发生异常",
+            "handling": "安装器报告需要人工检查，并给出由用户审查后执行的清理命令。",
+            "related_module_ids": ["MOD-INSTALLER"],
+            "related_runtime_unit_ids": ["RUN-INSTALL-SKILL"],
+            "confidence": "observed",
+            "evidence_refs": ["EV-INSTALLER"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          }
+        ],
+        "related_module_ids": ["MOD-INSTALLER", "MOD-SKILL-CONTRACT", "MOD-DSL-SCHEMA", "MOD-DSL-VALIDATOR", "MOD-MERMAID-VALIDATOR", "MOD-MARKDOWN-RENDERER"],
+        "related_runtime_unit_ids": ["RUN-INSTALL-SKILL"],
+        "confidence": "observed",
+        "evidence_refs": ["EV-INSTALLER", "EV-INSTALL-DOC"],
+        "traceability_refs": [],
+        "source_snippet_refs": [],
+        "diagram": {
+          "id": "MER-FLOW-INSTALL-SKILL",
+          "kind": "key_flow",
+          "title": "技能安装流程图",
+          "diagram_type": "flowchart",
+          "description": "展示 copy-only 安装器的主流程。",
+          "source": "flowchart TD\n  A[\"Parse install args\"] --> B[\"Resolve target\"]\n  B --> C[\"Validate source\"]\n  C --> D[\"Print plan and dependencies\"]\n  D --> E{\"Dry run\"}\n  E -->|yes| F[\"Exit without copy\"]\n  E -->|no| G{\"Target exists\"}\n  G -->|yes| X[\"Fail with cleanup command\"]\n  G -->|no| H[\"Copy runtime entries\"]\n  H --> I[\"Validate installed target\"]\n  I --> J[\"Report installed path\"]",
+          "confidence": "observed"
+        }
+      },
+      {
+        "flow_id": "FLOW-RUN-TESTS",
+        "name": "运行回归测试",
+        "overview": "该流程使用 Python 标准库 unittest 发现并执行测试，验证仓库脚本、示例和文档契约。",
+        "steps": [
+          {
+            "step_id": "STEP-TESTS-001",
+            "order": 1,
+            "description": "运行 unittest discover 发现 tests 目录中的测试模块。",
+            "actor": "测试运行者",
+            "related_module_ids": ["MOD-EXAMPLES-TESTS"],
+            "related_runtime_unit_ids": ["RUN-TEST-SUITE"],
+            "input": "tests 目录",
+            "output": "测试套件",
+            "confidence": "observed",
+            "evidence_refs": ["EV-TESTS", "EV-INSTALL-DOC"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          },
+          {
+            "step_id": "STEP-TESTS-002",
+            "order": 2,
+            "description": "测试用例加载示例、fixture 和脚本模块。",
+            "actor": "测试模块",
+            "related_module_ids": ["MOD-EXAMPLES-TESTS", "MOD-DSL-SCHEMA", "MOD-DSL-VALIDATOR", "MOD-MERMAID-VALIDATOR", "MOD-MARKDOWN-RENDERER", "MOD-INSTALLER"],
+            "related_runtime_unit_ids": ["RUN-TEST-SUITE"],
+            "input": "examples、fixtures、scripts",
+            "output": "可执行测试上下文",
+            "confidence": "observed",
+            "evidence_refs": ["EV-TESTS", "EV-EXAMPLES"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          },
+          {
+            "step_id": "STEP-TESTS-003",
+            "order": 3,
+            "description": "执行 schema、语义、Mermaid、渲染、安装和端到端断言。",
+            "actor": "测试模块",
+            "related_module_ids": ["MOD-EXAMPLES-TESTS", "MOD-DSL-VALIDATOR", "MOD-MERMAID-VALIDATOR", "MOD-MARKDOWN-RENDERER", "MOD-INSTALLER"],
+            "related_runtime_unit_ids": ["RUN-TEST-SUITE"],
+            "input": "测试上下文",
+            "output": "测试通过或失败报告",
+            "confidence": "observed",
+            "evidence_refs": ["EV-TESTS"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          }
+        ],
+        "branches_or_exceptions": [
+          {
+            "branch_id": "BR-TESTS-FAILURE",
+            "condition": "任一测试断言失败",
+            "handling": "unittest 报告失败用例，维护者根据失败模块定位契约或实现回归。",
+            "related_module_ids": ["MOD-EXAMPLES-TESTS"],
+            "related_runtime_unit_ids": ["RUN-TEST-SUITE"],
+            "confidence": "observed",
+            "evidence_refs": ["EV-TESTS"],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          }
+        ],
+        "related_module_ids": ["MOD-EXAMPLES-TESTS", "MOD-DSL-SCHEMA", "MOD-DSL-VALIDATOR", "MOD-MERMAID-VALIDATOR", "MOD-MARKDOWN-RENDERER", "MOD-INSTALLER"],
+        "related_runtime_unit_ids": ["RUN-TEST-SUITE"],
+        "confidence": "observed",
+        "evidence_refs": ["EV-TESTS", "EV-EXAMPLES"],
+        "traceability_refs": [],
+        "source_snippet_refs": [],
+        "diagram": {
+          "id": "MER-FLOW-RUN-TESTS",
+          "kind": "key_flow",
+          "title": "回归测试流程图",
+          "diagram_type": "flowchart",
+          "description": "展示测试发现和执行流程。",
+          "source": "flowchart TD\n  A[\"Run unittest discover\"] --> B[\"Load test modules\"]\n  B --> C[\"Load examples and fixtures\"]\n  C --> D[\"Exercise scripts\"]\n  D --> E[\"Assert contracts\"]\n  E --> F[\"Report result\"]\n  E -->|failure| X[\"Locate regression\"]",
+          "confidence": "observed"
+        }
+      }
+    ],
+    "extra_tables": [],
+    "extra_diagrams": []
+  },
+  "structure_issues_and_suggestions": "当前仓库职责边界清晰，核心运行时依赖精简，安装器采用保守复制策略，适合作为本地 Codex 技能维护。建议补充顶层 README 或 pyproject 元数据，方便非 IDE 场景快速识别项目入口、测试命令和安装方式。建议在未来版本中把严格 Mermaid 校验的浏览器环境要求写得更具体，降低 mmdc 已安装但运行环境异常时的排查成本。",
+  "evidence": [
+    {
+      "id": "EV-SKILL-CONTRACT",
+      "kind": "source",
+      "title": "技能入口和工作流契约",
+      "location": "SKILL.md:1-62",
+      "description": "定义技能名称、边界、输入就绪条件、固定流程、输出文件名和临时目录策略。",
+      "confidence": "observed"
+    },
+    {
+      "id": "EV-DSL-SPEC",
+      "kind": "source",
+      "title": "DSL 规范",
+      "location": "references/dsl-spec.md",
+      "description": "说明 DSL 顶层字段、ID 前缀、支持数据、traceability 和 source snippet 规则。",
+      "confidence": "observed"
+    },
+    {
+      "id": "EV-DOCUMENT-STRUCTURE",
+      "kind": "source",
+      "title": "固定文档结构",
+      "location": "references/document-structure.md",
+      "description": "定义渲染后的固定 9 章 Markdown 结构、章节编号和表格列规则。",
+      "confidence": "observed"
+    },
+    {
+      "id": "EV-MERMAID-RULES",
+      "kind": "source",
+      "title": "Mermaid 规则",
+      "location": "references/mermaid-rules.md",
+      "description": "定义 Mermaid-only 输出、支持图类型、严格和静态校验差异以及 Graphviz 拒绝策略。",
+      "confidence": "observed"
+    },
+    {
+      "id": "EV-REVIEW-CHECKLIST",
+      "kind": "source",
+      "title": "复核清单",
+      "location": "references/review-checklist.md",
+      "description": "列出最终报告、边界、DSL、Mermaid、文本安全和渲染结构复核项。",
+      "confidence": "observed"
+    },
+    {
+      "id": "EV-SCHEMA",
+      "kind": "source",
+      "title": "DSL JSON Schema",
+      "location": "schemas/structure-design.schema.json",
+      "description": "定义 DSL 根对象、章节字段、支持数据、diagram 对象和安全 Markdown 文件名规则。",
+      "confidence": "observed"
+    },
+    {
+      "id": "EV-DSL-VALIDATOR",
+      "kind": "source",
+      "title": "DSL 校验器实现",
+      "location": "scripts/validate_dsl.py",
+      "description": "实现 JSON 加载、schema 校验、ID 注册、引用解析、章节规则、输出文件名、支持数据和 Markdown 安全校验。",
+      "confidence": "observed"
+    },
+    {
+      "id": "EV-MERMAID-VALIDATOR",
+      "kind": "source",
+      "title": "Mermaid 校验器实现",
+      "location": "scripts/validate_mermaid.py",
+      "description": "实现 DSL 和 Markdown Mermaid 提取、静态规则检查、环境检查和严格模式 mmdc 调用。",
+      "confidence": "observed"
+    },
+    {
+      "id": "EV-RENDERER",
+      "kind": "source",
+      "title": "Markdown 渲染器实现",
+      "location": "scripts/render_markdown.py",
+      "description": "实现固定章节渲染、表格和文本转义、支持数据渲染、输出文件名校验和文件写入策略。",
+      "confidence": "observed"
+    },
+    {
+      "id": "EV-INSTALLER",
+      "kind": "source",
+      "title": "copy-only 安装器实现",
+      "location": "scripts/install_skill.py",
+      "description": "实现运行时条目白名单、源验证、Codex home 解析、依赖状态报告、copy-only 安装和目标存在保护。",
+      "confidence": "observed"
+    },
+    {
+      "id": "EV-INSTALL-DOC",
+      "kind": "source",
+      "title": "安装文档",
+      "location": "docs/install.md",
+      "description": "说明 dry-run、安装、已有目标、依赖和测试命令。",
+      "confidence": "observed"
+    },
+    {
+      "id": "EV-REQUIREMENTS",
+      "kind": "source",
+      "title": "Python 依赖清单",
+      "location": "requirements.txt",
+      "description": "声明运行时 Python 依赖 jsonschema。",
+      "confidence": "observed"
+    },
+    {
+      "id": "EV-EXAMPLES",
+      "kind": "source",
+      "title": "最小 DSL 示例",
+      "location": "examples/minimal-from-code.dsl.json, examples/minimal-from-requirements.dsl.json, tests/fixtures/valid-phase2.dsl.json",
+      "description": "提供可用于校验和渲染测试的 DSL 示例与 fixture。",
+      "confidence": "observed"
+    },
+    {
+      "id": "EV-TESTS",
+      "kind": "source",
+      "title": "unittest 测试集合",
+      "location": "tests/test_validate_dsl.py, tests/test_validate_dsl_semantics.py, tests/test_validate_mermaid.py, tests/test_render_markdown.py, tests/test_install_skill.py, tests/test_phase7_e2e.py",
+      "description": "覆盖 schema、语义、Mermaid、渲染、安装和端到端工作流。",
+      "confidence": "observed"
+    }
+  ],
+  "traceability": [],
+  "risks": [
+    {
+      "id": "RISK-MERMAID-LOCAL-ENV",
+      "description": "严格 Mermaid 校验依赖本地 node、mmdc 和其浏览器运行环境，工具安装完整但运行环境异常时仍可能导致严格校验失败。",
+      "impact": "文档生成会在严格校验阶段停止，需要维护者先处理本地 Mermaid CLI 环境或明确接受静态校验降级。",
+      "mitigation": "保留 --check-env 检查，失败时按技能规则报告限制并获得用户接受后再使用 static-only。",
+      "confidence": "inferred",
+      "evidence_refs": ["EV-SKILL-CONTRACT", "EV-MERMAID-VALIDATOR", "EV-MERMAID-RULES"],
+      "traceability_refs": [],
+      "source_snippet_refs": []
+    },
+    {
+      "id": "RISK-DOC-METADATA-DISCOVERY",
+      "description": "仓库缺少顶层 README 和 pyproject 元数据时，新维护者需要从 SKILL.md、docs/install.md 和测试文件中拼出项目入口。",
+      "impact": "降低首次接手时定位入口、依赖和测试命令的效率。",
+      "mitigation": "补充简短 README 或 pyproject 元数据，并复用 docs/install.md 中的安装和测试说明。",
+      "confidence": "observed",
+      "evidence_refs": ["EV-INSTALL-DOC", "EV-TESTS"],
+      "traceability_refs": [],
+      "source_snippet_refs": []
+    }
+  ],
+  "assumptions": [],
+  "source_snippets": []
+}

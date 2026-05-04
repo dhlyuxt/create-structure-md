@@ -1,0 +1,7 @@
+flowchart TD
+  ARGS["parse args"] --> SOURCE["validate source"]
+  SOURCE --> HOME["resolve Codex home"]
+  HOME --> PLAN["print plan and dependencies"]
+  PLAN --> CHECK["target exists check"]
+  CHECK --> COPY["copy runtime entries"]
+  COPY --> VERIFY["validate installed target"]
