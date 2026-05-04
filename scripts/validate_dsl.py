@@ -9,6 +9,11 @@ from pathlib import Path
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
+try:
+    from v2_foundation import V2_VERSION_ERROR, require_v2_dsl_version
+except ModuleNotFoundError:
+    from scripts.v2_foundation import V2_VERSION_ERROR, require_v2_dsl_version
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = ROOT / "schemas/structure-design.schema.json"
@@ -185,7 +190,6 @@ PREFIX_BY_KIND = {
     "runtime_unit": "RUN-",
     "configuration_item": "CFG-",
     "data_artifact": "DATA-",
-    "dependency": "DEP-",
     "collaboration": "COL-",
     "flow": "FLOW-",
     "flow_step": "STEP-",
@@ -198,6 +202,9 @@ PREFIX_BY_KIND = {
     "assumption": "ASM-",
     "source_snippet": "SNIP-",
 }
+
+DEPENDENCY_ID_PREFIXES = ("SYSDEP-", "MDEP-")
+ID_KINDS = tuple(PREFIX_BY_KIND) + ("dependency",)
 
 SUPPORT_REF_FIELDS = {
     "evidence_refs": "evidence",
@@ -298,7 +305,7 @@ class ValidationContext:
     def __init__(self, document, report):
         self.document = document
         self.report = report
-        self.ids_by_kind = {kind: {} for kind in PREFIX_BY_KIND}
+        self.ids_by_kind = {kind: {} for kind in ID_KINDS}
         self.id_owner = {}
         self.flow_index_ids = []
         self.flow_index_paths = {}
@@ -311,10 +318,15 @@ class ValidationContext:
         self._check_unregistered_id_fields(self.document)
 
     def register(self, kind, value, path):
-        prefix = PREFIX_BY_KIND[kind]
-        if not isinstance(value, str) or not value.startswith(prefix):
-            self.report.error(path, f"ID must start with {prefix}", "Use the documented prefix; numeric suffixes are optional")
-            return
+        if kind == "dependency":
+            if not isinstance(value, str) or not value.startswith(DEPENDENCY_ID_PREFIXES):
+                self.report.error(path, "dependency ID must start with SYSDEP- or MDEP-", "Use SYSDEP- for Chapter 6 system dependencies and MDEP- for module dependencies")
+                return
+        else:
+            prefix = PREFIX_BY_KIND[kind]
+            if not isinstance(value, str) or not value.startswith(prefix):
+                self.report.error(path, f"ID must start with {prefix}", "Use the documented prefix; numeric suffixes are optional")
+                return
         if value in self.id_owner:
             first_kind, first_path = self.id_owner[value]
             self.report.error(path, f"duplicate ID {value}", f"First defined as {first_kind} at {first_path}")
@@ -986,6 +998,12 @@ def main(argv=None):
         document = load_json_file(path)
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+
+    try:
+        require_v2_dsl_version(document)
+    except ValueError:
+        print(f"ERROR: {V2_VERSION_ERROR}", file=sys.stderr)
         return 2
 
     schema_failure = schema_errors(document)

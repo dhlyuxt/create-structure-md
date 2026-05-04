@@ -9,7 +9,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 VALIDATOR = ROOT / "scripts/validate_dsl.py"
-FIXTURE = ROOT / "tests/fixtures/valid-phase2.dsl.json"
+FIXTURE = ROOT / "tests/fixtures/valid-v2-foundation.dsl.json"
+REJECTED_V1_FIXTURE = ROOT / "tests/fixtures/valid-phase2.dsl.json"
 PYTHON = sys.executable
 
 
@@ -70,6 +71,26 @@ class CliAndSchemaFirstTests(unittest.TestCase):
         self.assertIn("$.document.status", completed.stderr)
         self.assertIn("schema validation failed", completed.stderr)
         self.assertNotIn("semantic validation failed", completed.stderr)
+
+
+class V2VersionCliTests(unittest.TestCase):
+    def test_validator_rejects_v1_fixture_before_schema_validation(self):
+        completed = run_validator(REJECTED_V1_FIXTURE)
+        self.assertEqual(2, completed.returncode)
+        self.assertEqual("", completed.stdout)
+        self.assertIn("V1 DSL is not supported by the V2 renderer", completed.stderr)
+        self.assertIn("0.2.0", completed.stderr)
+        self.assertNotIn("schema validation failed", completed.stderr)
+
+    def test_validator_rejects_missing_dsl_version_before_schema_validation(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            del document["dsl_version"]
+            path = write_json(tmpdir, "missing-version.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(2, completed.returncode)
+        self.assertIn("V1 DSL is not supported by the V2 renderer", completed.stderr)
+        self.assertNotIn("schema validation failed", completed.stderr)
 
 
 class DocumentValidationTests(unittest.TestCase):
@@ -791,7 +812,7 @@ class ExtraTableAndTraceabilityTests(unittest.TestCase):
             ("runtime_unit", "RUN-GENERATE", lambda document: document["runtime_view"]["runtime_units"]["rows"][0]),
             ("configuration_item", "CFG-001", lambda document: document["configuration_data_dependencies"]["configuration_items"]["rows"][0]),
             ("data_artifact", "DATA-001", lambda document: document["configuration_data_dependencies"]["structural_data_artifacts"]["rows"][0]),
-            ("dependency", "DEP-001", lambda document: document["configuration_data_dependencies"]["dependencies"]["rows"][0]),
+            ("dependency", "SYSDEP-JSONSCHEMA", lambda document: document["configuration_data_dependencies"]["dependencies"]["rows"][0]),
             ("collaboration", "COL-001", lambda document: document["cross_module_collaboration"]["collaboration_scenarios"]["rows"][0]),
             ("flow", "FLOW-GENERATE", lambda document: document["key_flows"]["flows"][0]),
             ("flow_step", "STEP-GENERATE-001", lambda document: document["key_flows"]["flows"][0]["steps"][0]),
@@ -1221,15 +1242,16 @@ class MarkdownSafetyAndLowConfidenceTests(unittest.TestCase):
 
 
 class AcceptanceTests(unittest.TestCase):
-    def test_examples_pass_semantic_cli_validation(self):
+    def test_examples_are_rejected_until_migrated_to_v2(self):
         for relative_path in [
             "examples/minimal-from-code.dsl.json",
             "examples/minimal-from-requirements.dsl.json",
         ]:
             completed = run_validator(ROOT / relative_path)
             with self.subTest(path=relative_path):
-                self.assertEqual(0, completed.returncode, completed.stderr)
-                self.assertIn("Validation succeeded", completed.stdout)
+                self.assertEqual(2, completed.returncode)
+                self.assertEqual("", completed.stdout)
+                self.assertIn("V1 DSL is not supported by the V2 renderer", completed.stderr)
 
     def test_semantic_validation_accumulates_multiple_errors_after_schema_success(self):
         with tempfile.TemporaryDirectory() as tmpdir:

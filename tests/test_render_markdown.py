@@ -14,7 +14,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 RENDERER = ROOT / "scripts/render_markdown.py"
 VALIDATOR = ROOT / "scripts/validate_mermaid.py"
-FIXTURE = ROOT / "tests/fixtures/valid-phase2.dsl.json"
+FIXTURE = ROOT / "tests/fixtures/valid-v2-foundation.dsl.json"
 PYTHON = sys.executable
 
 
@@ -381,6 +381,26 @@ class RendererCliAndFilenameTests(unittest.TestCase):
                         self.assertTrue((Path(tmpdir) / output_file).is_file())
                     else:
                         self.assertIn(renderer_error, renderer_result.stderr)
+
+
+class RendererV2VersionTests(unittest.TestCase):
+    def test_renderer_rejects_v1_before_output_filename_validation_or_rendering(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            completed = subprocess.run(
+                [PYTHON, str(RENDERER), str(ROOT / "tests/fixtures/valid-phase2.dsl.json"), "--output-dir", tmpdir],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(2, completed.returncode)
+            self.assertIn("V1 DSL is not supported by the V2 renderer", completed.stderr)
+            self.assertEqual([], list(Path(tmpdir).glob("*.md")))
+
+    def test_render_markdown_api_rejects_non_v2_document_before_rendering(self):
+        module = load_renderer_module()
+        with self.assertRaisesRegex(module.InputError, "V1 DSL is not supported by the V2 renderer"):
+            module.render_markdown({"dsl_version": "0.1.0"})
 
 
 class RendererOutputSafetyTests(unittest.TestCase):
@@ -883,7 +903,7 @@ class SupportDataTablePlacementTests(unittest.TestCase):
             {"id": "EV-CFG", "kind": "note", "title": "配置证据", "location": "", "description": "", "confidence": "observed"},
         ]
         document["traceability"] = [
-            {"id": "TR-DEP", "source_external_id": "REQ-DEP", "source_type": "requirement", "target_type": "dependency", "target_id": "DEP-001", "description": ""},
+            {"id": "TR-DEP", "source_external_id": "REQ-DEP", "source_type": "requirement", "target_type": "dependency", "target_id": "SYSDEP-JSONSCHEMA", "description": ""},
         ]
         document["source_snippets"] = [
             {"id": "SNIP-COL", "path": "src/collab.py", "line_start": 4, "line_end": 5, "language": "python", "purpose": "协作证据。", "content": "collaborate()", "confidence": "observed"},
@@ -895,7 +915,7 @@ class SupportDataTablePlacementTests(unittest.TestCase):
 
         self.assertIn("支持数据（CFG-001 / 输出目录）", chapter_6)
         self.assertIn("依据：EV-CFG（配置证据）", chapter_6)
-        self.assertIn("支持数据（DEP-001 / jsonschema）", chapter_6)
+        self.assertIn("支持数据（SYSDEP-JSONSCHEMA / jsonschema）", chapter_6)
         self.assertIn("关联来源：REQ-DEP", chapter_6)
         self.assertIn("支持数据（COL-001 / DSL 校验后渲染）", chapter_7)
         self.assertIn("Source: src/collab.py:4-5", chapter_7)
@@ -1159,7 +1179,7 @@ class ChapterOneToFourRenderingTests(unittest.TestCase):
         markdown = module.render_markdown(valid_document())
         section = section_between(markdown, "#### 4.1.5 模块内部结构关系图", "#### 4.1.6 补充说明")
         self.assertIn("schema 描述 DSL 结构", section)
-        self.assertIn("单模块示例中使用文字结构说明即可。", section)
+        self.assertNotIn("单模块示例中使用文字结构说明即可。", section)
         self.assertNotIn("```mermaid", section)
 
     def test_architecture_extras_render_tables_and_diagrams_without_empty_state(self):
@@ -1703,14 +1723,23 @@ class RendererIntegrationTests(unittest.TestCase):
         self.assertNotIn("## 10.", markdown)
         self.assertNotIn("```mermaid\n\n```", markdown)
 
-    def test_minimal_examples_render_and_pass_post_render_mermaid_static_validation(self):
+    def test_minimal_examples_are_rejected_until_migrated_to_v2(self):
         for relative_path in [
             "examples/minimal-from-code.dsl.json",
             "examples/minimal-from-requirements.dsl.json",
         ]:
             with self.subTest(path=relative_path):
-                markdown = self.render_and_validate(ROOT / relative_path)
-                self.assertIn("## 9. 结构问题与改进建议", markdown)
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    completed = subprocess.run(
+                        [PYTHON, str(RENDERER), str(ROOT / relative_path), "--output-dir", tmpdir],
+                        cwd=ROOT,
+                        text=True,
+                        capture_output=True,
+                        check=False,
+                    )
+                    self.assertEqual(2, completed.returncode)
+                    self.assertIn("V1 DSL is not supported by the V2 renderer", completed.stderr)
+                    self.assertEqual([], list(Path(tmpdir).glob("*.md")))
 
     def test_synthetic_all_known_mermaid_paths_render_inside_fences(self):
         sources = {

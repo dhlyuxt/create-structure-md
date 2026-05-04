@@ -45,6 +45,8 @@ JSON_SCAFFOLD_FILES = [
 SCRIPT_CASES = []
 
 SCHEMA_PATH = ROOT / "schemas/structure-design.schema.json"
+VALID_V2_FIXTURE = ROOT / "tests/fixtures/valid-v2-foundation.dsl.json"
+REJECTED_V1_FIXTURE = ROOT / "tests/fixtures/valid-phase2.dsl.json"
 EXAMPLE_PATHS = [
     ROOT / "examples/minimal-from-code.dsl.json",
     ROOT / "examples/minimal-from-requirements.dsl.json",
@@ -95,7 +97,7 @@ def validator_for_def(def_name):
 
 
 def valid_example():
-    return deepcopy(load_json("tests/fixtures/valid-phase2.dsl.json"))
+    return deepcopy(load_json("tests/fixtures/valid-v2-foundation.dsl.json"))
 
 
 def validation_errors(document):
@@ -213,7 +215,7 @@ class ScriptStubTests(unittest.TestCase):
 class ValidateDslCliTests(unittest.TestCase):
     def test_validate_dsl_cli_accepts_valid_fixture(self):
         completed = subprocess.run(
-            [sys.executable, str(ROOT / "scripts/validate_dsl.py"), str(ROOT / "tests/fixtures/valid-phase2.dsl.json")],
+            [sys.executable, str(ROOT / "scripts/validate_dsl.py"), str(VALID_V2_FIXTURE)],
             cwd=ROOT,
             text=True,
             capture_output=True,
@@ -222,6 +224,25 @@ class ValidateDslCliTests(unittest.TestCase):
         self.assertEqual(0, completed.returncode, completed.stderr)
         self.assertIn("Validation succeeded", completed.stdout)
         self.assertEqual("", completed.stderr)
+
+
+class V2VersionSchemaTests(unittest.TestCase):
+    def test_schema_requires_dsl_version_0_2_0(self):
+        schema = load_schema()
+        self.assertEqual({"const": "0.2.0"}, schema["properties"]["dsl_version"])
+
+    def test_v2_foundation_fixture_validates(self):
+        validator().validate(valid_example())
+
+    def test_v1_fixture_is_rejected_by_schema(self):
+        document = load_json("tests/fixtures/valid-phase2.dsl.json")
+        assert_invalid(
+            self,
+            document,
+            "'0.2.0' was expected",
+            expected_validator="const",
+            expected_path=["dsl_version"],
+        )
 
 
 class SchemaRootContractTests(unittest.TestCase):
@@ -265,14 +286,14 @@ class SchemaRootContractTests(unittest.TestCase):
     def test_fixture_passes_root_shell_validation(self):
         validator().validate(valid_example())
 
-    def test_dsl_version_must_be_non_empty(self):
+    def test_dsl_version_must_be_v2_const(self):
         document = valid_example()
         document["dsl_version"] = ""
         assert_invalid(
             self,
             document,
-            "should be non-empty",
-            expected_validator="minLength",
+            "'0.2.0' was expected",
+            expected_validator="const",
             expected_path=["dsl_version"],
         )
 
@@ -749,11 +770,22 @@ class SchemaSupportDataTests(unittest.TestCase):
 
 
 class SchemaExampleValidationTests(unittest.TestCase):
-    def test_example_dsl_files_pass_schema_validation(self):
+    def test_example_dsl_files_are_rejected_until_migrated_to_v2(self):
         schema_validator = validator()
         for path in EXAMPLE_PATHS:
             with self.subTest(path=path.name):
-                schema_validator.validate(json.loads(path.read_text(encoding="utf-8")))
+                errors = sorted(
+                    schema_validator.iter_errors(json.loads(path.read_text(encoding="utf-8"))),
+                    key=lambda error: list(error.path),
+                )
+                self.assertTrue(
+                    matching_errors(
+                        errors,
+                        "'0.2.0' was expected",
+                        expected_validator="const",
+                        expected_path=["dsl_version"],
+                    )
+                )
 
     def test_examples_use_concrete_output_filenames(self):
         for path in EXAMPLE_PATHS:

@@ -9,6 +9,11 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+try:
+    from v2_foundation import V2_VERSION_ERROR, require_v2_dsl_version
+except ModuleNotFoundError:
+    from scripts.v2_foundation import V2_VERSION_ERROR, require_v2_dsl_version
+
 
 GENERIC_OUTPUT_NAMES = {
     "structure_design.md",
@@ -1159,6 +1164,11 @@ def resolve_output_path(output_dir, output_file):
 
 
 def render_markdown(document):
+    try:
+        require_v2_dsl_version(document)
+    except ValueError:
+        raise InputError(V2_VERSION_ERROR)
+
     module_display_names = build_module_display_names(document)
     runtime_unit_display_names = build_runtime_unit_display_names(document)
     support_context = build_support_context(document)
@@ -1236,10 +1246,14 @@ def main(argv=None):
 
     try:
         document = load_json_file(args.dsl_file)
+        require_v2_dsl_version(document)
         output_file = validate_output_filename(document)
         output_path = resolve_output_path(args.output_dir, output_file)
         markdown = render_markdown(document)
         backup_path = write_output(output_path, markdown, overwrite=args.overwrite, backup=args.backup)
+    except ValueError:
+        print(f"ERROR: {V2_VERSION_ERROR}", file=sys.stderr)
+        return 2
     except InputError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return exc.exit_code

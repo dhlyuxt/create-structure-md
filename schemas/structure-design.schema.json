@@ -21,9 +21,7 @@
     "source_snippets"
   ],
   "properties": {
-    "dsl_version": {
-      "$ref": "#/$defs/nonEmptyString"
-    },
+    "dsl_version": { "const": "0.2.0" },
     "document": {
       "$ref": "#/$defs/document"
     },
@@ -102,6 +100,30 @@
     "confidence": {
       "type": "string",
       "enum": ["observed", "inferred", "unknown"]
+    },
+    "moduleKind": {
+      "type": "string",
+      "enum": ["documentation_contract", "schema_contract", "validator", "renderer", "installer", "test_suite", "library", "other"]
+    },
+    "valueSource": {
+      "type": "string",
+      "enum": ["default", "cli_argument", "environment", "constant", "config_file", "computed", "inferred", "unknown"]
+    },
+    "dependencyType": {
+      "type": "string",
+      "enum": ["runtime", "library", "tool", "schema_contract", "documentation_contract", "dsl_contract", "internal_module", "data_object", "filesystem", "external_service", "test_fixture", "other"]
+    },
+    "usageRelation": {
+      "type": "string",
+      "enum": ["reads", "writes", "validates_against", "renders", "invokes", "imports", "tests", "produces", "consumes", "uses", "other"]
+    },
+    "interfaceType": {
+      "type": "string",
+      "enum": ["command_line", "function", "method", "library_api", "schema_contract", "dsl_contract", "document_contract", "configuration_contract", "data_contract", "test_fixture", "workflow", "other"]
+    },
+    "anchorType": {
+      "type": "string",
+      "enum": ["file_path", "module_id", "interface_id", "data_id", "dependency_id", "parameter_id", "diagram_id", "table_id", "source_snippet_id", "evidence_id", "traceability_id", "other"]
     },
     "document": {
       "type": "object",
@@ -381,7 +403,7 @@
       "properties": {
         "dependency_id": { "$ref": "#/$defs/nonEmptyString" },
         "dependency_name": { "$ref": "#/$defs/nonEmptyString" },
-        "dependency_type": { "$ref": "#/$defs/nonEmptyString" },
+        "dependency_type": { "$ref": "#/$defs/dependencyType" },
         "used_by": { "type": "string" },
         "purpose": { "$ref": "#/$defs/nonEmptyString" },
         "notes": { "type": "string" },
