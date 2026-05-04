@@ -199,7 +199,7 @@ def interface_location_violations(base_path, location, *, line_one_supported=Fal
     if line_start is None or line_end is None:
         violations.append(RuleViolation(base_path, f"{base_path} line_start and line_end must both be non-null when either line value is present"))
         return violations
-    if not isinstance(line_start, int) or not isinstance(line_end, int):
+    if type(line_start) is not int or type(line_end) is not int:
         violations.append(RuleViolation(base_path, f"{base_path} line_start and line_end must be integers"))
         return violations
     if line_start < 1 or line_end < 1:

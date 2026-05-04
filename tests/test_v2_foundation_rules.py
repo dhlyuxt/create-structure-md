@@ -292,6 +292,8 @@ class DirectHelperTests(unittest.TestCase):
             {"file_path": "scripts/x.py", "line_end": 2},
             {"file_path": "scripts/x.py", "line_start": None, "line_end": 2},
             {"file_path": "scripts/x.py", "line_start": 2, "line_end": None},
+            {"file_path": "scripts/x.py", "line_start": True, "line_end": 5},
+            {"file_path": "scripts/x.py", "line_start": 1, "line_end": False},
             {"file_path": "scripts/x.py", "line_start": 4, "line_end": 2},
             {"file_path": "scripts/x.py", "line_start": 1, "line_end": 1},
         ]
