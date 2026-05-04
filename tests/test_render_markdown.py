@@ -1245,6 +1245,7 @@ class ChapterOneToFourRenderingTests(unittest.TestCase):
         second_design["module_id"] = "MOD-SECOND"
         second_design["name"] = "第二模块"
         second_design["summary"] = "第二模块概述。"
+        second_design["internal_structure"]["diagram"]["id"] = "MER-MOD-SECOND-STRUCT"
         document["module_design"]["modules"] = [second_design, document["module_design"]["modules"][0]]
 
         markdown = module.render_markdown(document)

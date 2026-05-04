@@ -465,7 +465,7 @@ def enum_and_other_reason_violations(document):
 def location_scan_violations(document):
     violations = []
     for path, value in walk(document):
-        if path.endswith(".location"):
+        if path.endswith(".location") and isinstance(value, dict):
             violations.extend(interface_location_violations(path, value))
     return violations
 

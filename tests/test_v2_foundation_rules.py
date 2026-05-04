@@ -407,11 +407,13 @@ class GlobalRuleTests(unittest.TestCase):
             "nested": [
                 {"location": {"file_path": "scripts/x.py", "line_start": 7}},
                 {"child": {"location": {"file_path": "scripts/y.py", "line_start": 3, "line_end": 2}}},
-            ]
+            ],
+            "evidence": [{"location": "notes"}],
         }
         paths = [violation.path for violation in v2_global_rule_violations(document)]
         self.assertIn("$.nested[0].location", paths)
         self.assertIn("$.nested[1].child.location", paths)
+        self.assertNotIn("$.evidence[0].location", paths)
 
     def test_contract_interfaces_do_not_require_absent_parameter_or_return_gates(self):
         document = {
