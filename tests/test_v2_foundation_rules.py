@@ -271,6 +271,12 @@ class DirectHelperTests(unittest.TestCase):
         self.assertEqual(
             [],
             interface_location_violations(
+                "$.location", {"file_path": "scripts/x.py", "line_start": None, "line_end": None}
+            ),
+        )
+        self.assertEqual(
+            [],
+            interface_location_violations(
                 "$.location",
                 {"file_path": "scripts/x.py", "line_start": 1, "line_end": 1},
                 line_one_supported=True,
@@ -284,6 +290,8 @@ class DirectHelperTests(unittest.TestCase):
             {"file_path": ""},
             {"file_path": "scripts/x.py", "line_start": 2},
             {"file_path": "scripts/x.py", "line_end": 2},
+            {"file_path": "scripts/x.py", "line_start": None, "line_end": 2},
+            {"file_path": "scripts/x.py", "line_start": 2, "line_end": None},
             {"file_path": "scripts/x.py", "line_start": 4, "line_end": 2},
             {"file_path": "scripts/x.py", "line_start": 1, "line_end": 1},
         ]
@@ -445,11 +453,59 @@ class GlobalRuleTests(unittest.TestCase):
             "structure_issues_and_suggestions": {
                 "blocks": [{"block_id": "BLOCK-DUP"}, {"block_id": "BLOCK-DUP"}]
             },
+            "architecture_views": {
+                "module_intro": {
+                    "rows": [{"module_id": "MOD-DUP"}, {"module_id": "MOD-DUP"}]
+                },
+                "module_relationship_diagram": {
+                    "id": "MER-DUP",
+                    "diagram_type": "flowchart",
+                    "source": "flowchart TD\n  A --> B",
+                },
+            },
+            "runtime_view": {
+                "runtime_flow_diagram": {
+                    "id": "MER-DUP",
+                    "diagram_type": "flowchart",
+                    "source": "flowchart TD\n  B --> C",
+                }
+            },
+            "chapter_nine": {
+                "blocks": [
+                    {
+                        "block_id": "BLOCK-TABLE-A",
+                        "block_type": "table",
+                        "table": {"id": "TBL-DUP", "columns": [], "rows": []},
+                    },
+                    {
+                        "block_id": "BLOCK-TABLE-B",
+                        "block_type": "table",
+                        "table": {"id": "TBL-DUP", "columns": [], "rows": []},
+                    },
+                ]
+            },
         }
         messages = "\n".join(violation.message for violation in v2_global_rule_violations(document))
-        for duplicated_id in ["MPARAM-DUP", "DATA-DUP", "MDEP-DUP", "LIMIT-DUP", "BLOCK-DUP"]:
+        for duplicated_id in [
+            "MPARAM-DUP",
+            "DATA-DUP",
+            "MDEP-DUP",
+            "LIMIT-DUP",
+            "BLOCK-DUP",
+            "MOD-DUP",
+            "MER-DUP",
+            "TBL-DUP",
+        ]:
             self.assertIn(duplicated_id, messages)
             self.assertIn("duplicate", messages)
+
+    def test_module_intro_and_module_detail_can_share_logical_module_id_once(self):
+        document = {
+            "architecture_views": {"module_intro": {"rows": [{"module_id": "MOD-PAIR"}]}},
+            "module_design": {"modules": [{"module_id": "MOD-PAIR"}]},
+        }
+        messages = "\n".join(violation.message for violation in v2_global_rule_violations(document))
+        self.assertNotIn("duplicate module_id MOD-PAIR", messages)
 
     def test_interface_id_scope_allows_logical_pair_and_rejects_invalid_reuse(self):
         allowed = {

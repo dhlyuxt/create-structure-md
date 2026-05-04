@@ -194,6 +194,11 @@ def interface_location_violations(base_path, location, *, line_one_supported=Fal
 
     line_start = location.get("line_start")
     line_end = location.get("line_end")
+    if line_start is None and line_end is None:
+        return violations
+    if line_start is None or line_end is None:
+        violations.append(RuleViolation(base_path, f"{base_path} line_start and line_end must both be non-null when either line value is present"))
+        return violations
     if not isinstance(line_start, int) or not isinstance(line_end, int):
         violations.append(RuleViolation(base_path, f"{base_path} line_start and line_end must be integers"))
         return violations
@@ -533,6 +538,45 @@ def interface_id_scope_violations(document):
     return violations
 
 
+def module_id_scope_violations(document):
+    violations = []
+    if not isinstance(document, dict):
+        return violations
+
+    intro_seen = {}
+    intro_rows = as_rows(document.get("architecture_views", {}).get("module_intro"))
+    for row_index, row in enumerate(intro_rows):
+        if not isinstance(row, dict):
+            continue
+        module_id = row.get("module_id")
+        if not isinstance(module_id, str) or not module_id:
+            continue
+        path = f"$.architecture_views.module_intro.rows[{row_index}].module_id"
+        previous_path = intro_seen.get(module_id)
+        if previous_path:
+            violations.append(RuleViolation(path, f"duplicate module_id {module_id}; first seen at {previous_path}"))
+        else:
+            intro_seen[module_id] = path
+
+    design_seen = {}
+    modules = document.get("module_design", {}).get("modules", [])
+    if not isinstance(modules, list):
+        return violations
+    for module_index, module in enumerate(modules):
+        if not isinstance(module, dict):
+            continue
+        module_id = module.get("module_id")
+        if not isinstance(module_id, str) or not module_id:
+            continue
+        path = f"$.module_design.modules[{module_index}].module_id"
+        previous_path = design_seen.get(module_id)
+        if previous_path:
+            violations.append(RuleViolation(path, f"duplicate module_id {module_id}; first seen at {previous_path}"))
+        else:
+            design_seen[module_id] = path
+    return violations
+
+
 def id_scope_violations(document):
     violations = []
     seen_by_field = {field: {} for field in V2_TYPED_ID_FIELDS}
@@ -573,6 +617,54 @@ def id_scope_violations(document):
     return violations
 
 
+def _path_leaf(path):
+    return path.rsplit(".", 1)[-1]
+
+
+def _is_diagram_object(path, value):
+    leaf = _path_leaf(path)
+    return (
+        isinstance(value, dict)
+        and isinstance(value.get("id"), str)
+        and value.get("id") != ""
+        and (leaf == "diagram" or leaf.endswith("_diagram") or leaf.startswith("diagrams[") or "diagram_type" in value)
+    )
+
+
+def _is_table_object(path, value):
+    leaf = _path_leaf(path)
+    return (
+        isinstance(value, dict)
+        and isinstance(value.get("id"), str)
+        and value.get("id") != ""
+        and (leaf == "table" or leaf.endswith("_table") or leaf.startswith("tables["))
+    )
+
+
+def diagram_table_id_scope_violations(document):
+    violations = []
+    seen_diagrams = {}
+    seen_tables = {}
+    for path, value in walk(document):
+        if _is_diagram_object(path, value):
+            diagram_id = value["id"]
+            id_path = f"{path}.id"
+            previous_path = seen_diagrams.get(diagram_id)
+            if previous_path:
+                violations.append(RuleViolation(id_path, f"duplicate diagram.id {diagram_id}; first seen at {previous_path}"))
+            else:
+                seen_diagrams[diagram_id] = id_path
+        if _is_table_object(path, value):
+            table_id = value["id"]
+            id_path = f"{path}.id"
+            previous_path = seen_tables.get(table_id)
+            if previous_path:
+                violations.append(RuleViolation(id_path, f"duplicate table.id {table_id}; first seen at {previous_path}"))
+            else:
+                seen_tables[table_id] = id_path
+    return violations
+
+
 def dependency_prefix_violations(document):
     violations = []
     if not isinstance(document, dict):
@@ -610,6 +702,8 @@ def v2_global_rule_violations(document):
     violations.extend(enum_and_other_reason_violations(document))
     violations.extend(location_scan_violations(document))
     violations.extend(interface_id_scope_violations(document))
+    violations.extend(module_id_scope_violations(document))
     violations.extend(id_scope_violations(document))
+    violations.extend(diagram_table_id_scope_violations(document))
     violations.extend(dependency_prefix_violations(document))
     return violations
