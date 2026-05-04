@@ -7,7 +7,7 @@ V2 upgrades create-structure-md from a fixed 9-chapter Markdown renderer into a 
 The primary changes are:
 
 - Evidence support blocks are hidden by default in final Markdown.
-- Chapter 4 is rebuilt around module scope, configuration, dependencies, data objects, public interfaces, implementation notes, and known limitations.
+- Chapter 4 is rebuilt around module scope, configuration, dependencies, data objects, public interfaces, internal mechanism, and known limitations.
 - Mermaid diagrams receive an adversarial readability review by a subagent before strict validation.
 - Section 5.2 runtime unit tables are simplified.
 - Mermaid validator files and Mermaid rule files are not changed in this phase.
@@ -43,9 +43,13 @@ repo-analysis skill or human analysis -> structure DSL -> create-structure-md ->
 
 ## DSL Version
 
-V2 should use `dsl_version: "0.2.0"`.
+V2 is a breaking DSL shape change.
 
-The validator may keep compatibility with `0.1.0` only if that does not complicate the main implementation. The V2 examples and tests should use `0.2.0`.
+The only supported DSL version is `0.2.0`. The V2 schema, validator, renderer, examples, and tests target `0.2.0` only.
+
+Inputs with any `dsl_version` other than `0.2.0` must fail fast before rendering. The error should state that V1 DSL is not supported by the V2 renderer and that the input must be migrated to `0.2.0`.
+
+This phase does not implement a migration tool. Legacy V1 examples may be retained only as rejected fixtures.
 
 ## Evidence Rendering
 
@@ -192,6 +196,9 @@ Use this rule of thumb:
         "dependency_id": "DEP-PYTHON",
         "name": "Python 3",
         "dependency_type": "runtime",
+        "usage_relation": "uses",
+        "target_module_id": "",
+        "target_data_id": "",
         "required_for": "运行渲染脚本",
         "failure_behavior": "命令无法执行",
         "confidence": "observed",
@@ -240,8 +247,9 @@ Use this rule of thumb:
         "purpose": "把 DSL 渲染为最终 Markdown 文件。",
         "location": {
           "file_path": "scripts/render_markdown.py",
-          "line_start": 1,
-          "line_end": 1
+          "symbol": "main",
+          "line_start": null,
+          "line_end": null
         },
         "parameters": {
           "rows": [
@@ -295,51 +303,91 @@ Use this rule of thumb:
     "not_applicable_reason": ""
   },
 
-  "implementation_notes": {
-    "summary": "说明该模块内部如何完成职责。Codex 可自由组合文字、图和表。",
-    "blocks": [
-      {
-        "block_id": "IMPLNOTE-RENDER-TEXT",
-        "block_type": "text",
-        "title": "固定章节渲染机制",
-        "text": "渲染器读取 DSL 后构建渲染上下文，再按固定章节顺序生成 Markdown。第四章由模块设计数据驱动，依次输出范围、配置、依赖、数据对象、接口、实现机制和已知限制。"
-      },
-      {
-        "block_id": "IMPLNOTE-RENDER-DIAGRAM",
-        "block_type": "diagram",
-        "title": "章节渲染机制图",
-        "diagram": {
-          "id": "MER-IMPLNOTE-RENDER-FLOW",
-          "kind": "implementation_note",
-          "title": "章节渲染机制图",
-          "diagram_type": "flowchart",
-          "description": "展示渲染器如何组织章节输出。",
-          "source": "flowchart TD\n  A[\"Load DSL\"] --> B[\"Build context\"]\n  B --> C[\"Render chapters\"]\n  C --> D[\"Write Markdown\"]",
-          "confidence": "observed"
-        }
-      },
-      {
-        "block_id": "IMPLNOTE-RENDER-TABLE",
-        "block_type": "table",
-        "title": "关键阶段",
-        "table": {
-          "id": "TBL-IMPLNOTE-RENDER-STAGES",
-          "title": "关键阶段",
-          "columns": [
-            { "key": "stage", "title": "阶段" },
-            { "key": "description", "title": "说明" }
+  "internal_mechanism": {
+    "summary": "说明该模块内部如何完成职责。该节不是补充说明，而是第四章解释模块内部机制的核心区域。",
+    "mechanism_index": {
+      "rows": [
+        {
+          "mechanism_id": "MECH-RENDER-CHAPTER-DISPATCH",
+          "mechanism_name": "固定章节调度机制",
+          "purpose": "按固定章节顺序组织全文 Markdown 渲染。",
+          "input": "通过校验的 DSL document 和支持数据上下文",
+          "processing": "按固定顺序调用各章渲染逻辑并拼接输出。",
+          "output": "完整 Markdown 字符串",
+          "structural_significance": "决定文档章节顺序稳定，并让每章渲染逻辑保持可测试边界。",
+          "related_anchors": [
+            "scripts/render_markdown.py",
+            "IFACE-RENDER-CLI",
+            "DATA-STRUCTURE-DSL"
           ],
-          "rows": [
-            {
-              "stage": "上下文构建",
-              "description": "收集 DSL 中的结构信息和支持数据索引。"
-            },
-            {
-              "stage": "章节渲染",
-              "description": "按固定章节顺序调用对应渲染逻辑。"
-            }
-          ]
+          "confidence": "observed",
+          "evidence_refs": [],
+          "traceability_refs": [],
+          "source_snippet_refs": []
         }
+      ],
+      "not_applicable_reason": ""
+    },
+    "mechanism_details": [
+      {
+        "mechanism_id": "MECH-RENDER-CHAPTER-DISPATCH",
+        "blocks": [
+          {
+            "block_id": "MECH-RENDER-TEXT",
+            "block_type": "text",
+            "title": "固定章节调度机制说明",
+            "text": "渲染器读取 DSL 后构建渲染上下文，再按固定章节顺序生成 Markdown。第四章由模块设计数据驱动，依次输出范围、配置、依赖、数据对象、接口、实现机制和已知限制。",
+            "confidence": "observed",
+            "evidence_refs": [],
+            "traceability_refs": [],
+            "source_snippet_refs": []
+          },
+          {
+            "block_id": "MECH-RENDER-DIAGRAM",
+            "block_type": "diagram",
+            "title": "固定章节调度机制图",
+            "confidence": "observed",
+            "evidence_refs": [],
+            "traceability_refs": [],
+            "source_snippet_refs": [],
+            "diagram": {
+              "id": "MER-MECH-RENDER-FLOW",
+              "kind": "internal_mechanism",
+              "title": "固定章节调度机制图",
+              "diagram_type": "flowchart",
+              "description": "展示渲染器如何组织章节输出。",
+              "source": "flowchart TD\n  A[\"Load DSL\"] --> B[\"Build context\"]\n  B --> C[\"Render chapters\"]\n  C --> D[\"Write Markdown\"]",
+              "confidence": "observed"
+            }
+          },
+          {
+            "block_id": "MECH-RENDER-TABLE",
+            "block_type": "table",
+            "title": "关键阶段",
+            "confidence": "observed",
+            "evidence_refs": [],
+            "traceability_refs": [],
+            "source_snippet_refs": [],
+            "table": {
+              "id": "TBL-MECH-RENDER-STAGES",
+              "title": "关键阶段",
+              "columns": [
+                { "key": "stage", "title": "阶段" },
+                { "key": "description", "title": "说明" }
+              ],
+              "rows": [
+                {
+                  "stage": "上下文构建",
+                  "description": "收集 DSL 中的结构信息和支持数据索引。"
+                },
+                {
+                  "stage": "章节渲染",
+                  "description": "按固定章节顺序调用对应渲染逻辑。"
+                }
+              ]
+            }
+          }
+        ]
       }
     ],
     "not_applicable_reason": ""
@@ -418,10 +466,39 @@ Render module-level parameters as:
 
 Render dependencies as:
 
-| 名称 | 类型 | 用途 | 失败行为 |
-| --- | --- | --- | --- |
+| 名称 | 类型 | 关系 | 用途 | 失败行为 |
+| --- | --- | --- | --- | --- |
 
-`dependency_id`, confidence, and evidence refs are internal DSL fields and are not shown by default.
+`dependency_id`, target refs, confidence, and evidence refs are internal DSL fields and are not shown by default.
+
+`dependency_type` is an enum:
+
+- `runtime`
+- `library`
+- `tool`
+- `schema_contract`
+- `documentation_contract`
+- `dsl_contract`
+- `internal_module`
+- `data_object`
+- `filesystem`
+- `external_service`
+- `test_fixture`
+- `other`
+
+`usage_relation` is an enum:
+
+- `reads`
+- `writes`
+- `validates_against`
+- `renders`
+- `invokes`
+- `imports`
+- `tests`
+- `produces`
+- `consumes`
+- `uses`
+- `other`
 
 ### Data Objects Rendering
 
@@ -443,7 +520,9 @@ First render a module-level interface list:
 
 Then render one detail section per interface:
 
-- interface prototype
+Executable interface types render:
+
+- prototype
 - purpose
 - location
 - parameter table
@@ -452,6 +531,66 @@ Then render one detail section per interface:
 - side effects
 - error behavior
 - consumers
+
+Contract interface types render:
+
+- purpose
+- location
+- contract scope
+- contract location
+- required fields
+- consumers
+- validation behavior
+
+`interface_type` is an enum:
+
+- `command_line`
+- `function`
+- `method`
+- `library_api`
+- `schema_contract`
+- `dsl_contract`
+- `document_contract`
+- `configuration_contract`
+- `data_contract`
+- `test_fixture`
+- `workflow`
+- `other`
+
+Executable interface types are `command_line`, `function`, `method`, `library_api`, and `workflow`.
+
+Contract interface types are `schema_contract`, `dsl_contract`, `document_contract`, `configuration_contract`, `data_contract`, and `test_fixture`.
+
+`other` requires `interface_type_reason`.
+
+Location shape:
+
+```json
+{
+  "file_path": "scripts/render_markdown.py",
+  "symbol": "main",
+  "line_start": null,
+  "line_end": null
+}
+```
+
+`file_path` is required. `symbol`, `line_start`, and `line_end` are optional. `line_start` and `line_end` may be `null`; if one line value is present, both must be present. Do not use `line_start: 1` and `line_end: 1` as an unknown placeholder. That range is allowed only when evidence proves the target is actually on line 1.
+
+If `confidence` is `observed` and `interface_type` is `function` or `method`, validation should warn unless `symbol` or a line range is provided.
+
+Contract interface object:
+
+```json
+{
+  "contract": {
+    "contract_scope": "说明契约覆盖什么。",
+    "contract_location": "schemas/structure-design.schema.json#/properties/module_design",
+    "required_fields": ["module_id", "name", "source_scope"],
+    "consumers": ["validate_dsl.py", "render_markdown.py"],
+    "validation_behavior": "违反契约时 validate_dsl.py 失败。"
+  }
+}
+```
 
 Parameter table:
 
@@ -463,19 +602,30 @@ Return value table:
 | 返回名 | 返回类型 | 描述 | 条件 |
 | --- | --- | --- | --- |
 
-The execution flow diagram is stored locally on the interface object as `execution_flow_diagram`. It is not routed through supplemental diagram fields. `execution_flow_diagram.source` is required and must be non-empty for every public interface.
+The execution flow diagram is stored locally on executable interface objects as `execution_flow_diagram`. It is not routed through supplemental diagram fields. `execution_flow_diagram.source` is required and must be non-empty for executable interfaces.
 
-### Implementation Notes Rendering
+### Internal Mechanism Rendering
 
-Render `implementation_notes` as a free content-block section. Codex decides the number, order, and mix of text, diagram, and table blocks. This section should explain how the module works internally without forcing a fixed table template.
+Render `internal_mechanism` as the primary Chapter 4 section for explaining how the module works internally. It is not a miscellaneous notes section.
 
 The renderer outputs:
 
 - summary paragraph
-- each block in `blocks[]` order
-- `not_applicable_reason` only when `blocks[]` is empty
+- mechanism index table
+- one mechanism detail subsection for each mechanism
+- each mechanism detail's content blocks in DSL order
+- `not_applicable_reason` only when the mechanism index and details are empty
 
-At least one text block with non-empty `text` is required whenever `blocks[]` is non-empty.
+Mechanism detail blocks use the reusable content block module.
+
+The mechanism index table renders:
+
+| 机制 | 用途 | 输入 | 处理方式 | 输出 | 结构意义 |
+| --- | --- | --- | --- | --- | --- |
+
+`mechanism_id`, related anchors, confidence, and support refs are internal DSL fields and are not shown by default.
+
+`mechanism_details[]` must correspond one-to-one with `mechanism_index.rows[]` by `mechanism_id`. Each mechanism detail renders as a child subsection under `4.x.6`.
 
 ### Known Limitations Rendering
 
@@ -492,10 +642,25 @@ V2 introduces reusable content blocks for sections where Codex needs freedom to 
 
 Initial content-block users:
 
-- `module_design.modules[].implementation_notes.blocks[]`
+- `module_design.modules[].internal_mechanism.mechanism_details[].blocks[]`
 - `structure_issues_and_suggestions.blocks[]`
 
 Content blocks are rendered in DSL order. They are not raw Markdown. The renderer owns Markdown headings, Mermaid fences, and table formatting.
+
+The same content-block schema definition, semantic validator helper, and renderer helper must be used by Chapter 4 internal mechanism details and Chapter 9 structure issues. Do not implement separate Chapter 4 and Chapter 9 block renderers with divergent behavior.
+
+Every content block has common metadata:
+
+```json
+{
+  "confidence": "observed",
+  "evidence_refs": [],
+  "traceability_refs": [],
+  "source_snippet_refs": []
+}
+```
+
+Hidden evidence mode suppresses rendering of these refs. Inline evidence mode may render support data after the block.
 
 ### Text Block
 
@@ -504,7 +669,11 @@ Content blocks are rendered in DSL order. They are not raw Markdown. The rendere
   "block_id": "BLOCK-TEXT-001",
   "block_type": "text",
   "title": "说明标题",
-  "text": "普通说明文字。"
+  "text": "普通说明文字。",
+  "confidence": "observed",
+  "evidence_refs": [],
+  "traceability_refs": [],
+  "source_snippet_refs": []
 }
 ```
 
@@ -517,6 +686,10 @@ Content blocks are rendered in DSL order. They are not raw Markdown. The rendere
   "block_id": "BLOCK-DIAGRAM-001",
   "block_type": "diagram",
   "title": "图标题",
+  "confidence": "observed",
+  "evidence_refs": [],
+  "traceability_refs": [],
+  "source_snippet_refs": [],
   "diagram": {
     "id": "MER-BLOCK-001",
     "kind": "content_block",
@@ -538,6 +711,10 @@ Content blocks are rendered in DSL order. They are not raw Markdown. The rendere
   "block_id": "BLOCK-TABLE-001",
   "block_type": "table",
   "title": "表标题",
+  "confidence": "observed",
+  "evidence_refs": [],
+  "traceability_refs": [],
+  "source_snippet_refs": [],
   "table": {
     "id": "TBL-BLOCK-001",
     "title": "表标题",
@@ -555,7 +732,7 @@ Content blocks are rendered in DSL order. They are not raw Markdown. The rendere
 }
 ```
 
-`table` uses the existing local table shape. Table block rows may only use declared column keys. They should not carry evidence, traceability, or source snippet refs.
+`table` uses the existing local table shape. Table block rows may only use declared column keys. They must not carry evidence, traceability, or source snippet refs. Support data attaches to the table block as a whole.
 
 ### Content Block Validation
 
@@ -563,15 +740,42 @@ For every content-block section:
 
 - `blocks[]` may be empty only when `not_applicable_reason` is non-empty.
 - If `blocks[]` is non-empty, at least one block must have `block_type: "text"` and non-empty `text`.
-- `block_id` values must be unique within the section.
+- `block_id` values must be unique within the parent content-block section.
 - `block_type` must be `text`, `diagram`, or `table`.
+- Every block must have non-empty `block_id`, `block_type`, `title`, and `confidence`.
+- `evidence_refs`, `traceability_refs`, and `source_snippet_refs` are optional arrays on every block; when present, each referenced ID must resolve.
 - Text blocks must have non-empty `text`.
 - Diagram blocks must have a full Mermaid diagram object with non-empty `source`.
+- Diagram block `confidence` must not conflict with `diagram.confidence`; if both are present, they must match.
 - Table blocks must have non-empty `columns[]` and `rows[]`.
+- Table block rows must not contain evidence, traceability, or source snippet refs.
+
+Renderer uses `block.title` as the visible block heading. For diagram blocks, `diagram.title` may match `block.title` but does not have to. If they differ, `block.title` remains the visible block heading and `diagram.title` remains diagram metadata. Table blocks follow the same rule for `table.title`.
+
+### ID Scope Rules
+
+- `block_id` is unique within its parent content-block section.
+- Mermaid `diagram.id` is globally unique across the DSL document.
+- Table `table.id` is globally unique across the DSL document.
+- `module_id`, `interface_id`, `parameter_id`, `data_id`, `dependency_id`, and `limitation_id` are globally unique within their own ID type.
+- Existing V1 support IDs keep their V1 global/type scope rules.
+
+Validation errors should include both JSON path and stable ID when the item has an ID. For nested content block objects, report the nearest containing `block_id` plus nested `diagram.id` or `table.id` where present.
 
 ## Chapter 9 Design
 
-V2 replaces the V1 free-form `structure_issues_and_suggestions` string with a content-block section.
+V2 keeps Chapter 9 as the place for risks, assumptions, low-confidence items, and structure improvement guidance. Only `structure_issues_and_suggestions` changes from a restricted free-form string to a reusable content-block section.
+
+Chapter 9 renders:
+
+```text
+9.1 风险清单
+9.2 假设清单
+9.3 低置信度项目
+9.4 结构问题与改进建议
+```
+
+`9.4 结构问题与改进建议` renders `structure_issues_and_suggestions.blocks[]`.
 
 ```json
 {
@@ -582,12 +786,20 @@ V2 replaces the V1 free-form `structure_issues_and_suggestions` string with a co
         "block_id": "ISSUE-TEXT-001",
         "block_type": "text",
         "title": "第四章信息密度不足",
-        "text": "V1 第四章容易停留在职责摘要，缺少模块实现机制说明。V2 通过对外接口和实现机制说明补足这一点。"
+        "text": "V1 第四章容易停留在职责摘要，缺少模块实现机制说明。V2 通过对外接口和实现机制说明补足这一点。",
+        "confidence": "observed",
+        "evidence_refs": [],
+        "traceability_refs": [],
+        "source_snippet_refs": []
       },
       {
         "block_id": "ISSUE-DIAGRAM-001",
         "block_type": "diagram",
         "title": "质量门禁关系图",
+        "confidence": "observed",
+        "evidence_refs": [],
+        "traceability_refs": [],
+        "source_snippet_refs": [],
         "diagram": {
           "id": "MER-ISSUE-QUALITY-GATES",
           "kind": "structure_issue",
@@ -602,6 +814,10 @@ V2 replaces the V1 free-form `structure_issues_and_suggestions` string with a co
         "block_id": "ISSUE-TABLE-001",
         "block_type": "table",
         "title": "改进建议清单",
+        "confidence": "observed",
+        "evidence_refs": [],
+        "traceability_refs": [],
+        "source_snippet_refs": [],
         "table": {
           "id": "TBL-ISSUE-IMPROVEMENTS",
           "title": "改进建议清单",
@@ -682,7 +898,8 @@ If no concrete entrypoint exists, write the reason directly in `entrypoint`, for
 
 V2 validation should enforce:
 
-- `dsl_version` is `0.2.0` for V2 examples.
+- `dsl_version` must be exactly `0.2.0`; any other value fails before rendering.
+- V1 `0.1.0` examples are accepted only as rejected fixtures.
 - `module_design.modules[]` matches Chapter 3 modules one-to-one.
 - Each module has non-empty `module_kind`, `summary`, and `source_scope.summary`.
 - Each module has at least one of:
@@ -692,15 +909,33 @@ V2 validation should enforce:
 - `configuration.parameters.rows[]`, when present, has non-empty `prototype`, `value_source`, and `meaning`.
 - `configuration.parameters.rows[].value_source` is one of `default`, `cli_argument`, `environment`, `constant`, `config_file`, `computed`, `inferred`, or `unknown`.
 - `configuration.parameters.rows[].value_or_default` may be empty only when `value_source` is `unknown`.
-- `dependencies.rows[]`, when present, has non-empty `name`, `dependency_type`, `required_for`, and `failure_behavior`.
+- `dependencies.rows[]`, when present, has non-empty `dependency_id`, `name`, `dependency_type`, `usage_relation`, `required_for`, and `failure_behavior`.
+- `dependencies.rows[].dependency_type` must use the dependency enum defined in this spec.
+- `dependencies.rows[].usage_relation` must use the usage relation enum defined in this spec.
+- If `dependency_type` is `internal_module`, `target_module_id` must reference an existing module.
+- If `dependency_type` is `data_object`, `target_data_id` must reference an existing data object.
 - `data_objects.rows[]`, when present, has non-empty `data_id`, `name`, `data_type`, `role`, `producer`, `consumer`, and `shape_or_contract`.
 - `public_interfaces.interface_index.rows[]` and `public_interfaces.interfaces[]` use matching `interface_id` sets.
-- Each interface has non-empty `interface_name`, `interface_type`, `prototype`, `purpose`, and `location.file_path`.
-- Each interface parameter row has non-empty `parameter_name`, `parameter_type`, `description`, and `direction`.
-- Each return value row has non-empty `return_name`, `return_type`, `description`, and `condition`.
-- Each interface execution diagram uses the existing diagram object shape and has non-empty `source`.
-- `implementation_notes` follows the reusable content block rules.
-- Each known limitation row has non-empty `limitation`, `impact`, and `mitigation_or_next_step`.
+- Each interface has non-empty `interface_id`, `interface_name`, `interface_type`, `purpose`, and `location.file_path`.
+- `interface_type` must use the interface enum defined in this spec.
+- `other` interfaces require non-empty `interface_type_reason`.
+- Executable interface types require non-empty `prototype`, `parameters`, `return_values`, `execution_flow_diagram`, `side_effects`, and `error_behavior`.
+- Executable interface `execution_flow_diagram` uses the existing diagram object shape and has non-empty `source`.
+- Executable interface parameter and return-value tables may be empty only when their `not_applicable_reason` is non-empty.
+- Each executable interface parameter row has non-empty `parameter_name`, `parameter_type`, `description`, and `direction`.
+- Each executable interface return value row has non-empty `return_name`, `return_type`, `description`, and `condition`.
+- Contract interface types require non-empty `contract.contract_scope`, `contract.contract_location`, `contract.required_fields`, `contract.consumers`, and `contract.validation_behavior`.
+- Contract interface types do not require `parameters`, `return_values`, or `execution_flow_diagram`.
+- Interface `location.file_path` is required; `symbol`, `line_start`, and `line_end` are optional.
+- If either `line_start` or `line_end` is present and non-null, both must be present and non-null; `line_start` must be at least 1 and `line_end` must be greater than or equal to `line_start`.
+- `line_start: 1` plus `line_end: 1` is invalid as an unknown placeholder unless support evidence proves the target is actually on line 1.
+- If an interface has `confidence: "observed"` and `interface_type` is `function` or `method`, validation should warn unless `symbol` or a line range is provided.
+- `internal_mechanism.mechanism_index.rows[]` must be non-empty unless `internal_mechanism.not_applicable_reason` is non-empty.
+- Each mechanism index row has non-empty `mechanism_id`, `mechanism_name`, `purpose`, `input`, `processing`, `output`, `structural_significance`, and at least one `related_anchors[]` value.
+- `mechanism_id` values are unique within the module.
+- `mechanism_details[]` corresponds one-to-one with `mechanism_index.rows[]` by `mechanism_id`.
+- Each mechanism detail follows the reusable content block rules and includes at least one text block with non-empty `text`.
+- Each known limitation row has non-empty `limitation_id`, `limitation`, `impact`, and `mitigation_or_next_step`.
 - `structure_issues_and_suggestions` follows the reusable content block rules.
 - Runtime unit rows do not contain `entrypoint_not_applicable_reason` or `external_environment_reason`.
 - Runtime unit `entrypoint` is non-empty. If there is no concrete executable entrypoint, the value must begin with `不适用：`.
@@ -709,14 +944,16 @@ V2 validation should enforce:
 
 Renderer changes:
 
+- Fail fast for any `dsl_version` other than `0.2.0`; do not render V1 input.
 - Add evidence mode handling.
 - Suppress evidence-node rendering in `hidden` mode.
 - Preserve V1 support-data rendering in `inline` mode.
 - Render Chapter 4 using the new seven-subsection structure.
 - Render local interface execution flow diagrams.
-- Render reusable content blocks for implementation notes and Chapter 9.
+- Render `internal_mechanism` mechanism index and one detail subsection per mechanism.
+- Render reusable content blocks through one shared helper used by internal mechanism details and Chapter 9 structure issues.
+- Render Chapter 9 in the fixed `9.1` to `9.4` order defined in this spec.
 - Render Section 5.2 with the simplified runtime-unit columns.
-- Treat missing V2 optional arrays as empty where migration compatibility is desired.
 
 ## Documentation Requirements
 
@@ -737,21 +974,40 @@ Do not update:
 
 Add or update tests for:
 
+- non-`0.2.0` `dsl_version` fails fast before rendering
+- legacy V1 fixtures are rejected fixtures, not renderer acceptance fixtures
 - default hidden evidence mode suppresses evidence-node rendering
 - inline evidence mode preserves V1 evidence rendering
+- hidden evidence mode suppresses content-block support refs while preserving structural content
 - Chapter 4 new subsection order
 - source scope rendering
 - configuration rendering
+- configuration `value_source` enum validation
 - dependency rendering
+- dependency `dependency_type` enum validation
+- dependency `usage_relation` enum validation
+- dependency target reference validation for `internal_module` and `data_object`
 - data object rendering
 - public interface index rendering
 - public interface detail rendering
+- executable interface validation
+- contract interface validation
+- `other` interface requires `interface_type_reason`
+- interface location allows null line values
+- interface location rejects fake `1-1` placeholder ranges
 - local interface Mermaid rendering
 - local interface Mermaid `source` requiredness
-- implementation notes content block rendering
-- implementation notes require at least one text block when present
+- `internal_mechanism` mechanism index rendering
+- `internal_mechanism` mechanism detail rendering
+- `internal_mechanism` index/detail one-to-one validation
+- `internal_mechanism` mechanism details require at least one text block
+- reusable content block helper renders text, diagram, and table blocks for both Chapter 4 and Chapter 9
+- content block title requiredness
+- content block support refs validate but do not render in hidden mode
+- diagram and table ID global uniqueness
 - known limitations rendering
 - Chapter 9 content block rendering
+- Chapter 9 fixed `9.1` to `9.4` rendering order
 - Chapter 9 requires at least one text block when blocks are present
 - Section 5.2 simplified columns
 - Section 5.2 runtime unit DSL no longer uses `entrypoint_not_applicable_reason` or `external_environment_reason`
@@ -791,10 +1047,15 @@ Files intentionally out of scope:
 - V2 examples validate successfully.
 - Final Markdown defaults to hidden evidence mode.
 - Final Markdown can opt into inline evidence mode.
+- Inputs with `dsl_version` other than `0.2.0` fail before rendering.
 - Chapter 4 renders the seven agreed subsections in order.
-- Interface detail sections include prototype, purpose, location, parameter table, return value table, local non-empty Mermaid flow diagram, side effects, error behavior, and consumers.
-- Implementation notes render text, diagram, and table content blocks in DSL order.
-- Chapter 9 renders text, diagram, and table content blocks in DSL order.
+- Executable interface detail sections include prototype, purpose, location, parameter table, return value table, local non-empty Mermaid flow diagram, side effects, error behavior, and consumers.
+- Contract interface detail sections include purpose, location, contract scope, contract location, required fields, consumers, and validation behavior.
+- Internal mechanism renders a mechanism index plus one detail subsection per mechanism.
+- Internal mechanism details render text, diagram, and table content blocks in DSL order through the reusable content-block renderer.
+- Chapter 9 renders risks, assumptions, low-confidence items, then structure issues in the agreed order.
+- Chapter 9 structure issues render text, diagram, and table content blocks in DSL order through the reusable content-block renderer.
+- Content block support refs remain valid DSL metadata and are hidden from final Markdown by default.
 - Section 5.2 no longer shows `入口不适用原因` or `外部环境原因` columns.
 - Section 5.2 DSL no longer uses `entrypoint_not_applicable_reason` or `external_environment_reason`.
 - Skill workflow requires subagent Mermaid readability review before strict validation.
