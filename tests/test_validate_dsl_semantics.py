@@ -1,4 +1,5 @@
 import json
+import importlib.util
 import subprocess
 import sys
 import tempfile
@@ -32,6 +33,13 @@ def run_validator(path, *args):
         capture_output=True,
         check=False,
     )
+
+
+def load_validator_module():
+    spec = importlib.util.spec_from_file_location("validate_dsl_under_test", VALIDATOR)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 class CliAndSchemaFirstTests(unittest.TestCase):
@@ -91,6 +99,103 @@ class V2VersionCliTests(unittest.TestCase):
         self.assertEqual(2, completed.returncode)
         self.assertIn("V1 DSL is not supported by the V2 renderer", completed.stderr)
         self.assertNotIn("schema validation failed", completed.stderr)
+
+
+class V2GlobalFoundationSemanticTests(unittest.TestCase):
+    def test_duplicate_mermaid_diagram_ids_include_json_path_and_stable_id(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["runtime_view"]["runtime_flow_diagram"]["id"] = document["architecture_views"]["module_relationship_diagram"]["id"]
+            path = write_json(tmpdir, "duplicate-diagram-id.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.runtime_view.runtime_flow_diagram.id", completed.stderr)
+        self.assertIn("duplicate_id", completed.stderr)
+        self.assertIn("duplicate ID", completed.stderr)
+
+    def test_duplicate_table_ids_include_json_path_and_stable_id(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["architecture_views"]["extra_tables"] = [
+                {
+                    "id": "TBL-DUP",
+                    "title": "补充表 A",
+                    "columns": [{"key": "name", "title": "名称"}],
+                    "rows": [{"name": "A"}],
+                },
+                {
+                    "id": "TBL-DUP",
+                    "title": "补充表 B",
+                    "columns": [{"key": "name", "title": "名称"}],
+                    "rows": [{"name": "B"}],
+                },
+            ]
+            path = write_json(tmpdir, "duplicate-table-id.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.architecture_views.extra_tables[1].id", completed.stderr)
+        self.assertIn("TBL-DUP", completed.stderr)
+        self.assertIn("duplicate ID", completed.stderr)
+
+    def test_chapter_6_dependency_id_must_use_sysdep_prefix(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = valid_document()
+            document["configuration_data_dependencies"]["dependencies"]["rows"][0]["dependency_id"] = "DEP-001"
+            path = write_json(tmpdir, "bad-system-dependency-id.dsl.json", document)
+            completed = run_validator(path)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("$.configuration_data_dependencies.dependencies.rows[0].dependency_id", completed.stderr)
+        self.assertIn("SYSDEP-", completed.stderr)
+
+
+class V2GlobalRuleHookTests(unittest.TestCase):
+    def collect_errors(self, fragment):
+        module = load_validator_module()
+        report = module.ValidationReport()
+        module.check_v2_global_foundation_rules(fragment, report)
+        return "\n".join(f"{error.path}: {error.message}" for error in report.errors)
+
+    def test_global_hook_rejects_invalid_reason_fields(self):
+        messages = self.collect_errors({
+            "module_design": {
+                "modules": [
+                    {
+                        "source_scope": {"not_applicable_reason": "不适用。"},
+                        "configuration": {"not_applicable_reason": "不适用。"},
+                    }
+                ]
+            }
+        })
+        self.assertIn("$.module_design.modules[0].source_scope.not_applicable_reason", messages)
+        self.assertIn("$.module_design.modules[0].configuration.not_applicable_reason", messages)
+
+    def test_global_hook_rejects_other_reason_and_location_errors(self):
+        messages = self.collect_errors({
+            "module_design": {
+                "modules": [
+                    {
+                        "module_kind": "other",
+                        "module_kind_reason": "",
+                        "public_interfaces": {
+                            "interfaces": [
+                                {
+                                    "interface_type": "other",
+                                    "interface_type_reason": "",
+                                    "location": {
+                                        "file_path": "scripts/example.py",
+                                        "line_start": 1,
+                                        "line_end": 1,
+                                    },
+                                }
+                            ]
+                        },
+                    }
+                ]
+            }
+        })
+        self.assertIn("module_kind_reason", messages)
+        self.assertIn("interface_type_reason", messages)
+        self.assertIn("line 1-1 is not allowed", messages)
 
 
 class DocumentValidationTests(unittest.TestCase):

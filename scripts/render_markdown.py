@@ -10,9 +10,9 @@ from datetime import datetime
 from pathlib import Path
 
 try:
-    from v2_foundation import EVIDENCE_MODES, V2_VERSION_ERROR, require_v2_dsl_version
+    from v2_foundation import EVIDENCE_MODES, V2_VERSION_ERROR, require_v2_dsl_version, v2_global_rule_violations
 except ModuleNotFoundError:
-    from scripts.v2_foundation import EVIDENCE_MODES, V2_VERSION_ERROR, require_v2_dsl_version
+    from scripts.v2_foundation import EVIDENCE_MODES, V2_VERSION_ERROR, require_v2_dsl_version, v2_global_rule_violations
 
 
 GENERIC_OUTPUT_NAMES = {
@@ -1175,11 +1175,25 @@ def resolve_output_path(output_dir, output_file):
     return output_dir / output_file
 
 
-def render_markdown(document, evidence_mode="hidden"):
+def require_renderer_v2_document(document):
     try:
         require_v2_dsl_version(document)
     except ValueError:
         raise InputError(V2_VERSION_ERROR)
+
+
+def fail_if_v2_global_rules_invalid(document):
+    violations = v2_global_rule_violations(document)
+    if violations:
+        message = violations[0].message
+        if "cannot provide both content and not_applicable_reason" in message:
+            message = f"not_applicable_reason conflict: {message}"
+        raise RenderError(message)
+
+
+def render_markdown(document, evidence_mode="hidden"):
+    require_renderer_v2_document(document)
+    fail_if_v2_global_rules_invalid(document)
 
     module_display_names = build_module_display_names(document)
     runtime_unit_display_names = build_runtime_unit_display_names(document)

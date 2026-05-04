@@ -138,6 +138,19 @@ class EvidenceModeRenderingTests(unittest.TestCase):
         self.assertIn("invalid choice", completed.stderr)
         self.assertIn("appendix", completed.stderr)
 
+
+class RendererNotApplicableFailFastTests(unittest.TestCase):
+    def test_renderer_fails_fast_when_v2_mapped_section_has_content_and_reason(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["module_design"]["modules"][0]["dependencies"] = {
+            "rows": [{"dependency_id": "MDEP-ONE"}],
+            "not_applicable_reason": "不适用。",
+        }
+        with self.assertRaisesRegex(module.RenderError, "not_applicable_reason conflict"):
+            module.render_markdown(document)
+
+
 REFERENCE_EXPECTATIONS = {
     "references/dsl-spec.md": [
         "# create-structure-md DSL Spec",

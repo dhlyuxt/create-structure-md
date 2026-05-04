@@ -245,6 +245,33 @@ class V2VersionSchemaTests(unittest.TestCase):
         )
 
 
+class V2GlobalEnumSchemaTests(unittest.TestCase):
+    def test_schema_defines_global_v2_enums(self):
+        defs = load_schema()["$defs"]
+        expected_enums = {
+            "moduleKind": ["documentation_contract", "schema_contract", "validator", "renderer", "installer", "test_suite", "library", "other"],
+            "valueSource": ["default", "cli_argument", "environment", "constant", "config_file", "computed", "inferred", "unknown"],
+            "dependencyType": ["runtime", "library", "tool", "schema_contract", "documentation_contract", "dsl_contract", "internal_module", "data_object", "filesystem", "external_service", "test_fixture", "other"],
+            "usageRelation": ["reads", "writes", "validates_against", "renders", "invokes", "imports", "tests", "produces", "consumes", "uses", "other"],
+            "interfaceType": ["command_line", "function", "method", "library_api", "schema_contract", "dsl_contract", "document_contract", "configuration_contract", "data_contract", "test_fixture", "workflow", "other"],
+            "anchorType": ["file_path", "module_id", "interface_id", "data_id", "dependency_id", "parameter_id", "diagram_id", "table_id", "source_snippet_id", "evidence_id", "traceability_id", "other"],
+        }
+        for def_name, expected_values in expected_enums.items():
+            with self.subTest(def_name=def_name):
+                self.assertEqual(expected_values, defs[def_name]["enum"])
+
+    def test_chapter_6_dependency_type_uses_global_enum(self):
+        document = valid_example()
+        document["configuration_data_dependencies"]["dependencies"]["rows"][0]["dependency_type"] = "Python runtime dependency"
+        assert_invalid(
+            self,
+            document,
+            "is not one of",
+            expected_validator="enum",
+            expected_path=["configuration_data_dependencies", "dependencies", "rows", 0, "dependency_type"],
+        )
+
+
 class SchemaRootContractTests(unittest.TestCase):
     def test_schema_is_valid_draft_2020_12_schema(self):
         Draft202012Validator.check_schema(load_schema())

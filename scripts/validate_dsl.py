@@ -10,9 +10,17 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
 try:
-    from v2_foundation import V2_VERSION_ERROR, require_v2_dsl_version
+    from v2_foundation import (
+        V2_VERSION_ERROR,
+        require_v2_dsl_version,
+        v2_global_rule_violations,
+    )
 except ModuleNotFoundError:
-    from scripts.v2_foundation import V2_VERSION_ERROR, require_v2_dsl_version
+    from scripts.v2_foundation import (
+        V2_VERSION_ERROR,
+        require_v2_dsl_version,
+        v2_global_rule_violations,
+    )
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -329,7 +337,7 @@ class ValidationContext:
                 return
         if value in self.id_owner:
             first_kind, first_path = self.id_owner[value]
-            self.report.error(path, f"duplicate ID {value}", f"First defined as {first_kind} at {first_path}")
+            self.report.error(path, f"duplicate ID {value}; duplicate_id={value}", f"First defined as {first_kind} at {first_path}")
             return
         self.ids_by_kind[kind][value] = path
         self.id_owner[value] = (kind, path)
@@ -979,7 +987,14 @@ def validate_semantics(document, *, allow_long_snippets=False):
     return report
 
 
+def check_v2_global_foundation_rules(document, report):
+    for violation in v2_global_rule_violations(document):
+        message = violation.message.replace("line 1-1 is a placeholder location", "line 1-1 is not allowed")
+        report.error(violation.path, message)
+
+
 def run_semantic_checks(document, context, *, allow_long_snippets):
+    check_v2_global_foundation_rules(document, context.report)
     check_chapter_rules(document, context)
     check_extra_tables(document, context)
     check_traceability(document, context)
