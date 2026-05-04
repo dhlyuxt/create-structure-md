@@ -94,6 +94,7 @@ Read `references/dsl-spec.md` before writing DSL.
         "validate_dsl.py": "def main(argv=None):\n    return 0\n",
         "validate_mermaid.py": "def main(argv=None):\n    return 0\n",
         "render_markdown.py": "def main(argv=None):\n    return 0\n",
+        "v2_foundation.py": "V2_DSL_VERSION = '0.2.0'\n",
     }
     for name, text in runtime_scripts.items():
         if name not in omit_runtime_scripts:
@@ -238,6 +239,17 @@ class InstallerStructureValidationTests(unittest.TestCase):
 
         self.assertFalse(report.ok)
         self.assertIn("missing required file: scripts/validate_mermaid.py", report.messages)
+
+    def test_validate_source_rejects_missing_v2_foundation_helper(self):
+        module = load_installer_module()
+        run_dir = make_run_dir("missing-v2-foundation")
+        source = run_dir / "source"
+        create_minimal_source(source, omit_runtime_scripts={"v2_foundation.py"})
+
+        report = module.validate_source(source)
+
+        self.assertFalse(report.ok)
+        self.assertIn("missing required file: scripts/v2_foundation.py", report.messages)
 
     def test_validate_source_checks_references_named_by_skill(self):
         module = load_installer_module()

@@ -1581,6 +1581,18 @@ class ChapterNineRenderingTests(unittest.TestCase):
         self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", section)
         self.assertNotIn("未识别到明确的结构问题与改进建议。", section)
 
+    def test_chapter_9_object_shape_fails_until_v2_rendering_is_supported(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["structure_issues_and_suggestions"] = {
+            "summary": "",
+            "blocks": [],
+            "not_applicable_reason": "当前阶段没有结构问题。",
+        }
+
+        with self.assertRaisesRegex(module.RenderError, "structure_issues_and_suggestions object shape"):
+            module.render_markdown(document)
+
     def test_risks_and_assumptions_render_under_owned_headings_without_empty_state(self):
         module = load_renderer_module()
         document = valid_document()

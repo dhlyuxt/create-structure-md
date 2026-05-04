@@ -1046,7 +1046,12 @@ def render_collection_support(items, context, *, id_key, label_key, target_type)
 
 def render_chapter_9(document, support_context):
     parts = [chapter_heading(9, "结构问题与改进建议")]
-    free_form_text = stringify_markdown_value(document.get("structure_issues_and_suggestions", "")).strip()
+    structure_issues = document.get("structure_issues_and_suggestions", "")
+    if isinstance(structure_issues, dict):
+        raise RenderError(
+            "structure_issues_and_suggestions object shape is not supported by the V2 renderer yet"
+        )
+    free_form_text = stringify_markdown_value(structure_issues).strip()
     risks = document.get("risks", [])
     assumptions = document.get("assumptions", [])
     low_confidence_items = collect_low_confidence_items(document)

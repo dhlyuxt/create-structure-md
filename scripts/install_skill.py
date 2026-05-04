@@ -28,6 +28,7 @@ REQUIRED_FILES = (
     "scripts/validate_dsl.py",
     "scripts/validate_mermaid.py",
     "scripts/render_markdown.py",
+    "scripts/v2_foundation.py",
 )
 REQUIRED_DIRS = ("references", "schemas", "scripts", "examples")
 REFERENCE_RE = re.compile(r"references/[A-Za-z0-9_.\-/]+\.md")
