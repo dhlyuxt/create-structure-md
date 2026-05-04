@@ -96,6 +96,13 @@ OTHER_REASON_BY_FIELD = {
     "anchor_type": "reason",
 }
 V2_TYPED_ID_FIELDS = ("parameter_id", "data_id", "dependency_id", "limitation_id")
+SUPPORT_ID_COLLECTIONS = (
+    ("evidence", "evidence"),
+    ("traceability", "traceability"),
+    ("risk", "risks"),
+    ("assumption", "assumptions"),
+    ("source_snippet", "source_snippets"),
+)
 
 
 @dataclass(frozen=True)
@@ -665,6 +672,37 @@ def diagram_table_id_scope_violations(document):
     return violations
 
 
+def support_id_scope_violations(document):
+    violations = []
+    if not isinstance(document, dict):
+        return violations
+
+    seen_support_ids = {}
+    for kind, collection_name in SUPPORT_ID_COLLECTIONS:
+        collection = document.get(collection_name, [])
+        if not isinstance(collection, list):
+            continue
+        for index, item in enumerate(collection):
+            if not isinstance(item, dict):
+                continue
+            support_id = item.get("id")
+            if not isinstance(support_id, str) or not support_id:
+                continue
+            path = f"$.{collection_name}[{index}].id"
+            previous = seen_support_ids.get(support_id)
+            if previous:
+                previous_kind, previous_path = previous
+                violations.append(
+                    RuleViolation(
+                        path,
+                        f"duplicate support ID {support_id}; first seen as {previous_kind} at {previous_path}",
+                    )
+                )
+            else:
+                seen_support_ids[support_id] = (kind, path)
+    return violations
+
+
 def dependency_prefix_violations(document):
     violations = []
     if not isinstance(document, dict):
@@ -705,5 +743,6 @@ def v2_global_rule_violations(document):
     violations.extend(module_id_scope_violations(document))
     violations.extend(id_scope_violations(document))
     violations.extend(diagram_table_id_scope_violations(document))
+    violations.extend(support_id_scope_violations(document))
     violations.extend(dependency_prefix_violations(document))
     return violations

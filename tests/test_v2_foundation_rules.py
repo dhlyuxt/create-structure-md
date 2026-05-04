@@ -486,6 +486,11 @@ class GlobalRuleTests(unittest.TestCase):
                     },
                 ]
             },
+            "evidence": [{"id": "EV-DUP"}, {"id": "EV-DUP"}],
+            "traceability": [{"id": "TR-DUP"}, {"id": "TR-DUP"}],
+            "source_snippets": [{"id": "SNIP-DUP"}, {"id": "SNIP-DUP"}],
+            "risks": [{"id": "RISK-DUP"}, {"id": "RISK-DUP"}],
+            "assumptions": [{"id": "ASM-DUP"}, {"id": "ASM-DUP"}],
         }
         messages = "\n".join(violation.message for violation in v2_global_rule_violations(document))
         for duplicated_id in [
@@ -497,9 +502,23 @@ class GlobalRuleTests(unittest.TestCase):
             "MOD-DUP",
             "MER-DUP",
             "TBL-DUP",
+            "EV-DUP",
+            "TR-DUP",
+            "SNIP-DUP",
+            "RISK-DUP",
+            "ASM-DUP",
         ]:
             self.assertIn(duplicated_id, messages)
             self.assertIn("duplicate", messages)
+
+    def test_support_id_scope_rejects_cross_collection_reuse(self):
+        document = {
+            "evidence": [{"id": "SUPPORT-DUP"}],
+            "traceability": [{"id": "SUPPORT-DUP"}],
+        }
+        messages = "\n".join(violation.message for violation in v2_global_rule_violations(document))
+        self.assertIn("duplicate support ID SUPPORT-DUP", messages)
+        self.assertIn("first seen as evidence at $.evidence[0].id", messages)
 
     def test_module_intro_and_module_detail_can_share_logical_module_id_once(self):
         document = {
