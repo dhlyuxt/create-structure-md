@@ -10,9 +10,9 @@ from datetime import datetime
 from pathlib import Path
 
 try:
-    from v2_foundation import V2_VERSION_ERROR, require_v2_dsl_version
+    from v2_foundation import EVIDENCE_MODES, V2_VERSION_ERROR, require_v2_dsl_version
 except ModuleNotFoundError:
-    from scripts.v2_foundation import V2_VERSION_ERROR, require_v2_dsl_version
+    from scripts.v2_foundation import EVIDENCE_MODES, V2_VERSION_ERROR, require_v2_dsl_version
 
 
 GENERIC_OUTPUT_NAMES = {
@@ -430,14 +430,17 @@ def safe_fence_info_string(value):
 
 @dataclass
 class SupportContext:
+    render_support: bool = False
     evidence_by_id: dict = field(default_factory=dict)
     traceability_by_id: dict = field(default_factory=dict)
     traceability_by_target: dict = field(default_factory=dict)
     snippets_by_id: dict = field(default_factory=dict)
 
 
-def build_support_context(document):
-    context = SupportContext()
+def build_support_context(document, evidence_mode="hidden"):
+    if evidence_mode not in EVIDENCE_MODES:
+        raise RenderError(f"unsupported evidence mode: {evidence_mode}")
+    context = SupportContext(render_support=evidence_mode == "inline")
     context.evidence_by_id = {item.get("id"): item for item in document.get("evidence", [])}
     context.traceability_by_id = {item.get("id"): item for item in document.get("traceability", [])}
     context.snippets_by_id = {item.get("id"): item for item in document.get("source_snippets", [])}
@@ -491,6 +494,9 @@ def render_support_lines(lines):
 
 
 def render_node_support(node, context, target_type=None, target_id=None):
+    if not context.render_support:
+        return ""
+
     lines = []
     for evidence in unique_existing_items(node.get("evidence_refs", []), context.evidence_by_id):
         lines.append(f"依据：{evidence_label(evidence)}")
@@ -1083,6 +1089,12 @@ def build_parser():
     parser = argparse.ArgumentParser(description="Render create-structure-md DSL JSON to Markdown.")
     parser.add_argument("dsl_file", help="Path to structure DSL JSON.")
     parser.add_argument("--output-dir", default=".", help="Directory for the generated Markdown file.")
+    parser.add_argument(
+        "--evidence-mode",
+        choices=EVIDENCE_MODES,
+        default="hidden",
+        help="Render evidence support blocks inline or hide them from final Markdown.",
+    )
     output_group = parser.add_mutually_exclusive_group()
     output_group.add_argument("--overwrite", action="store_true", help="Replace an existing output file.")
     output_group.add_argument("--backup", action="store_true", help="Back up an existing output file before writing.")
@@ -1163,7 +1175,7 @@ def resolve_output_path(output_dir, output_file):
     return output_dir / output_file
 
 
-def render_markdown(document):
+def render_markdown(document, evidence_mode="hidden"):
     try:
         require_v2_dsl_version(document)
     except ValueError:
@@ -1171,7 +1183,7 @@ def render_markdown(document):
 
     module_display_names = build_module_display_names(document)
     runtime_unit_display_names = build_runtime_unit_display_names(document)
-    support_context = build_support_context(document)
+    support_context = build_support_context(document, evidence_mode=evidence_mode)
     parts = [
         "# 软件结构设计说明书",
         render_chapter_1(document),
@@ -1249,7 +1261,7 @@ def main(argv=None):
         require_v2_dsl_version(document)
         output_file = validate_output_filename(document)
         output_path = resolve_output_path(args.output_dir, output_file)
-        markdown = render_markdown(document)
+        markdown = render_markdown(document, evidence_mode=args.evidence_mode)
         backup_path = write_output(output_path, markdown, overwrite=args.overwrite, backup=args.backup)
     except ValueError:
         print(f"ERROR: {V2_VERSION_ERROR}", file=sys.stderr)

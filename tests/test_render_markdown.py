@@ -37,6 +37,23 @@ def valid_document():
     return deepcopy(json.loads(FIXTURE.read_text(encoding="utf-8")))
 
 
+def document_with_support_refs():
+    document = valid_document()
+    document["architecture_views"]["module_intro"]["rows"][0]["evidence_refs"] = ["EV-001"]
+    document["architecture_views"]["module_intro"]["rows"][0]["traceability_refs"] = ["TR-001"]
+    document["architecture_views"]["module_intro"]["rows"][0]["source_snippet_refs"] = ["SNIP-001"]
+    document["evidence"] = [
+        {"id": "EV-001", "kind": "source", "title": "模块表证据", "location": "schema", "description": "不内联。", "confidence": "observed"},
+    ]
+    document["traceability"] = [
+        {"id": "TR-001", "source_external_id": "REQ-MODULE", "source_type": "requirement", "target_type": "module", "target_id": "MOD-SKILL", "description": "模块追踪。"},
+    ]
+    document["source_snippets"] = [
+        {"id": "SNIP-001", "path": "scripts/render_markdown.py", "line_start": 2, "line_end": 3, "language": "python", "purpose": "表格行证据。", "content": "print('row support')", "confidence": "observed"},
+    ]
+    return document
+
+
 def write_json(tmpdir, name, document):
     path = Path(tmpdir) / name
     path.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -51,6 +68,75 @@ def run_validate_dsl(path):
         capture_output=True,
         check=False,
     )
+
+
+class EvidenceModeRenderingTests(unittest.TestCase):
+    def test_render_markdown_defaults_to_hidden_evidence_mode(self):
+        module = load_renderer_module()
+        markdown = module.render_markdown(document_with_support_refs())
+        self.assertIn("技能文档生成模块", markdown)
+        self.assertNotIn("支持数据", markdown)
+        self.assertNotIn("EV-001", markdown)
+        self.assertNotIn("REQ-MODULE", markdown)
+        self.assertNotIn("Source: scripts/render_markdown.py:2-3", markdown)
+
+    def test_render_markdown_inline_evidence_mode_preserves_support_blocks(self):
+        module = load_renderer_module()
+        markdown = module.render_markdown(document_with_support_refs(), evidence_mode="inline")
+        self.assertIn("支持数据（MOD-SKILL / 技能文档生成模块）", markdown)
+        self.assertIn("依据：EV-001（模块表证据，schema）", markdown)
+        self.assertIn("关联来源：REQ-MODULE（模块追踪。）", markdown)
+        self.assertIn("Source: scripts/render_markdown.py:2-3", markdown)
+
+    def test_hidden_support_context_suppresses_generic_node_support_refs(self):
+        module = load_renderer_module()
+        document = document_with_support_refs()
+        context = module.build_support_context(document, evidence_mode="hidden")
+        node = {"evidence_refs": ["EV-001"], "traceability_refs": ["TR-001"], "source_snippet_refs": ["SNIP-001"]}
+        self.assertEqual("", module.render_node_support(node, context, target_type="module", target_id="MOD-SKILL"))
+
+    def test_cli_defaults_to_hidden_and_can_opt_into_inline(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = document_with_support_refs()
+            dsl_path = write_json(tmpdir, "support.dsl.json", document)
+            hidden = subprocess.run(
+                [PYTHON, str(RENDERER), str(dsl_path), "--output-dir", tmpdir],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(0, hidden.returncode, hidden.stderr)
+            output_path = Path(tmpdir) / document["document"]["output_file"]
+            hidden_text = output_path.read_text(encoding="utf-8")
+            self.assertNotIn("支持数据", hidden_text)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document = document_with_support_refs()
+            dsl_path = write_json(tmpdir, "support.dsl.json", document)
+            inline = subprocess.run(
+                [PYTHON, str(RENDERER), str(dsl_path), "--output-dir", tmpdir, "--evidence-mode", "inline"],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(0, inline.returncode, inline.stderr)
+            output_path = Path(tmpdir) / document["document"]["output_file"]
+            inline_text = output_path.read_text(encoding="utf-8")
+            self.assertIn("支持数据", inline_text)
+
+    def test_cli_rejects_appendix_evidence_mode(self):
+        completed = subprocess.run(
+            [PYTHON, str(RENDERER), str(FIXTURE), "--evidence-mode", "appendix"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(2, completed.returncode)
+        self.assertIn("invalid choice", completed.stderr)
+        self.assertIn("appendix", completed.stderr)
 
 REFERENCE_EXPECTATIONS = {
     "references/dsl-spec.md": [
@@ -809,7 +895,7 @@ class SupportDataPrimitiveTests(unittest.TestCase):
             "traceability_refs": ["TR-001"],
             "source_snippet_refs": ["SNIP-001"],
         }
-        context = module.build_support_context(document)
+        context = module.build_support_context(document, evidence_mode="inline")
 
         rendered = module.render_node_support(node, context, target_type="module", target_id="MOD-SKILL")
 
@@ -847,7 +933,7 @@ class SupportDataPrimitiveTests(unittest.TestCase):
             "evidence_refs": ["EV-001"],
             "traceability_refs": ["TR-001"],
         }
-        context = module.build_support_context(document)
+        context = module.build_support_context(document, evidence_mode="inline")
 
         rendered = module.render_node_support(node, context, target_type="module", target_id="MOD-SKILL")
 
@@ -880,7 +966,7 @@ class SupportDataTablePlacementTests(unittest.TestCase):
             {"id": "SNIP-001", "path": "scripts/render_markdown.py", "line_start": 1, "line_end": 2, "language": "python", "purpose": "表格行证据。", "content": "print('row support')", "confidence": "observed"},
         ]
 
-        markdown = module.render_markdown(document)
+        markdown = module.render_markdown(document, evidence_mode="inline")
         section = section_between(markdown, "### 3.2 各模块介绍", "### 3.3 模块关系图")
 
         self.assertIn("| 模块名称 | 职责 | 输入 | 输出 | 备注 |", section)
@@ -909,7 +995,7 @@ class SupportDataTablePlacementTests(unittest.TestCase):
             {"id": "SNIP-COL", "path": "src/collab.py", "line_start": 4, "line_end": 5, "language": "python", "purpose": "协作证据。", "content": "collaborate()", "confidence": "observed"},
         ]
 
-        markdown = module.render_markdown(document)
+        markdown = module.render_markdown(document, evidence_mode="inline")
         chapter_6 = section_between(markdown, "## 6. 配置、数据与依赖关系", "## 7. 跨模块协作关系")
         chapter_7 = section_between(markdown, "## 7. 跨模块协作关系", "## 8. 关键流程")
 
@@ -947,7 +1033,7 @@ class SupportDataTablePlacementTests(unittest.TestCase):
             },
         ]
 
-        markdown = module.render_markdown(document)
+        markdown = module.render_markdown(document, evidence_mode="inline")
         chapter_2 = section_between(markdown, "## 2. 系统概览", "## 3. 架构视图")
         chapter_5 = section_between(markdown, "### 5.2 运行单元说明", "### 5.3 运行时流程图")
 
@@ -982,7 +1068,7 @@ class SupportDataTablePlacementTests(unittest.TestCase):
             },
         ]
 
-        markdown = module.render_markdown(document)
+        markdown = module.render_markdown(document, evidence_mode="inline")
         chapter_6 = section_between(markdown, "## 6. 配置、数据与依赖关系", "## 7. 跨模块协作关系")
         chapter_7 = section_between(markdown, "## 7. 跨模块协作关系", "## 8. 关键流程")
 
@@ -1013,7 +1099,7 @@ class NodeLevelSupportPlacementTests(unittest.TestCase):
             {"id": "SNIP-MODULE", "path": "SKILL.md", "line_start": 1, "line_end": 4, "language": "markdown", "purpose": "模块说明证据。", "content": "---\nname: create-structure-md\n---", "confidence": "observed"},
         ]
 
-        markdown = module.render_markdown(document)
+        markdown = module.render_markdown(document, evidence_mode="inline")
         module_section = section_between(markdown, "### 4.1 技能文档生成模块", "## 5. 运行时视图")
 
         self.assertIn("依据：EV-MODULE（模块设计依据，design note）", module_section)
@@ -1041,7 +1127,7 @@ class NodeLevelSupportPlacementTests(unittest.TestCase):
             {"id": "SNIP-BRANCH", "path": "scripts/validate_dsl.py", "line_start": 20, "line_end": 22, "language": "python", "purpose": "失败分支证据。", "content": "if errors:\n    return 1", "confidence": "observed"},
         ]
 
-        markdown = module.render_markdown(document)
+        markdown = module.render_markdown(document, evidence_mode="inline")
         flow_section = section_from(markdown, "### 8.3 生成结构设计文档")
 
         self.assertIn("依据：EV-FLOW（流程来源，workflow）", flow_section)
@@ -1545,7 +1631,7 @@ class ChapterNineRenderingTests(unittest.TestCase):
             {"id": "ASM-001", "description": "调用方已先执行 DSL 校验。", "rationale": "Renderer 只做防御性检查。", "validation_suggestion": "保留 validate_dsl.py。", "confidence": "unknown", "evidence_refs": ["EV-ASM"], "traceability_refs": [], "source_snippet_refs": []},
         ]
 
-        markdown = module.render_markdown(document)
+        markdown = module.render_markdown(document, evidence_mode="inline")
         chapter_9 = markdown[markdown.index("## 9. 结构问题与改进建议") :]
 
         self.assertIn("### 风险", chapter_9)
@@ -1880,7 +1966,7 @@ class RendererIntegrationTests(unittest.TestCase):
             ],
         }]
 
-        markdown = module.render_markdown(document)
+        markdown = module.render_markdown(document, evidence_mode="inline")
         section = section_between(markdown, "### 3.4 补充架构图表", "## 4. 模块设计")
 
         self.assertIn("#### 架构补充依据", section)
@@ -1929,7 +2015,7 @@ class RendererIntegrationTests(unittest.TestCase):
             self.assertEqual(0, validate.returncode, validate.stderr)
 
             render = subprocess.run(
-                [PYTHON, str(RENDERER), str(dsl_path), "--output-dir", tmpdir],
+                [PYTHON, str(RENDERER), str(dsl_path), "--output-dir", tmpdir, "--evidence-mode", "inline"],
                 cwd=ROOT,
                 text=True,
                 capture_output=True,
