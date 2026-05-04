@@ -466,6 +466,10 @@ class GlobalRuleTests(unittest.TestCase):
                     "diagram_type": "flowchart",
                     "source": "flowchart TD\n  A --> B",
                 },
+                "extra_tables": [
+                    {"id": "TBL-EXTRA-DUP", "title": "A", "columns": [], "rows": []},
+                    {"id": "TBL-EXTRA-DUP", "title": "B", "columns": [], "rows": []},
+                ],
             },
             "runtime_view": {
                 "runtime_flow_diagram": {
@@ -504,6 +508,7 @@ class GlobalRuleTests(unittest.TestCase):
             "MOD-DUP",
             "MER-DUP",
             "TBL-DUP",
+            "TBL-EXTRA-DUP",
             "EV-DUP",
             "TR-DUP",
             "SNIP-DUP",

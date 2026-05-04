@@ -150,6 +150,16 @@ class RendererNotApplicableFailFastTests(unittest.TestCase):
         with self.assertRaisesRegex(module.RenderError, "not_applicable_reason conflict"):
             module.render_markdown(document)
 
+    def test_renderer_fails_fast_when_extra_table_ids_are_duplicate(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["architecture_views"]["extra_tables"] = [
+            {"id": "TBL-DUP", "title": "A", "columns": [{"key": "name", "title": "名称"}], "rows": [{"name": "一"}]},
+            {"id": "TBL-DUP", "title": "B", "columns": [{"key": "name", "title": "名称"}], "rows": [{"name": "二"}]},
+        ]
+        with self.assertRaisesRegex(module.RenderError, "duplicate table.id TBL-DUP"):
+            module.render_markdown(document)
+
 
 REFERENCE_EXPECTATIONS = {
     "references/dsl-spec.md": [

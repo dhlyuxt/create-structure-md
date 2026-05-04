@@ -644,7 +644,7 @@ def _is_table_object(path, value):
         isinstance(value, dict)
         and isinstance(value.get("id"), str)
         and value.get("id") != ""
-        and (leaf == "table" or leaf.endswith("_table") or leaf.startswith("tables["))
+        and (leaf == "table" or leaf.endswith("_table") or leaf.startswith("tables[") or leaf.startswith("extra_tables["))
     )
 
 
