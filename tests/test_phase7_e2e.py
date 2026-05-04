@@ -23,6 +23,20 @@ EXAMPLE_PATHS = [
     ROOT / "examples/minimal-from-requirements.dsl.json",
 ]
 POLICY_FIELD_NAMES = {"empty_allowed", "required", "min_rows"}
+V2_DEPENDENCY_TYPES = {
+    "runtime",
+    "library",
+    "tool",
+    "schema_contract",
+    "documentation_contract",
+    "dsl_contract",
+    "internal_module",
+    "data_object",
+    "filesystem",
+    "external_service",
+    "test_fixture",
+    "other",
+}
 
 
 def make_run_dir(name):
@@ -400,6 +414,7 @@ class Phase7ExampleContractTests(unittest.TestCase):
         for path in EXAMPLE_PATHS:
             document = self.load_example(path)
             with self.subTest(path=path.name):
+                self.assertEqual("0.2.0", document["dsl_version"])
                 self.assert_module_specific_output_file(document["document"]["output_file"])
                 self.assert_non_empty_text(document["system_overview"]["summary"], "system overview summary")
                 self.assertGreaterEqual(len(document["system_overview"]["core_capabilities"]), 1)
@@ -436,6 +451,9 @@ class Phase7ExampleContractTests(unittest.TestCase):
                 for table_key in ("configuration_items", "structural_data_artifacts", "dependencies"):
                     self.assertIn(table_key, chapter_6)
                     self.assertIn("rows", chapter_6[table_key])
+                for row in non_empty_rows(chapter_6, "dependencies"):
+                    with self.subTest(path=path.name, dependency=row["dependency_id"]):
+                        self.assertIn(row["dependency_type"], V2_DEPENDENCY_TYPES)
 
                 self.assertGreaterEqual(len(non_empty_rows(document, "key_flows", "flow_index")), 1)
                 self.assertGreaterEqual(len(document["key_flows"]["flows"]), 1)
@@ -567,6 +585,7 @@ class Phase7EndToEndWorkflowTests(unittest.TestCase):
                     dsl_path,
                     f"{dsl_path.stem}-static-workflow",
                 )
+                self.assertEqual("0.2.0", document["dsl_version"])
                 lowered = markdown.casefold()
                 self.assertNotIn("```dot", lowered)
                 self.assertNotIn("```graphviz", lowered)

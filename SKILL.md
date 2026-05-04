@@ -37,7 +37,7 @@ If any required input is missing, stop and perform project or requirement unders
 4. Run `python scripts/validate_dsl.py structure.dsl.json`.
 5. Read references/mermaid-rules.md before creating/revising Mermaid.
 6. Run `python scripts/validate_mermaid.py --from-dsl structure.dsl.json --strict --work-dir <temporary-work-directory>/mermaid`.
-7. Render exactly one document with `python scripts/render_markdown.py structure.dsl.json --output-dir <output-dir>`.
+7. Render exactly one document with `python scripts/render_markdown.py structure.dsl.json --output-dir <output-dir>`. Evidence support blocks are hidden by default; use `--evidence-mode inline` only when the user explicitly asks to preserve inline support data in final Markdown.
 8. Run `python scripts/validate_mermaid.py --from-markdown <output-file> --static`.
 9. Review with references/review-checklist.md.
 10. Report output path, temporary work directory, assumptions, low-confidence items, and static-only Mermaid acceptance.

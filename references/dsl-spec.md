@@ -4,6 +4,12 @@
 
 The DSL records document-ready structure design content prepared by Codex outside this skill. It does not analyze repositories, infer requirements, or decide what a target system means.
 
+## V2 DSL Version Contract
+
+V2 accepts only `dsl_version: "0.2.0"`. Inputs with any other version fail before semantic validation or rendering. The error says: `V1 DSL is not supported by the V2 renderer; migrate the input to dsl_version 0.2.0.`
+
+V1 fixtures may remain in the repository only as rejected fixtures. They must not be used as renderer acceptance fixtures.
+
 ## Input Readiness Contract
 
 The Input Readiness Contract is the gate before any DSL JSON is written. Codex must already have prepared structure design content from an earlier project-understanding step, including module IDs, responsibilities, relationships, runtime units, configuration/data/dependency details when applicable, key flows, diagram intent, confidence levels, assumptions, risks, evidence, traceability targets, and safe source snippets. If required facts are missing, do not invent placeholders inside the DSL; stop and gather the missing design input outside this skill.

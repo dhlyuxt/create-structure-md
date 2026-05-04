@@ -64,6 +64,10 @@ Table-row support-data placement happens immediately after the relevant table. F
 
 Chapter 9 rendering behavior is review-oriented. Risks render under `风险`, assumptions render under `假设`, and low-confidence summaries render only for design content that belongs in the whitelist. Evidence, traceability, source snippets, risks, assumptions, and Mermaid diagram nodes are excluded from the low-confidence summary whitelist.
 
+## Evidence Rendering Mode
+
+Evidence support blocks are hidden by default in final Markdown. Use `python scripts/render_markdown.py structure.dsl.json --evidence-mode inline` only when final Markdown should preserve inline support-data blocks such as `支持数据（...）`.
+
 ## Output Filename Policy
 
 The output is one module- or system-specific Markdown file named by `document.output_file`, normally `<documented-object-name>_STRUCTURE_DESIGN.md`. Generic-only filenames are forbidden, including `STRUCTURE_DESIGN.md`, `structure_design.md`, `design.md`, and `软件结构设计说明书.md`.

@@ -45,6 +45,14 @@
 - Confirm fixed table columns are owned by renderer/schema/reference docs, not DSL instances.
 - Confirm extra table evidence renders after the table, support metadata names are not visible column keys, and extra diagrams render only when non-empty.
 
+## V2 Foundation Checks
+
+- Confirm DSL input uses `dsl_version: "0.2.0"`.
+- Confirm V1 DSL fixtures are rejected fixtures, not renderer acceptance fixtures.
+- Confirm final Markdown was rendered with hidden evidence mode unless inline evidence was requested.
+- Confirm evidence refs remain DSL metadata when hidden from final Markdown.
+- Confirm no repository analysis was added to create-structure-md.
+
 ## Mermaid Validation
 
 - Confirm Mermaid-only diagram output: every final diagram is a Markdown Mermaid code block.

@@ -1,5 +1,5 @@
 {
-  "dsl_version": "0.1.0",
+  "dsl_version": "0.2.0",
   "document": {
     "title": "软件结构设计说明书",
     "project_name": "requirements-note-example",
@@ -106,7 +106,7 @@
             "confidence": "observed"
           },
           "textual_structure": "schema 描述 DSL 结构，校验脚本负责质量门禁，渲染脚本负责输出 Markdown。",
-          "not_applicable_reason": "单模块示例中使用文字结构说明即可。"
+          "not_applicable_reason": ""
         },
         "extra_tables": [],
         "extra_diagrams": [],
