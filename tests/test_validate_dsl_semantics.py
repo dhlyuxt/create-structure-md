@@ -1349,16 +1349,16 @@ class MarkdownSafetyAndLowConfidenceTests(unittest.TestCase):
 
 
 class AcceptanceTests(unittest.TestCase):
-    def test_examples_are_rejected_until_migrated_to_v2(self):
+    def test_examples_validate_after_v2_migration(self):
         for relative_path in [
             "examples/minimal-from-code.dsl.json",
             "examples/minimal-from-requirements.dsl.json",
         ]:
             completed = run_validator(ROOT / relative_path)
             with self.subTest(path=relative_path):
-                self.assertEqual(2, completed.returncode)
-                self.assertEqual("", completed.stdout)
-                self.assertIn("V1 DSL is not supported by the V2 renderer", completed.stderr)
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                self.assertIn("Validation succeeded", completed.stdout)
+                self.assertEqual("", completed.stderr)
 
     def test_semantic_validation_accumulates_multiple_errors_after_schema_success(self):
         with tempfile.TemporaryDirectory() as tmpdir:

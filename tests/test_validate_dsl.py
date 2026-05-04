@@ -797,7 +797,7 @@ class SchemaSupportDataTests(unittest.TestCase):
 
 
 class SchemaExampleValidationTests(unittest.TestCase):
-    def test_example_dsl_files_are_rejected_until_migrated_to_v2(self):
+    def test_example_dsl_files_are_valid_v2_documents(self):
         schema_validator = validator()
         for path in EXAMPLE_PATHS:
             with self.subTest(path=path.name):
@@ -805,14 +805,7 @@ class SchemaExampleValidationTests(unittest.TestCase):
                     schema_validator.iter_errors(json.loads(path.read_text(encoding="utf-8"))),
                     key=lambda error: list(error.path),
                 )
-                self.assertTrue(
-                    matching_errors(
-                        errors,
-                        "'0.2.0' was expected",
-                        expected_validator="const",
-                        expected_path=["dsl_version"],
-                    )
-                )
+                self.assertEqual([], errors)
 
     def test_examples_use_concrete_output_filenames(self):
         for path in EXAMPLE_PATHS:
