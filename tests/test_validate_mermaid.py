@@ -13,7 +13,7 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 VALIDATOR = ROOT / "scripts/validate_mermaid.py"
-FIXTURE = ROOT / "tests/fixtures/valid-phase2.dsl.json"
+FIXTURE = ROOT / "tests/fixtures/valid-v2-foundation.dsl.json"
 PYTHON = sys.executable
 SKILL = ROOT / "SKILL.md"
 
