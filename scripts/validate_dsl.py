@@ -989,8 +989,7 @@ def validate_semantics(document, *, allow_long_snippets=False):
 
 def check_v2_global_foundation_rules(document, report):
     for violation in v2_global_rule_violations(document):
-        message = violation.message.replace("line 1-1 is a placeholder location", "line 1-1 is not allowed")
-        report.error(violation.path, message)
+        report.error(violation.path, violation.message)
 
 
 def run_semantic_checks(document, context, *, allow_long_snippets):

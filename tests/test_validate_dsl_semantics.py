@@ -105,11 +105,13 @@ class V2GlobalFoundationSemanticTests(unittest.TestCase):
     def test_duplicate_mermaid_diagram_ids_include_json_path_and_stable_id(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             document = valid_document()
-            document["runtime_view"]["runtime_flow_diagram"]["id"] = document["architecture_views"]["module_relationship_diagram"]["id"]
+            duplicate_id = document["architecture_views"]["module_relationship_diagram"]["id"]
+            document["runtime_view"]["runtime_flow_diagram"]["id"] = duplicate_id
             path = write_json(tmpdir, "duplicate-diagram-id.dsl.json", document)
             completed = run_validator(path)
         self.assertEqual(1, completed.returncode)
         self.assertIn("$.runtime_view.runtime_flow_diagram.id", completed.stderr)
+        self.assertIn(duplicate_id, completed.stderr)
         self.assertIn("duplicate_id", completed.stderr)
         self.assertIn("duplicate ID", completed.stderr)
 

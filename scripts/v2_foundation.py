@@ -214,7 +214,7 @@ def interface_location_violations(base_path, location, *, line_one_supported=Fal
     if line_end < line_start:
         violations.append(RuleViolation(base_path, f"{base_path} line_end must be >= line_start"))
     if line_start == 1 and line_end == 1 and not line_one_supported:
-        violations.append(RuleViolation(base_path, f"{base_path} line 1-1 is a placeholder location"))
+        violations.append(RuleViolation(base_path, f"{base_path} line 1-1 is not allowed as an unknown placeholder"))
     return violations
 
 
