@@ -86,7 +86,7 @@
 - Confirm optional empty sections use the documented empty-state wording.
 - Confirm table-row support data rendered outside Markdown table cells.
 - Confirm IDs, confidence, and refs are not visible table columns except in chapter 9 risks, assumptions, and low-confidence summaries.
-- Confirm evidence notes render near the referenced design item or after the referenced table row.
+- When inline evidence mode was requested, confirm evidence notes render near the referenced design item or after the referenced table row.
 - Confirm unreferenced evidence warnings were reviewed.
 - Confirm risks and assumptions render in chapter 9 with support refs when present.
 - Confirm Chapter 9 risk/assumption/low-confidence visibility when those items are present.

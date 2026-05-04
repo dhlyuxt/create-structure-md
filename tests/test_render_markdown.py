@@ -1820,7 +1820,7 @@ class RendererIntegrationTests(unittest.TestCase):
         self.assertNotIn("## 10.", markdown)
         self.assertNotIn("```mermaid\n\n```", markdown)
 
-    def test_minimal_examples_are_rejected_until_migrated_to_v2(self):
+    def test_minimal_examples_render_after_v2_migration(self):
         for relative_path in [
             "examples/minimal-from-code.dsl.json",
             "examples/minimal-from-requirements.dsl.json",
@@ -1834,9 +1834,8 @@ class RendererIntegrationTests(unittest.TestCase):
                         capture_output=True,
                         check=False,
                     )
-                    self.assertEqual(2, completed.returncode)
-                    self.assertIn("V1 DSL is not supported by the V2 renderer", completed.stderr)
-                    self.assertEqual([], list(Path(tmpdir).glob("*.md")))
+                    self.assertEqual(0, completed.returncode, completed.stderr)
+                    self.assertEqual(1, len(list(Path(tmpdir).glob("*.md"))))
 
     def test_synthetic_all_known_mermaid_paths_render_inside_fences(self):
         sources = {

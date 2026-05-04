@@ -68,7 +68,7 @@ Source snippets must be necessary, minimal, and safe to disclose. Do not include
 
 Support data supplies confidence, evidence, traceability, source snippets, risks, and assumptions for design items. Support data helps render stronger documentation but does not create standalone Markdown chapters.
 
-- Evidence referenced by design nodes renders near those nodes as compact `依据：EV-...` notes.
+- Evidence refs remain DSL metadata by default; when rendered with `--evidence-mode inline`, evidence referenced by design nodes renders near those nodes as compact `依据：EV-...` notes.
 - Unreferenced evidence produces a validation warning, not a failure.
 - Traceability binding is authoritative through `traceability[].target_type` and `traceability[].target_id`; local `traceability_refs` are optional backlinks and must target the current node when present.
 - Duplicate traceability discovered through both authoritative target scanning and local backlinks renders once.
