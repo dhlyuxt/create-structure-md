@@ -49,7 +49,7 @@ The validator may keep compatibility with `0.1.0` only if that does not complica
 
 ## Evidence Rendering
 
-V2 adds a final Markdown evidence rendering switch.
+V2 adds a final Markdown evidence rendering switch as a renderer CLI option. This option must not be stored in DSL instances because the DSL should remain document content, not rendering policy.
 
 Supported modes:
 
@@ -60,31 +60,20 @@ Supported modes:
 
 `appendix` mode is intentionally not supported.
 
-### DSL Shape
+### CLI Shape
 
-Add top-level render options:
-
-```json
-{
-  "render_options": {
-    "evidence_mode": "hidden"
-  }
-}
-```
-
-If `render_options` or `render_options.evidence_mode` is absent during migration, the renderer treats the mode as `hidden`.
-
-An optional CLI override may be added:
+Add a renderer option:
 
 ```text
+python3 scripts/render_markdown.py structure.dsl.json --evidence-mode hidden
 python3 scripts/render_markdown.py structure.dsl.json --evidence-mode inline
 ```
 
-If both DSL and CLI specify the mode, the CLI option wins.
+If `--evidence-mode` is absent, the renderer defaults to `hidden`.
 
 ### Hidden Mode Semantics
 
-`hidden` mode hides generated support-data blocks only. It does not hide structural facts in normal content.
+`hidden` mode fully suppresses evidence-node rendering in final Markdown. This includes rendered evidence, traceability, source snippet blocks, and table-row support-data groups generated from those nodes. It does not hide structural facts in normal content.
 
 Markdown may still show:
 
@@ -99,11 +88,13 @@ Markdown may still show:
 - known limitations
 - Mermaid diagrams
 
-DSL fields such as `evidence_refs`, `traceability_refs`, and `source_snippet_refs` remain available for validation and upstream tooling. They are simply not rendered as support blocks in final Markdown when mode is `hidden`.
+DSL fields such as `evidence_refs`, `traceability_refs`, and `source_snippet_refs` remain available for validation and upstream tooling. They are not rendered in final Markdown when mode is `hidden`.
 
 ## Chapter 4 Design
 
 V2 replaces the V1 module subsection template.
+
+V2 intentionally overrides the V1 rule that Chapter 4 must not center on function prototypes or parameter lists. In V2, public function and command-line interfaces are first-class module structure. This allowance is limited to public interfaces listed under `public_interfaces`; V2 still does not require documenting arbitrary private helper functions or full internal call chains.
 
 Remove the V1 Chapter 4 subsections:
 
@@ -266,7 +257,7 @@ The renderer should output these subsections in this exact order.
           "title": "render_markdown.py 执行流程图",
           "diagram_type": "flowchart",
           "description": "展示 CLI 从读取 DSL 到写出 Markdown 的流程。",
-          "source": "",
+          "source": "flowchart TD\n  A[\"Parse args\"] --> B[\"Load DSL\"]\n  B --> C[\"Render Markdown\"]\n  C --> D[\"Write output\"]",
           "confidence": "observed"
         },
         "side_effects": [
@@ -305,8 +296,6 @@ The renderer should output these subsections in this exact order.
     "not_applicable_reason": ""
   },
 
-  "extra_tables": [],
-  "extra_diagrams": [],
   "evidence_refs": [],
   "traceability_refs": [],
   "source_snippet_refs": [],
@@ -399,7 +388,7 @@ Return value table:
 | 返回名 | 返回类型 | 描述 | 条件 |
 | --- | --- | --- | --- |
 
-The execution flow diagram is stored locally on the interface object as `execution_flow_diagram`. Do not use a reference to `extra_diagrams[]` for this field.
+The execution flow diagram is stored locally on the interface object as `execution_flow_diagram`. It is not routed through supplemental diagram fields. `execution_flow_diagram.source` is required and must be non-empty for every public interface.
 
 ### Known Limitations Rendering
 
@@ -454,14 +443,20 @@ The new visible table columns are:
 
 If a runtime unit has no entrypoint, render `不适用` in the `入口` column and place any explanation in `备注`.
 
-The DSL may keep old fields temporarily for migration, but the renderer should not show them as standalone columns.
+V2 should remove these V1 runtime-unit fields from the DSL:
+
+- `entrypoint_not_applicable_reason`
+- `external_environment_reason`
+
+If no concrete entrypoint exists, write the reason directly in `entrypoint`, for example `不适用：由 render_markdown.py 内部调用`.
+
+`external_environment_reason` should not be replaced. If a row only describes an external runtime, tool, browser, filesystem, or environment condition, model it as a dependency or configuration item instead of a runtime unit.
 
 ## Validation Rules
 
 V2 validation should enforce:
 
 - `dsl_version` is `0.2.0` for V2 examples.
-- `render_options.evidence_mode`, when present, is `hidden` or `inline`.
 - `module_design.modules[]` matches Chapter 3 modules one-to-one.
 - Each module has non-empty `module_kind`, `summary`, and `source_scope.summary`.
 - Each module has at least one of:
@@ -475,15 +470,17 @@ V2 validation should enforce:
 - Each interface has non-empty `interface_name`, `interface_type`, `prototype`, `purpose`, and `location.file_path`.
 - Each interface parameter row has non-empty `parameter_name`, `parameter_type`, `description`, and `direction`.
 - Each return value row has non-empty `return_name`, `return_type`, `description`, and `condition`.
-- Each interface execution diagram uses the existing diagram object shape.
+- Each interface execution diagram uses the existing diagram object shape and has non-empty `source`.
 - Each known limitation row has non-empty `limitation`, `impact`, and `mitigation_or_next_step`.
+- Runtime unit rows do not contain `entrypoint_not_applicable_reason` or `external_environment_reason`.
+- Runtime unit `entrypoint` is non-empty. If there is no concrete executable entrypoint, the value must begin with `不适用：`.
 
 ## Renderer Requirements
 
 Renderer changes:
 
 - Add evidence mode handling.
-- Suppress support-data blocks in `hidden` mode.
+- Suppress evidence-node rendering in `hidden` mode.
 - Preserve V1 support-data rendering in `inline` mode.
 - Render Chapter 4 using the new six-subsection structure.
 - Render local interface execution flow diagrams.
@@ -509,7 +506,7 @@ Do not update:
 
 Add or update tests for:
 
-- default hidden evidence mode suppresses `支持数据（...）`
+- default hidden evidence mode suppresses evidence-node rendering
 - inline evidence mode preserves V1 evidence rendering
 - Chapter 4 new subsection order
 - source scope rendering
@@ -519,8 +516,10 @@ Add or update tests for:
 - public interface index rendering
 - public interface detail rendering
 - local interface Mermaid rendering
+- local interface Mermaid `source` requiredness
 - known limitations rendering
 - Section 5.2 simplified columns
+- Section 5.2 runtime unit DSL no longer uses `entrypoint_not_applicable_reason` or `external_environment_reason`
 - V2 schema acceptance
 - V2 semantic validation failures for missing required structural fields
 - strict validation of rendered Markdown containing local interface diagrams
@@ -558,8 +557,9 @@ Files intentionally out of scope:
 - Final Markdown defaults to hidden evidence mode.
 - Final Markdown can opt into inline evidence mode.
 - Chapter 4 renders the six agreed subsections in order.
-- Interface detail sections include prototype, purpose, location, parameter table, return value table, local Mermaid flow diagram, side effects, error behavior, and consumers.
+- Interface detail sections include prototype, purpose, location, parameter table, return value table, local non-empty Mermaid flow diagram, side effects, error behavior, and consumers.
 - Section 5.2 no longer shows `入口不适用原因` or `外部环境原因` columns.
+- Section 5.2 DSL no longer uses `entrypoint_not_applicable_reason` or `external_environment_reason`.
 - Skill workflow requires subagent Mermaid readability review before strict validation.
 - Rendered Markdown Mermaid diagrams pass strict validation.
 - No Mermaid validator or Mermaid rules files are changed.
