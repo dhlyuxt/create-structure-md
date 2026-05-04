@@ -293,6 +293,11 @@ class DirectHelperTests(unittest.TestCase):
                 self.assertGreaterEqual(len(violations), 1)
                 self.assertEqual("$.location", violations[0].path)
 
+        self.assertEqual(
+            "$.iface.location must be an object",
+            interface_location_violations("$.iface.location", None)[0].message,
+        )
+
 
 class GlobalRuleTests(unittest.TestCase):
     def test_rejects_invalid_alternate_reason_fields(self):
@@ -508,6 +513,49 @@ class GlobalRuleTests(unittest.TestCase):
             violation.message for violation in v2_global_rule_violations(same_module_id_reuse)
         )
         self.assertIn("interface_id IFACE-SAME is already defined under module index 0", same_id_messages)
+
+    def test_interface_reuse_violations_follow_first_seen_order(self):
+        document = {
+            "module_design": {
+                "modules": [
+                    {
+                        "module_id": "MOD-FIRST",
+                        "public_interfaces": {
+                            "interface_index": {
+                                "rows": [
+                                    {"interface_id": "IFACE-A"},
+                                    {"interface_id": "IFACE-B"},
+                                    {"interface_id": "IFACE-C"},
+                                ]
+                            },
+                        },
+                    },
+                    {
+                        "module_id": "MOD-SECOND",
+                        "public_interfaces": {
+                            "interfaces": [
+                                {"interface_id": "IFACE-A"},
+                                {"interface_id": "IFACE-B"},
+                                {"interface_id": "IFACE-C"},
+                            ],
+                        },
+                    },
+                ]
+            }
+        }
+        reuse_messages = [
+            violation.message
+            for violation in v2_global_rule_violations(document)
+            if "is already defined under module index" in violation.message
+        ]
+        self.assertEqual(
+            [
+                "interface_id IFACE-A is already defined under module index 0; reused by module MOD-SECOND",
+                "interface_id IFACE-B is already defined under module index 0; reused by module MOD-SECOND",
+                "interface_id IFACE-C is already defined under module index 0; reused by module MOD-SECOND",
+            ],
+            reuse_messages,
+        )
 
 
 if __name__ == "__main__":

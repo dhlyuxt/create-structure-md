@@ -178,7 +178,7 @@ def not_applicable_gate_violations(section_path, content_values, not_applicable_
 def interface_location_violations(base_path, location, *, line_one_supported=False):
     violations = []
     if not isinstance(location, dict):
-        return [RuleViolation(base_path, f"{base_path}.location must be an object")]
+        return [RuleViolation(base_path, f"{base_path} must be an object")]
 
     file_path = location.get("file_path")
     if not isinstance(file_path, str) or not file_path.strip():
@@ -474,6 +474,8 @@ def interface_id_scope_violations(document):
             continue
 
         index_seen = set()
+        logical_ids = []
+        logical_seen = set()
         interface_index = public_interfaces.get("interface_index")
         for row_index, row in enumerate(as_rows(interface_index)):
             if not isinstance(row, dict):
@@ -490,6 +492,9 @@ def interface_id_scope_violations(document):
                     RuleViolation(path, f"duplicate interface_id in interface_index: {interface_id}")
                 )
             index_seen.add(interface_id)
+            if interface_id not in logical_seen:
+                logical_ids.append(interface_id)
+                logical_seen.add(interface_id)
 
         detail_seen = set()
         interfaces = public_interfaces.get("interfaces")
@@ -510,8 +515,11 @@ def interface_id_scope_violations(document):
                     RuleViolation(path, f"duplicate interface_id in interface details: {interface_id}")
                 )
             detail_seen.add(interface_id)
+            if interface_id not in logical_seen:
+                logical_ids.append(interface_id)
+                logical_seen.add(interface_id)
 
-        for interface_id in index_seen | detail_seen:
+        for interface_id in logical_ids:
             owner_index = owner_by_interface_id.get(interface_id)
             if owner_index is not None and owner_index != module_index:
                 violations.append(
