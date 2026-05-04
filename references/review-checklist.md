@@ -40,10 +40,10 @@
 - Confirm validation policy outside DSL: validation behavior is enforced by scripts and workflow references, not embedded as design prose.
 - Confirm DSL instances do not contain `empty_allowed`, `required`, `min_rows`, or similar schema policy fields.
 - Confirm common metadata, canonical module IDs, traceability target mappings, and ID reference rules were checked.
-- Confirm traceability uses `target_type` and `target_id` as the authoritative binding and duplicates render once.
+- Confirm traceability uses `target_type` and `target_id` as the authoritative binding; when inline evidence mode was requested, confirm duplicate traceability renders once.
 - Confirm optional, required, and extra diagram rules were checked.
 - Confirm fixed table columns are owned by renderer/schema/reference docs, not DSL instances.
-- Confirm extra table evidence renders after the table, support metadata names are not visible column keys, and extra diagrams render only when non-empty.
+- When inline evidence mode was requested, confirm extra table evidence renders after the table; confirm support metadata names are not visible column keys and extra diagrams render only when non-empty.
 
 ## V2 Foundation Checks
 
@@ -84,11 +84,11 @@
 - Confirm fixed section numbering remains stable when optional content is absent.
 - Confirm fixed numbering remains stable for all fixed sections.
 - Confirm optional empty sections use the documented empty-state wording.
-- Confirm table-row support data rendered outside Markdown table cells.
+- When inline evidence mode was requested, confirm table-row support data rendered outside Markdown table cells.
 - Confirm IDs, confidence, and refs are not visible table columns except in chapter 9 risks, assumptions, and low-confidence summaries.
 - When inline evidence mode was requested, confirm evidence notes render near the referenced design item or after the referenced table row.
 - Confirm unreferenced evidence warnings were reviewed.
-- Confirm risks and assumptions render in chapter 9 with support refs when present.
+- Confirm risks and assumptions render in chapter 9; when inline evidence mode was requested, confirm support refs render when present.
 - Confirm Chapter 9 risk/assumption/low-confidence visibility when those items are present.
 - Confirm low-confidence summary excludes support data and Mermaid diagram nodes.
 - Confirm low-confidence summary whitelist includes only intended design content.

@@ -164,6 +164,10 @@ class RendererNotApplicableFailFastTests(unittest.TestCase):
 REFERENCE_EXPECTATIONS = {
     "references/dsl-spec.md": [
         "# create-structure-md DSL Spec",
+        "## DSL Purpose",
+        "## DSL Top-Level Fields",
+        "## Chapter Fields",
+        "## Support Data",
         "dsl_version",
         "0.2.0",
         "V1 DSL is not supported by the V2 renderer",
@@ -171,8 +175,14 @@ REFERENCE_EXPECTATIONS = {
     ],
     "references/document-structure.md": [
         "# create-structure-md Document Structure",
+        "## Fixed 9-Chapter Markdown Outline",
+        "## Output Filename Policy",
         "Evidence support blocks are hidden by default",
         "--evidence-mode inline",
+        "When `--evidence-mode inline` is used, support data renders as compact notes",
+        "Extra table row evidence renders after the extra table",
+        "Chapter 6 empty tables render the documented empty-state sentences",
+        "module- or system-specific",
         "Generic-only filenames are forbidden",
     ],
     "references/mermaid-rules.md": [
@@ -184,7 +194,16 @@ REFERENCE_EXPECTATIONS = {
     ],
     "references/review-checklist.md": [
         "# create-structure-md Review Checklist",
+        "## Final Report",
+        "## Boundary Checks",
+        "## DSL Policy Checks",
+        "## Mermaid Validation",
+        "## Text Safety",
+        "## Rendered Structure",
         "Confirm final Markdown was rendered with hidden evidence mode unless inline evidence was requested",
+        "When inline evidence mode was requested, confirm evidence notes render near the referenced design item",
+        "Confirm traceability uses `target_type` and `target_id` as the authoritative binding",
+        "When inline evidence mode was requested, confirm extra table evidence renders after the table",
         "Confirm no repo analysis",
         "single Markdown file",
     ],

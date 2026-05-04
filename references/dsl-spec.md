@@ -54,7 +54,7 @@ Support data strengthens nearby design content and does not create standalone ch
 
 ## Traceability Target Mapping
 
-`traceability[].target_type` identifies the kind of design object being supported, and `traceability[].target_id` identifies the exact object ID. Validators should reject unknown target types, missing targets, or target IDs that do not match a defining ID field. Renderers should show the traceability note near the mapped object and avoid duplicate notes when a local backlink also references the same traceability object.
+`traceability[].target_type` identifies the kind of design object being supported, and `traceability[].target_id` identifies the exact object ID. Validators should reject unknown target types, missing targets, or target IDs that do not match a defining ID field. Traceability refs remain DSL metadata by default; when rendered with `--evidence-mode inline`, renderers should show the traceability note near the mapped object and avoid duplicate notes when a local backlink also references the same traceability object.
 
 ## Validation Policy Outside DSL
 
@@ -62,7 +62,7 @@ Validation policy outside DSL belongs in scripts and reference contracts, not em
 
 ## Source Snippet Rules
 
-Source snippets must be necessary, minimal, and safe to disclose. Do not include secrets, tokens, private keys, credentials, personal data, or unrelated code. Snippets must be referenced by at least one `source_snippet_refs` field, render near the referencing node, and never render inside Markdown table cells. Fence selection must prevent snippet content from breaking the Markdown code fence.
+Source snippets must be necessary, minimal, and safe to disclose. Do not include secrets, tokens, private keys, credentials, personal data, or unrelated code. Snippets must be referenced by at least one `source_snippet_refs` field. Source snippet refs remain DSL metadata by default; when rendered with `--evidence-mode inline`, snippets render near the referencing node and never inside Markdown table cells. Fence selection must prevent snippet content from breaking the Markdown code fence.
 
 ## Support Data
 
@@ -70,11 +70,11 @@ Support data supplies confidence, evidence, traceability, source snippets, risks
 
 - Evidence refs remain DSL metadata by default; when rendered with `--evidence-mode inline`, evidence referenced by design nodes renders near those nodes as compact `依据：EV-...` notes.
 - Unreferenced evidence produces a validation warning, not a failure.
-- Traceability binding is authoritative through `traceability[].target_type` and `traceability[].target_id`; local `traceability_refs` are optional backlinks and must target the current node when present.
-- Duplicate traceability discovered through both authoritative target scanning and local backlinks renders once.
-- Source snippets must be referenced by at least one `source_snippet_refs` field, render near the referencing node, and never render inside Markdown table cells.
+- Traceability binding is authoritative through `traceability[].target_type` and `traceability[].target_id`; local `traceability_refs` are optional backlinks and must target the current node when present. Traceability refs remain DSL metadata by default and render near the mapped object only with `--evidence-mode inline`.
+- Duplicate traceability discovered through both authoritative target scanning and local backlinks renders once in inline evidence mode.
+- Source snippets must be referenced by at least one `source_snippet_refs` field. Source snippet refs remain DSL metadata by default and render near the referencing node only with `--evidence-mode inline`; snippets never render inside Markdown table cells.
 - Snippet code fences are chosen so snippet content cannot break the fence.
 - Extra table rows may use declared content column keys plus `evidence_refs`; extra table `columns[].key` must not use support metadata names such as `evidence_refs`, `traceability_refs`, `source_snippet_refs`, or `confidence`.
 - Extra diagrams are optional by omission, must be full diagram objects when present, and must have non-empty Mermaid source.
-- Risks and assumptions render under chapter 9 `风险` and `假设`, with compact support refs when present.
+- Risks and assumptions render under chapter 9 `风险` and `假设`; compact support refs on those rows appear only with `--evidence-mode inline`.
 - Low-confidence summary excludes evidence, traceability, source snippets, risks, assumptions, and Mermaid diagrams.
