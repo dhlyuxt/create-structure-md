@@ -7,7 +7,7 @@ V2 upgrades create-structure-md from a fixed 9-chapter Markdown renderer into a 
 The primary changes are:
 
 - Evidence support blocks are hidden by default in final Markdown.
-- Chapter 4 is rebuilt around module scope, configuration, dependencies, data objects, public interfaces, and known limitations.
+- Chapter 4 is rebuilt around module scope, configuration, dependencies, data objects, public interfaces, implementation notes, and known limitations.
 - Mermaid diagrams receive an adversarial readability review by a subagent before strict validation.
 - Section 5.2 runtime unit tables are simplified.
 - Mermaid validator files and Mermaid rule files are not changed in this phase.
@@ -104,7 +104,7 @@ Remove the V1 Chapter 4 subsections:
 - standalone internal structure diagram section
 - supplement section as the primary extension mechanism
 
-Each module renders six fixed subsections:
+Each module renders seven fixed subsections:
 
 ```text
 4.x.1 模块定位与源码/产物范围
@@ -112,10 +112,24 @@ Each module renders six fixed subsections:
 4.x.3 依赖
 4.x.4 数据对象
 4.x.5 对外接口
-4.x.6 已知限制
+4.x.6 实现机制说明
+4.x.7 已知限制
 ```
 
 The renderer should output these subsections in this exact order.
+
+### Chapter 4 and Chapter 6 Split
+
+Chapter 4 renders module-local configuration, dependencies, and data objects. These items explain one module's boundary and behavior.
+
+Chapter 6 renders system-level configuration, dependencies, and data artifacts. These items explain cross-module, whole-skill, installation, or runtime-environment concerns.
+
+Use this rule of thumb:
+
+- If an item applies to exactly one module and helps explain that module's contract, place it in Chapter 4.
+- If an item is shared by multiple modules, affects the whole workflow, represents an external runtime environment, or describes final/installed artifacts at system scope, place it in Chapter 6.
+- If the same underlying object appears in both chapters, Chapter 4 describes module-local use and Chapter 6 describes the system-level relationship.
+- The renderer should not try to deduplicate Chapter 4 and Chapter 6 automatically.
 
 ### Chapter 4 DSL
 
@@ -159,7 +173,8 @@ The renderer should output these subsections in this exact order.
         {
           "parameter_id": "MPARAM-RENDER-OUTPUT-DIR",
           "prototype": "--output-dir",
-          "current_value": "当前目录",
+          "value_or_default": "当前目录",
+          "value_source": "default",
           "meaning": "指定最终 Markdown 文件写入目录。",
           "confidence": "observed",
           "evidence_refs": []
@@ -197,7 +212,6 @@ The renderer should output these subsections in this exact order.
         "producer": "Codex 或上游分析 skill",
         "consumer": "Markdown 渲染器",
         "shape_or_contract": "符合 structure-design.schema.json",
-        "persistence": "临时文件或用户指定文件",
         "confidence": "observed",
         "evidence_refs": []
       }
@@ -281,6 +295,56 @@ The renderer should output these subsections in this exact order.
     "not_applicable_reason": ""
   },
 
+  "implementation_notes": {
+    "summary": "说明该模块内部如何完成职责。Codex 可自由组合文字、图和表。",
+    "blocks": [
+      {
+        "block_id": "IMPLNOTE-RENDER-TEXT",
+        "block_type": "text",
+        "title": "固定章节渲染机制",
+        "text": "渲染器读取 DSL 后构建渲染上下文，再按固定章节顺序生成 Markdown。第四章由模块设计数据驱动，依次输出范围、配置、依赖、数据对象、接口、实现机制和已知限制。"
+      },
+      {
+        "block_id": "IMPLNOTE-RENDER-DIAGRAM",
+        "block_type": "diagram",
+        "title": "章节渲染机制图",
+        "diagram": {
+          "id": "MER-IMPLNOTE-RENDER-FLOW",
+          "kind": "implementation_note",
+          "title": "章节渲染机制图",
+          "diagram_type": "flowchart",
+          "description": "展示渲染器如何组织章节输出。",
+          "source": "flowchart TD\n  A[\"Load DSL\"] --> B[\"Build context\"]\n  B --> C[\"Render chapters\"]\n  C --> D[\"Write Markdown\"]",
+          "confidence": "observed"
+        }
+      },
+      {
+        "block_id": "IMPLNOTE-RENDER-TABLE",
+        "block_type": "table",
+        "title": "关键阶段",
+        "table": {
+          "id": "TBL-IMPLNOTE-RENDER-STAGES",
+          "title": "关键阶段",
+          "columns": [
+            { "key": "stage", "title": "阶段" },
+            { "key": "description", "title": "说明" }
+          ],
+          "rows": [
+            {
+              "stage": "上下文构建",
+              "description": "收集 DSL 中的结构信息和支持数据索引。"
+            },
+            {
+              "stage": "章节渲染",
+              "description": "按固定章节顺序调用对应渲染逻辑。"
+            }
+          ]
+        }
+      }
+    ],
+    "not_applicable_reason": ""
+  },
+
   "known_limitations": {
     "summary": "说明该模块当前已知的结构、运行、渲染或维护限制。",
     "rows": [
@@ -334,10 +398,21 @@ Do not include `primary_directories`.
 
 Render module-level parameters as:
 
-| 原型 | 当前值 | 含义 |
-| --- | --- | --- |
+| 原型 | 当前/默认值 | 来源 | 含义 |
+| --- | --- | --- | --- |
 
 `parameter_id`, confidence, and evidence refs are internal DSL fields and are not shown by default.
+
+`value_source` is an enum:
+
+- `default`
+- `cli_argument`
+- `environment`
+- `constant`
+- `config_file`
+- `computed`
+- `inferred`
+- `unknown`
 
 ### Dependencies Rendering
 
@@ -352,8 +427,8 @@ Render dependencies as:
 
 Render data objects as:
 
-| 名称 | 类型 | 角色 | 生产方 | 消费方 | 结构/契约 | 持久化 |
-| --- | --- | --- | --- | --- | --- | --- |
+| 名称 | 类型 | 角色 | 生产方 | 消费方 | 结构/契约 |
+| --- | --- | --- | --- | --- | --- |
 
 `data_id`, confidence, and evidence refs are internal DSL fields and are not shown by default.
 
@@ -390,6 +465,18 @@ Return value table:
 
 The execution flow diagram is stored locally on the interface object as `execution_flow_diagram`. It is not routed through supplemental diagram fields. `execution_flow_diagram.source` is required and must be non-empty for every public interface.
 
+### Implementation Notes Rendering
+
+Render `implementation_notes` as a free content-block section. Codex decides the number, order, and mix of text, diagram, and table blocks. This section should explain how the module works internally without forcing a fixed table template.
+
+The renderer outputs:
+
+- summary paragraph
+- each block in `blocks[]` order
+- `not_applicable_reason` only when `blocks[]` is empty
+
+At least one text block with non-empty `text` is required whenever `blocks[]` is non-empty.
+
 ### Known Limitations Rendering
 
 Render known limitations as:
@@ -398,6 +485,145 @@ Render known limitations as:
 | --- | --- | --- |
 
 `limitation_id`, confidence, and evidence refs are internal DSL fields and are not shown by default.
+
+## Content Blocks
+
+V2 introduces reusable content blocks for sections where Codex needs freedom to combine prose, diagrams, and tables.
+
+Initial content-block users:
+
+- `module_design.modules[].implementation_notes.blocks[]`
+- `structure_issues_and_suggestions.blocks[]`
+
+Content blocks are rendered in DSL order. They are not raw Markdown. The renderer owns Markdown headings, Mermaid fences, and table formatting.
+
+### Text Block
+
+```json
+{
+  "block_id": "BLOCK-TEXT-001",
+  "block_type": "text",
+  "title": "说明标题",
+  "text": "普通说明文字。"
+}
+```
+
+`text` is plain text, not Markdown. It must follow the same Markdown safety rules as other normal DSL text fields.
+
+### Diagram Block
+
+```json
+{
+  "block_id": "BLOCK-DIAGRAM-001",
+  "block_type": "diagram",
+  "title": "图标题",
+  "diagram": {
+    "id": "MER-BLOCK-001",
+    "kind": "content_block",
+    "title": "图标题",
+    "diagram_type": "flowchart",
+    "description": "图说明。",
+    "source": "flowchart TD\n  A[\"Input\"] --> B[\"Output\"]",
+    "confidence": "observed"
+  }
+}
+```
+
+`diagram` uses the existing Mermaid diagram object shape. `diagram.source` is required and must be non-empty.
+
+### Table Block
+
+```json
+{
+  "block_id": "BLOCK-TABLE-001",
+  "block_type": "table",
+  "title": "表标题",
+  "table": {
+    "id": "TBL-BLOCK-001",
+    "title": "表标题",
+    "columns": [
+      { "key": "name", "title": "名称" },
+      { "key": "description", "title": "说明" }
+    ],
+    "rows": [
+      {
+        "name": "示例",
+        "description": "示例说明。"
+      }
+    ]
+  }
+}
+```
+
+`table` uses the existing local table shape. Table block rows may only use declared column keys. They should not carry evidence, traceability, or source snippet refs.
+
+### Content Block Validation
+
+For every content-block section:
+
+- `blocks[]` may be empty only when `not_applicable_reason` is non-empty.
+- If `blocks[]` is non-empty, at least one block must have `block_type: "text"` and non-empty `text`.
+- `block_id` values must be unique within the section.
+- `block_type` must be `text`, `diagram`, or `table`.
+- Text blocks must have non-empty `text`.
+- Diagram blocks must have a full Mermaid diagram object with non-empty `source`.
+- Table blocks must have non-empty `columns[]` and `rows[]`.
+
+## Chapter 9 Design
+
+V2 replaces the V1 free-form `structure_issues_and_suggestions` string with a content-block section.
+
+```json
+{
+  "structure_issues_and_suggestions": {
+    "summary": "说明本系统当前识别到的结构问题、风险和改进方向。",
+    "blocks": [
+      {
+        "block_id": "ISSUE-TEXT-001",
+        "block_type": "text",
+        "title": "第四章信息密度不足",
+        "text": "V1 第四章容易停留在职责摘要，缺少模块实现机制说明。V2 通过对外接口和实现机制说明补足这一点。"
+      },
+      {
+        "block_id": "ISSUE-DIAGRAM-001",
+        "block_type": "diagram",
+        "title": "质量门禁关系图",
+        "diagram": {
+          "id": "MER-ISSUE-QUALITY-GATES",
+          "kind": "structure_issue",
+          "title": "质量门禁关系图",
+          "diagram_type": "flowchart",
+          "description": "展示 DSL、Mermaid 和 Markdown 渲染之间的质量门禁。",
+          "source": "flowchart TD\n  A[\"DSL\"] --> B[\"DSL validation\"]\n  B --> C[\"Mermaid review\"]\n  C --> D[\"Strict validation\"]\n  D --> E[\"Markdown output\"]",
+          "confidence": "observed"
+        }
+      },
+      {
+        "block_id": "ISSUE-TABLE-001",
+        "block_type": "table",
+        "title": "改进建议清单",
+        "table": {
+          "id": "TBL-ISSUE-IMPROVEMENTS",
+          "title": "改进建议清单",
+          "columns": [
+            { "key": "issue", "title": "问题" },
+            { "key": "suggestion", "title": "建议" }
+          ],
+          "rows": [
+            {
+              "issue": "证据块噪声过多",
+              "suggestion": "默认使用 hidden evidence mode"
+            }
+          ]
+        }
+      }
+    ],
+    "not_applicable_reason": ""
+  }
+}
+```
+
+Chapter 9 uses the same content block validation rules. If `blocks[]` is non-empty, it must include at least one non-empty text block.
 
 ## Mermaid Readability Review
 
@@ -463,15 +689,19 @@ V2 validation should enforce:
   - `source_scope.primary_files`
   - `source_scope.consumed_inputs`
   - `source_scope.owned_outputs`
-- `configuration.parameters.rows[]`, when present, has non-empty `prototype`, `current_value`, and `meaning`.
+- `configuration.parameters.rows[]`, when present, has non-empty `prototype`, `value_source`, and `meaning`.
+- `configuration.parameters.rows[].value_source` is one of `default`, `cli_argument`, `environment`, `constant`, `config_file`, `computed`, `inferred`, or `unknown`.
+- `configuration.parameters.rows[].value_or_default` may be empty only when `value_source` is `unknown`.
 - `dependencies.rows[]`, when present, has non-empty `name`, `dependency_type`, `required_for`, and `failure_behavior`.
-- `data_objects.rows[]`, when present, has non-empty `name`, `data_type`, `role`, `producer`, `consumer`, `shape_or_contract`, and `persistence`.
+- `data_objects.rows[]`, when present, has non-empty `data_id`, `name`, `data_type`, `role`, `producer`, `consumer`, and `shape_or_contract`.
 - `public_interfaces.interface_index.rows[]` and `public_interfaces.interfaces[]` use matching `interface_id` sets.
 - Each interface has non-empty `interface_name`, `interface_type`, `prototype`, `purpose`, and `location.file_path`.
 - Each interface parameter row has non-empty `parameter_name`, `parameter_type`, `description`, and `direction`.
 - Each return value row has non-empty `return_name`, `return_type`, `description`, and `condition`.
 - Each interface execution diagram uses the existing diagram object shape and has non-empty `source`.
+- `implementation_notes` follows the reusable content block rules.
 - Each known limitation row has non-empty `limitation`, `impact`, and `mitigation_or_next_step`.
+- `structure_issues_and_suggestions` follows the reusable content block rules.
 - Runtime unit rows do not contain `entrypoint_not_applicable_reason` or `external_environment_reason`.
 - Runtime unit `entrypoint` is non-empty. If there is no concrete executable entrypoint, the value must begin with `不适用：`.
 
@@ -482,8 +712,9 @@ Renderer changes:
 - Add evidence mode handling.
 - Suppress evidence-node rendering in `hidden` mode.
 - Preserve V1 support-data rendering in `inline` mode.
-- Render Chapter 4 using the new six-subsection structure.
+- Render Chapter 4 using the new seven-subsection structure.
 - Render local interface execution flow diagrams.
+- Render reusable content blocks for implementation notes and Chapter 9.
 - Render Section 5.2 with the simplified runtime-unit columns.
 - Treat missing V2 optional arrays as empty where migration compatibility is desired.
 
@@ -517,7 +748,11 @@ Add or update tests for:
 - public interface detail rendering
 - local interface Mermaid rendering
 - local interface Mermaid `source` requiredness
+- implementation notes content block rendering
+- implementation notes require at least one text block when present
 - known limitations rendering
+- Chapter 9 content block rendering
+- Chapter 9 requires at least one text block when blocks are present
 - Section 5.2 simplified columns
 - Section 5.2 runtime unit DSL no longer uses `entrypoint_not_applicable_reason` or `external_environment_reason`
 - V2 schema acceptance
@@ -556,8 +791,10 @@ Files intentionally out of scope:
 - V2 examples validate successfully.
 - Final Markdown defaults to hidden evidence mode.
 - Final Markdown can opt into inline evidence mode.
-- Chapter 4 renders the six agreed subsections in order.
+- Chapter 4 renders the seven agreed subsections in order.
 - Interface detail sections include prototype, purpose, location, parameter table, return value table, local non-empty Mermaid flow diagram, side effects, error behavior, and consumers.
+- Implementation notes render text, diagram, and table content blocks in DSL order.
+- Chapter 9 renders text, diagram, and table content blocks in DSL order.
 - Section 5.2 no longer shows `入口不适用原因` or `外部环境原因` columns.
 - Section 5.2 DSL no longer uses `entrypoint_not_applicable_reason` or `external_environment_reason`.
 - Skill workflow requires subagent Mermaid readability review before strict validation.
