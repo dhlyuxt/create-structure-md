@@ -683,6 +683,37 @@ class Phase7StrictMermaidAndFallbackTests(Phase7Phase4ArtifactMixin, unittest.Te
                             str(dsl_path),
                             "--mermaid-review-artifact",
                             str(artifact_path),
+                            "--pre-render",
+                            "--work-dir",
+                            str(work_dir),
+                        ],
+                    )
+                    self.assertEqual(0, code, f"STDOUT:\n{stdout}\nSTDERR:\n{stderr}")
+                    self.assertIn("Mermaid validation succeeded", stdout)
+                    self.assertEqual("", stderr)
+                    run_validator.assert_called_once_with(
+                        [
+                            sys.executable,
+                            str(ROOT / "scripts/validate_mermaid.py"),
+                            "--from-dsl",
+                            str(dsl_path),
+                            "--strict",
+                            "--work-dir",
+                            str(work_dir / "pre-render"),
+                        ],
+                        cwd=ROOT,
+                        text=True,
+                        capture_output=True,
+                        check=False,
+                    )
+
+                    run_validator.reset_mock()
+                    code, stdout, stderr = call_main(
+                        module,
+                        [
+                            str(dsl_path),
+                            "--mermaid-review-artifact",
+                            str(artifact_path),
                             "--rendered-markdown",
                             str(output_path),
                             "--post-render",

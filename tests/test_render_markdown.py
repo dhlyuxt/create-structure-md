@@ -1918,6 +1918,13 @@ def load_mermaid_validator_module():
     return module
 
 
+def load_phase4_module():
+    spec = importlib.util.spec_from_file_location("v2_phase4_for_renderer_test", ROOT / "scripts/v2_phase4.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def synthetic_flowchart_source(name):
     return f"flowchart TD\n  {name}A[{name} A] --> {name}B[{name} B]"
 
@@ -1955,6 +1962,8 @@ class RendererIntegrationTests(unittest.TestCase):
             self.assertGreater(len(expected_mermaid_sources), 0)
             self.assertEqual(len(expected_mermaid_sources), markdown.count("```mermaid"))
             self.assertIn("<!-- diagram-id:", markdown)
+            phase4 = load_phase4_module()
+            self.assertEqual([], phase4.rendered_diagram_completeness_errors(document, markdown))
             for source in required_mermaid_sources(document):
                 with self.subTest(required_source=source.splitlines()[0]):
                     self.assertEqual(1, markdown.count(source))
@@ -2093,6 +2102,8 @@ class RendererIntegrationTests(unittest.TestCase):
             self.assertCountEqual(expected_sources, parsed_sources)
             self.assertEqual(14, markdown.count("```mermaid"))
             self.assertIn("<!-- diagram-id:", markdown)
+            phase4 = load_phase4_module()
+            self.assertEqual([], phase4.rendered_diagram_completeness_errors(document, markdown))
 
             mermaid = subprocess.run(
                 [PYTHON, str(VALIDATOR), "--from-markdown", str(output_path), "--static"],
