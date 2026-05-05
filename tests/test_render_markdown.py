@@ -1616,6 +1616,28 @@ class ChapterFiveToEightRenderingTests(unittest.TestCase):
 
 
 class ChapterNineRenderingTests(unittest.TestCase):
+    def test_chapter_9_uses_fixed_numbered_headings_without_legacy_headings(self):
+        module = load_renderer_module()
+        markdown = module.render_markdown(valid_document())
+        section = markdown[markdown.index("## 9. 结构问题与改进建议") :]
+
+        for heading in [
+            "### 9.1 风险清单",
+            "### 9.2 假设清单",
+            "### 9.3 低置信度项目",
+            "### 9.4 结构问题与改进建议",
+        ]:
+            with self.subTest(heading=heading):
+                self.assertIn(heading, section)
+
+        for legacy_heading in [
+            "### 风险",
+            "### 假设",
+            "### 低置信度项",
+        ]:
+            with self.subTest(legacy_heading=legacy_heading):
+                self.assertNotIn(legacy_heading, section)
+
     def test_chapter_9_empty_structure_issues_reason_renders_when_all_sources_are_empty(self):
         module = load_renderer_module()
         document = valid_document()
