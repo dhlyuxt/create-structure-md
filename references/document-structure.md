@@ -12,12 +12,13 @@ The rendered document uses exactly nine fixed Chinese chapters. This is the fixe
    - 3.3 模块关系图
    - 3.4 补充架构图表
 4. 模块设计
-   - 4.x.1 模块概述
-   - 4.x.2 模块职责
-   - 4.x.3 对外能力说明
-   - 4.x.4 对外接口需求清单
-   - 4.x.5 模块内部结构关系图
-   - 4.x.6 补充说明
+   - 4.x.1 模块定位与源码/产物范围
+   - 4.x.2 配置
+   - 4.x.3 依赖
+   - 4.x.4 数据对象
+   - 4.x.5 对外接口
+   - 4.x.6 实现机制说明
+   - 4.x.7 已知限制
 5. 运行时视图
    - 5.1 运行时概述
    - 5.2 运行单元说明
@@ -46,11 +47,16 @@ Fixed subchapter numbering is part of the rendered contract. Chapters 1, 2, and 
 
 ## Chapter-By-Chapter Rendering Positions
 
-Chapter 1 renders document metadata from `document`. Chapter 2 renders prepared system overview content. Chapter 3 renders architecture overview, module list, module relationship Mermaid, and supplemental architecture diagrams. Chapter 4 renders each module's overview, responsibilities, external capabilities, interface requirements, internal Mermaid diagram, and supplemental notes. Chapter 5 renders runtime overview, runtime units, runtime flow Mermaid, runtime sequence Mermaid, and supplemental runtime diagrams. Chapter 6 renders configuration items, structural data/artifacts, dependencies, and supplemental diagrams. Chapter 7 renders collaboration overview, collaboration rows, collaboration Mermaid, and supplemental diagrams. Chapter 8 renders flow overview, flow list, and per-flow details. Chapter 9 renders risks, assumptions, low-confidence summaries, and improvement suggestions.
+Chapter 1 renders document metadata from `document`. Chapter 2 renders prepared system overview content. Chapter 3 renders architecture overview, module list, module relationship Mermaid, and supplemental architecture diagrams. Chapter 4 renders each module's V2 module model as seven fixed subsections: module positioning and source/output scope, configuration, dependencies, data objects, public interfaces, internal mechanism, and known limitations. Chapter 5 renders runtime overview, runtime units, runtime flow Mermaid, runtime sequence Mermaid, and supplemental runtime diagrams. Chapter 6 renders configuration items, structural data/artifacts, dependencies, and supplemental diagrams. Chapter 7 renders collaboration overview, collaboration rows, collaboration Mermaid, and supplemental diagrams. Chapter 8 renders flow overview, flow list, and per-flow details. Chapter 9 renders risks, assumptions, low-confidence summaries, and improvement suggestions.
 
 ## Fixed Table Visible Columns
 
 Fixed table visible columns are section-specific content columns only. IDs, confidence, evidence refs, traceability refs, source snippet refs, risk refs, and assumption refs are hidden from normal tables. They may appear only in chapter 9 review summaries when the purpose is review traceability.
+
+Section 5.2 runtime units render these visible columns:
+
+| 运行单元 | 类型 | 入口 | 职责 | 关联模块 | 备注 |
+| --- | --- | --- | --- | --- | --- |
 
 ## Empty-State Sentences
 

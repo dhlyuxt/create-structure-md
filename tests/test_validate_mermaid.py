@@ -27,10 +27,10 @@ EXPECTED_DESCRIPTION = (
 
 REQUIRED_INPUTS = [
     "module list and stable module IDs",
-    "module responsibilities",
+    "module scope",
     "module relationships",
-    "module-level external capabilities or interface requirements",
-    "module internal structure information",
+    "public interfaces",
+    "internal mechanisms",
     "runtime units and runtime flow",
     "configuration, structural data/artifact, and dependency information when applicable",
     "cross-module collaboration scenarios when more than one module is identified",
@@ -341,10 +341,12 @@ class DslMermaidStaticTests(unittest.TestCase):
             self.diagram("MER-ARCH-EMPTY", source=" \n\t"),
         ]
         module = document["module_design"]["modules"][0]
-        module["internal_structure"]["diagram"] = self.diagram("MER-MODULE-INTERNAL")
-        module["external_capability_details"]["extra_diagrams"] = [
-            self.diagram("MER-MODULE-CAPABILITY-EXTRA")
-        ]
+        module["internal_structure"] = {"diagram": self.diagram("MER-MODULE-INTERNAL")}
+        module["external_capability_details"] = {
+            "extra_diagrams": [
+                self.diagram("MER-MODULE-CAPABILITY-EXTRA")
+            ]
+        }
         module["extra_diagrams"] = [self.diagram("MER-MODULE-EXTRA")]
         document["runtime_view"]["runtime_flow_diagram"] = self.diagram("MER-RUNTIME-FLOW")
         document["runtime_view"]["runtime_sequence_diagram"] = self.diagram(

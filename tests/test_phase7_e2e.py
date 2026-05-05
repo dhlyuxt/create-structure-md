@@ -430,18 +430,19 @@ class Phase7ExampleContractTests(unittest.TestCase):
 
                 for module in module_design_modules:
                     with self.subTest(path=path.name, module=module["module_id"]):
-                        capabilities = non_empty_rows(
-                            module,
-                            "external_capability_details",
-                            "provided_capabilities",
-                        )
-                        self.assertGreaterEqual(len(capabilities), 1)
-                        internal = module["internal_structure"]
-                        has_diagram = bool(internal["diagram"]["source"].strip())
-                        has_text = bool(internal["textual_structure"].strip())
-                        self.assertTrue(has_diagram or has_text)
+                        self.assertIn("source_scope", module)
+                        self.assertIn("configuration", module)
+                        self.assertIn("dependencies", module)
+                        self.assertIn("data_objects", module)
+                        self.assertIn("public_interfaces", module)
+                        self.assertIn("internal_mechanism", module)
+                        self.assertIn("known_limitations", module)
 
                 self.assertGreaterEqual(len(non_empty_rows(document, "runtime_view", "runtime_units")), 1)
+                for unit in document["runtime_view"]["runtime_units"]["rows"]:
+                    with self.subTest(path=path.name, runtime_unit=unit["unit_id"]):
+                        self.assertNotIn("entrypoint_not_applicable_reason", unit)
+                        self.assertNotIn("external_environment_reason", unit)
                 self.assert_non_empty_text(
                     document["runtime_view"]["runtime_flow_diagram"]["source"],
                     "runtime flow source",
@@ -503,12 +504,13 @@ FIXED_RENDERED_HEADINGS = [
     "### 3.3 模块关系图",
     "### 3.4 补充架构图表",
     "## 4. 模块设计",
-    "#### 4.1.1 模块概述",
-    "#### 4.1.2 模块职责",
-    "#### 4.1.3 对外能力说明",
-    "#### 4.1.4 对外接口需求清单",
-    "#### 4.1.5 模块内部结构关系图",
-    "#### 4.1.6 补充说明",
+    "#### 4.1.1 模块定位与源码/产物范围",
+    "#### 4.1.2 配置",
+    "#### 4.1.3 依赖",
+    "#### 4.1.4 数据对象",
+    "#### 4.1.5 对外接口",
+    "#### 4.1.6 实现机制说明",
+    "#### 4.1.7 已知限制",
     "## 5. 运行时视图",
     "### 5.1 运行时概述",
     "### 5.2 运行单元说明",

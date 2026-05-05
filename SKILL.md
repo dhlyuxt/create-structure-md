@@ -16,10 +16,13 @@ This skill does not analyze repositories, infer requirements, generate multiple 
 Before creating DSL JSON, Codex must already have enough information to populate required sections without fabrication:
 
 - module list and stable module IDs
-- module responsibilities
+- module scope
 - module relationships
-- module-level external capabilities or interface requirements
-- module internal structure information
+- Chapter 4 uses the V2 `module_design.modules[]` shape and renders seven fixed subsections: `4.x.1 模块定位与源码/产物范围`, `4.x.2 配置`, `4.x.3 依赖`, `4.x.4 数据对象`, `4.x.5 对外接口`, `4.x.6 实现机制说明`, and `4.x.7 已知限制`.
+- Public function, method, library API, workflow, command-line, and contract interfaces belong under `public_interfaces`.
+- public interfaces
+- internal mechanisms
+- Section 5.2 runtime units use visible columns `运行单元 | 类型 | 入口 | 职责 | 关联模块 | 备注`; if no concrete entrypoint exists, set `entrypoint: "不适用"` and put the reason in `notes`.
 - runtime units and runtime flow
 - configuration, structural data/artifact, and dependency information when applicable
 - cross-module collaboration scenarios when more than one module is identified

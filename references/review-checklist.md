@@ -52,6 +52,9 @@
 - Confirm final Markdown was rendered with hidden evidence mode unless inline evidence was requested.
 - Confirm evidence refs remain DSL metadata when hidden from final Markdown.
 - Confirm no repository analysis was added to create-structure-md.
+- Confirm Chapter 4 uses the seven fixed V2 subsections in order.
+- Confirm public interface index rows and detail sections match and render in index order.
+- Confirm Section 5.2 simplified runtime unit table omits V1 reason columns.
 
 ## Mermaid Validation
 
@@ -83,6 +86,9 @@
 - Confirm the rendered document has fixed 9 chapters.
 - Confirm fixed section numbering remains stable when optional content is absent.
 - Confirm fixed numbering remains stable for all fixed sections.
+- Confirm Chapter 4 seven fixed subsections are present for every rendered module.
+- Confirm public interface index and details are consistent.
+- Confirm Section 5.2 simplified runtime unit table uses only `运行单元 | 类型 | 入口 | 职责 | 关联模块 | 备注`.
 - Confirm optional empty sections use the documented empty-state wording.
 - When inline evidence mode was requested, confirm table-row support data rendered outside Markdown table cells.
 - Confirm IDs, confidence, and refs are not visible table columns except in chapter 9 risks, assumptions, and low-confidence summaries.

@@ -24,6 +24,25 @@ The schema owns structural validation through `required`, `min_rows`, and `empty
 
 The DSL is organized around the fixed 9-chapter Markdown output: document metadata, system overview, architecture views, module design, runtime view, configuration/data/dependencies, cross-module collaboration, key flows, and structure issues or suggestions.
 
+## V2 Chapter 4 Module Model
+
+`module_design.modules[]` uses the V2 module model for `dsl_version: "0.2.0"`.
+Each module renders these fixed subsections in order:
+
+1. `4.x.1 模块定位与源码/产物范围`
+2. `4.x.2 配置`
+3. `4.x.3 依赖`
+4. `4.x.4 数据对象`
+5. `4.x.5 对外接口`
+6. `4.x.6 实现机制说明`
+7. `4.x.7 已知限制`
+
+The required V2 module fields include `source_scope`, `configuration`, `dependencies`, `data_objects`, `public_interfaces`, `internal_mechanism`, and `known_limitations`.
+
+V1 fields `internal_structure`, `external_capability_details`, `extra_diagrams`, and `extra_tables` are invalid as alternate V2 module-design inputs.
+Section 5.2 no longer accepts `entrypoint_not_applicable_reason` or `external_environment_reason`.
+When a runtime unit has no concrete entrypoint, set `entrypoint` to exactly `不适用` and put the explanation in `notes`.
+
 ## Common Metadata
 
 Design objects may carry common support metadata: `confidence`, `evidence_refs`, `traceability_refs`, `source_snippet_refs`, `risk_refs`, and `assumption_refs`. Metadata is never a visible fixed table column unless the document-structure contract explicitly allows a review-oriented chapter 9 rendering. Confidence values are for review summaries, not for replacing required design text.

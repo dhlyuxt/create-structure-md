@@ -65,54 +65,347 @@
       {
         "module_id": "MOD-SKILL",
         "name": "技能文档生成模块",
+        "module_kind": "library",
         "summary": "接收已经准备好的 DSL 内容，执行结构检查并生成文档。",
-        "responsibilities": ["维护 DSL 结构契约", "暴露校验和渲染入口"],
-        "external_capability_summary": {
-          "description": "为 Codex 提供结构设计文档生成能力。",
-          "consumers": ["Codex"],
-          "interface_style": "命令行脚本与 Markdown 参考文档",
-          "boundary_notes": ["不负责仓库分析", "不负责需求推理"]
+        "source_scope": {
+          "summary": "覆盖 schema、校验脚本、渲染脚本、示例和参考文档组成的文档生成能力。",
+          "primary_files": [
+            {
+              "path": "schemas/structure-design.schema.json",
+              "role": "DSL 结构契约",
+              "language": "json",
+              "notes": ""
+            },
+            {
+              "path": "scripts/validate_dsl.py",
+              "role": "DSL 校验入口",
+              "language": "python",
+              "notes": ""
+            },
+            {
+              "path": "scripts/render_markdown.py",
+              "role": "Markdown 渲染入口",
+              "language": "python",
+              "notes": ""
+            }
+          ],
+          "consumed_inputs": [
+            "结构化设计 DSL JSON"
+          ],
+          "owned_outputs": [
+            "document.output_file 指定的 Markdown 文件"
+          ],
+          "out_of_scope": [
+            "不负责仓库分析",
+            "不负责推理缺失设计内容"
+          ]
         },
-        "external_capability_details": {
-          "provided_capabilities": {
+        "configuration": {
+          "summary": "模块级配置来自渲染和校验命令行参数。",
+          "parameters": {
             "rows": [
               {
-                "capability_id": "CAP-MOD-SKILL-001",
-                "capability_name": "文档 DSL 处理",
-                "interface_style": "JSON 文件输入",
-                "description": "读取结构化 DSL 并交给校验与渲染流程。",
-                "inputs": "structure.dsl.json",
-                "outputs": "结构设计 Markdown",
-                "notes": "",
+                "parameter_id": "MPARAM-SKILL-OUTPUT-DIR",
+                "prototype": "--output-dir",
+                "value_or_default": "当前目录",
+                "value_source": "default",
+                "meaning": "指定最终 Markdown 文件写入目录。",
+                "confidence": "observed",
+                "evidence_refs": []
+              }
+            ],
+            "not_applicable_reason": ""
+          }
+        },
+        "dependencies": {
+          "summary": "模块依赖 Python、jsonschema 和 prepared DSL 输入。",
+          "rows": [
+            {
+              "dependency_id": "MDEP-SKILL-JSONSCHEMA",
+              "name": "jsonschema",
+              "dependency_type": "library",
+              "usage_relation": "validates_against",
+              "target_module_id": "",
+              "target_data_id": "",
+              "system_dependency_ref": "SYSDEP-JSONSCHEMA",
+              "required_for": "执行 Draft 2020-12 JSON Schema 校验。",
+              "failure_behavior": "DSL schema 校验无法执行。",
+              "confidence": "observed",
+              "evidence_refs": []
+            }
+          ],
+          "not_applicable_reason": ""
+        },
+        "data_objects": {
+          "summary": "模块读取 DSL JSON 并写出 Markdown 文件。",
+          "rows": [
+            {
+              "data_id": "DATA-SKILL-DSL",
+              "name": "结构设计 DSL",
+              "data_type": "json",
+              "role": "渲染输入",
+              "producer": "Codex 或上游分析 skill",
+              "consumer": "validate_dsl.py 和 render_markdown.py",
+              "shape_or_contract": "符合 schemas/structure-design.schema.json",
+              "confidence": "observed",
+              "evidence_refs": []
+            }
+          ],
+          "not_applicable_reason": ""
+        },
+        "public_interfaces": {
+          "summary": "模块暴露校验 CLI、渲染 CLI 和 DSL 契约。",
+          "interface_index": {
+            "rows": [
+              {
+                "interface_id": "IFACE-SKILL-VALIDATE-CLI",
+                "interface_name": "validate_dsl.py",
+                "interface_type": "command_line",
+                "description": "校验 DSL JSON 的 schema 和语义规则。"
+              },
+              {
+                "interface_id": "IFACE-SKILL-RENDER-CLI",
+                "interface_name": "render_markdown.py",
+                "interface_type": "command_line",
+                "description": "把通过校验的 DSL 渲染为最终 Markdown 文件。"
+              },
+              {
+                "interface_id": "IFACE-SKILL-DSL-CONTRACT",
+                "interface_name": "structure-design.schema.json",
+                "interface_type": "schema_contract",
+                "description": "定义 V2 DSL 的 JSON Schema 契约。"
+              }
+            ]
+          },
+          "interfaces": [
+            {
+              "interface_id": "IFACE-SKILL-DSL-CONTRACT",
+              "interface_name": "structure-design.schema.json",
+              "interface_type": "schema_contract",
+              "purpose": "定义结构设计 DSL 的可接受字段、枚举和对象形状。",
+              "location": {
+                "file_path": "schemas/structure-design.schema.json",
+                "symbol": "",
+                "line_start": null,
+                "line_end": null
+              },
+              "contract": {
+                "contract_scope": "覆盖 create-structure-md V2 DSL JSON 输入。",
+                "contract_location": "schemas/structure-design.schema.json",
+                "required_items": [
+                  "dsl_version",
+                  "document",
+                  "module_design"
+                ],
+                "constraints": [
+                  "dsl_version 必须为 0.2.0"
+                ],
+                "consumers": [
+                  "validate_dsl.py",
+                  "render_markdown.py"
+                ],
+                "validation_behavior": "违反契约时 validate_dsl.py 返回非 0。"
+              },
+              "confidence": "observed",
+              "evidence_refs": []
+            },
+            {
+              "interface_id": "IFACE-SKILL-RENDER-CLI",
+              "interface_name": "render_markdown.py",
+              "interface_type": "command_line",
+              "prototype": "python3 scripts/render_markdown.py structure.dsl.json --output-dir <dir>",
+              "purpose": "把 DSL 渲染为最终 Markdown 文件。",
+              "location": {
+                "file_path": "scripts/render_markdown.py",
+                "symbol": "main",
+                "line_start": null,
+                "line_end": null
+              },
+              "parameters": {
+                "rows": [
+                  {
+                    "parameter_name": "structure.dsl.json",
+                    "parameter_type": "path",
+                    "description": "待渲染的 DSL JSON 文件路径。",
+                    "direction": "input"
+                  }
+                ],
+                "not_applicable_reason": ""
+              },
+              "return_values": {
+                "rows": [
+                  {
+                    "return_name": "exit_code",
+                    "return_type": "int",
+                    "description": "0 表示成功，非 0 表示失败。",
+                    "condition": "命令结束时返回。"
+                  }
+                ],
+                "not_applicable_reason": ""
+              },
+              "execution_flow_diagram": {
+                "id": "MER-IFACE-SKILL-RENDER-CLI",
+                "kind": "interface_execution_flow",
+                "title": "render_markdown.py 执行流程",
+                "diagram_type": "flowchart",
+                "description": "展示 Markdown 渲染流程。",
+                "source": "flowchart TD\n  A[\"Parse args\"] --> B[\"Load DSL\"]\n  B --> C[\"Render Markdown\"]\n  C --> D[\"Write output\"]",
+                "confidence": "observed"
+              },
+              "side_effects": [
+                "读取 DSL 文件",
+                "写入 Markdown 输出文件"
+              ],
+              "error_behavior": [
+                {
+                  "condition": "DSL 文件不可读",
+                  "behavior": "报告错误并返回非 0 退出码。"
+                }
+              ],
+              "consumers": [
+                "Codex",
+                "仓库维护者"
+              ],
+              "confidence": "observed",
+              "evidence_refs": []
+            },
+            {
+              "interface_id": "IFACE-SKILL-VALIDATE-CLI",
+              "interface_name": "validate_dsl.py",
+              "interface_type": "command_line",
+              "prototype": "python3 scripts/validate_dsl.py structure.dsl.json",
+              "purpose": "校验 DSL JSON 的 schema 和语义规则。",
+              "location": {
+                "file_path": "scripts/validate_dsl.py",
+                "symbol": "main",
+                "line_start": null,
+                "line_end": null
+              },
+              "parameters": {
+                "rows": [
+                  {
+                    "parameter_name": "structure.dsl.json",
+                    "parameter_type": "path",
+                    "description": "待校验的 DSL JSON 文件路径。",
+                    "direction": "input"
+                  }
+                ],
+                "not_applicable_reason": ""
+              },
+              "return_values": {
+                "rows": [
+                  {
+                    "return_name": "exit_code",
+                    "return_type": "int",
+                    "description": "0 表示成功，1 表示语义错误，2 表示输入或 schema 错误。",
+                    "condition": "命令结束时返回。"
+                  }
+                ],
+                "not_applicable_reason": ""
+              },
+              "execution_flow_diagram": {
+                "id": "MER-IFACE-SKILL-VALIDATE-CLI",
+                "kind": "interface_execution_flow",
+                "title": "validate_dsl.py 执行流程",
+                "diagram_type": "flowchart",
+                "description": "展示 DSL 校验流程。",
+                "source": "flowchart TD\n  A[\"Load JSON\"] --> B[\"Require V2\"]\n  B --> C[\"Schema validation\"]\n  C --> D[\"Semantic checks\"]",
+                "confidence": "observed"
+              },
+              "side_effects": [
+                "读取 DSL 文件",
+                "向 stdout 或 stderr 输出校验结果"
+              ],
+              "error_behavior": [
+                {
+                  "condition": "DSL 文件不存在或 JSON 无效",
+                  "behavior": "返回 2 并向 stderr 输出错误。"
+                }
+              ],
+              "consumers": [
+                "Codex",
+                "仓库维护者"
+              ],
+              "confidence": "observed",
+              "evidence_refs": []
+            }
+          ],
+          "not_applicable_reason": ""
+        },
+        "internal_mechanism": {
+          "summary": "模块通过 schema 校验、语义检查和渲染函数分层完成文档生成。",
+          "mechanism_index": {
+            "rows": [
+              {
+                "mechanism_id": "MECH-SKILL-VALIDATION-PIPELINE",
+                "mechanism_name": "DSL 校验管线",
+                "purpose": "在渲染前拒绝不符合契约的 DSL 输入。",
+                "input": "结构化设计 DSL JSON",
+                "processing": "先检查 dsl_version，再执行 JSON Schema 和语义校验。",
+                "output": "校验报告或成功结果",
+                "structural_significance": "保证渲染器接收稳定的结构输入。",
+                "related_anchors": [
+                  {
+                    "anchor_type": "interface_id",
+                    "value": "IFACE-SKILL-VALIDATE-CLI",
+                    "reason": ""
+                  },
+                  {
+                    "anchor_type": "data_id",
+                    "value": "DATA-SKILL-DSL",
+                    "reason": ""
+                  }
+                ],
                 "confidence": "observed",
                 "evidence_refs": [],
                 "traceability_refs": [],
                 "source_snippet_refs": []
               }
-            ]
+            ],
+            "not_applicable_reason": ""
           },
-          "extra_tables": [],
-          "extra_diagrams": []
-        },
-        "internal_structure": {
-          "summary": "内部结构以 DSL schema、校验脚本、渲染脚本和参考文档为主要组成。",
-          "diagram": {
-            "id": "MER-MOD-SKILL-STRUCT",
-            "kind": "internal_structure",
-            "title": "模块内部结构图",
-            "diagram_type": "flowchart",
-            "description": "展示模块内部结构。",
-            "source": "",
-            "confidence": "observed"
-          },
-          "textual_structure": "schema 描述 DSL 结构，校验脚本负责质量门禁，渲染脚本负责输出 Markdown。",
+          "mechanism_details": [
+            {
+              "mechanism_id": "MECH-SKILL-VALIDATION-PIPELINE",
+              "blocks": [
+                {
+                  "block_id": "BLOCK-SKILL-VALIDATION-TEXT",
+                  "block_type": "text",
+                  "title": "DSL 校验管线说明",
+                  "text": "校验入口先拒绝非 0.2.0 DSL，再执行 JSON Schema 检查和语义检查；只有通过校验的 DSL 才进入渲染流程。",
+                  "confidence": "observed",
+                  "evidence_refs": [],
+                  "traceability_refs": [],
+                  "source_snippet_refs": []
+                }
+              ]
+            }
+          ],
           "not_applicable_reason": ""
         },
-        "extra_tables": [],
-        "extra_diagrams": [],
-        "evidence_refs": ["EV-REQ-INPUT"],
-        "traceability_refs": ["TR-REQ-MODULE"],
-        "source_snippet_refs": ["SNIP-WORKFLOW"],
+        "known_limitations": {
+          "summary": "模块仍依赖上游提供完整结构内容。",
+          "rows": [
+            {
+              "limitation_id": "LIMIT-SKILL-NO-REPO-ANALYSIS",
+              "limitation": "不会从仓库源码自动推理缺失设计内容。",
+              "impact": "DSL 内容缺失时输出文档也会缺失相应结构信息。",
+              "mitigation_or_next_step": "由上游分析 skill 或人工先准备完整 DSL。",
+              "confidence": "observed",
+              "evidence_refs": []
+            }
+          ],
+          "not_applicable_reason": ""
+        },
+        "evidence_refs": [
+          "EV-REQ-INPUT"
+        ],
+        "traceability_refs": [
+          "TR-REQ-MODULE"
+        ],
+        "source_snippet_refs": [
+          "SNIP-WORKFLOW"
+        ],
         "notes": [],
         "confidence": "observed"
       }
@@ -128,10 +421,10 @@
           "unit_name": "文档生成命令序列",
           "unit_type": "CLI workflow",
           "entrypoint": "python scripts/render_markdown.py",
-          "entrypoint_not_applicable_reason": "",
           "responsibility": "在校验通过后生成 Markdown 文档。",
-          "related_module_ids": ["MOD-SKILL"],
-          "external_environment_reason": "",
+          "related_module_ids": [
+            "MOD-SKILL"
+          ],
           "notes": "",
           "confidence": "observed",
           "evidence_refs": [],
@@ -155,16 +448,64 @@
   "configuration_data_dependencies": {
     "summary": "",
     "notes": [],
-    "configuration_items": { "rows": [] },
-    "structural_data_artifacts": { "rows": [] },
-    "dependencies": { "rows": [] },
+    "configuration_items": {
+      "rows": [
+        {
+          "config_id": "CFG-001",
+          "config_name": "输出目录",
+          "source": "命令行参数",
+          "used_by": "文档生成命令序列",
+          "purpose": "指定生成 Markdown 的输出目录。",
+          "notes": "",
+          "confidence": "observed",
+          "evidence_refs": [],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        }
+      ]
+    },
+    "structural_data_artifacts": {
+      "rows": [
+        {
+          "artifact_id": "DATA-001",
+          "artifact_name": "结构设计 DSL",
+          "artifact_type": "JSON",
+          "owner": "技能文档生成模块",
+          "producer": "Codex",
+          "consumer": "校验和渲染脚本",
+          "notes": "",
+          "confidence": "observed",
+          "evidence_refs": [],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        }
+      ]
+    },
+    "dependencies": {
+      "rows": [
+        {
+          "dependency_id": "SYSDEP-JSONSCHEMA",
+          "dependency_name": "jsonschema",
+          "dependency_type": "library",
+          "used_by": "DSL schema validation",
+          "purpose": "执行 Draft 2020-12 JSON Schema 校验。",
+          "notes": "",
+          "confidence": "observed",
+          "evidence_refs": [],
+          "traceability_refs": [],
+          "source_snippet_refs": []
+        }
+      ]
+    },
     "extra_tables": [],
     "extra_diagrams": []
   },
   "cross_module_collaboration": {
     "summary": "",
     "notes": [],
-    "collaboration_scenarios": { "rows": [] },
+    "collaboration_scenarios": {
+      "rows": []
+    },
     "extra_tables": [],
     "extra_diagrams": []
   },
@@ -177,8 +518,12 @@
           "flow_id": "FLOW-GENERATE",
           "flow_name": "生成结构设计文档",
           "trigger_condition": "Codex 已准备完整 DSL。",
-          "participant_module_ids": ["MOD-SKILL"],
-          "participant_runtime_unit_ids": ["RUN-GENERATE"],
+          "participant_module_ids": [
+            "MOD-SKILL"
+          ],
+          "participant_runtime_unit_ids": [
+            "RUN-GENERATE"
+          ],
           "main_steps": "校验 DSL、校验 Mermaid、渲染 Markdown。",
           "output_result": "模块专属结构设计 Markdown 文件。",
           "notes": ""
@@ -196,8 +541,12 @@
             "order": 1,
             "description": "准备结构化 DSL JSON。",
             "actor": "Codex",
-            "related_module_ids": ["MOD-SKILL"],
-            "related_runtime_unit_ids": ["RUN-GENERATE"],
+            "related_module_ids": [
+              "MOD-SKILL"
+            ],
+            "related_runtime_unit_ids": [
+              "RUN-GENERATE"
+            ],
             "input": "结构设计内容",
             "output": "structure.dsl.json",
             "confidence": "observed",
@@ -207,8 +556,12 @@
           }
         ],
         "branches_or_exceptions": [],
-        "related_module_ids": ["MOD-SKILL"],
-        "related_runtime_unit_ids": ["RUN-GENERATE"],
+        "related_module_ids": [
+          "MOD-SKILL"
+        ],
+        "related_runtime_unit_ids": [
+          "RUN-GENERATE"
+        ],
         "confidence": "observed",
         "evidence_refs": [],
         "traceability_refs": [],
@@ -255,9 +608,13 @@
       "impact": "输出报告需要清楚说明静态校验边界。",
       "mitigation": "按工作流报告静态校验接受情况，并在严格校验不可用时停止确认。",
       "confidence": "inferred",
-      "evidence_refs": ["EV-REQ-INPUT"],
+      "evidence_refs": [
+        "EV-REQ-INPUT"
+      ],
       "traceability_refs": [],
-      "source_snippet_refs": ["SNIP-WORKFLOW"]
+      "source_snippet_refs": [
+        "SNIP-WORKFLOW"
+      ]
     }
   ],
   "assumptions": [
@@ -267,7 +624,9 @@
       "rationale": "技能工作流要求先完成需求或项目理解，再创建完整 DSL JSON。",
       "validation_suggestion": "在执行示例前确认输入内容已经覆盖模块、运行时、流程和支持数据。",
       "confidence": "unknown",
-      "evidence_refs": ["EV-REQ-INPUT"],
+      "evidence_refs": [
+        "EV-REQ-INPUT"
+      ],
       "traceability_refs": [],
       "source_snippet_refs": []
     }
@@ -276,8 +635,8 @@
     {
       "id": "SNIP-WORKFLOW",
       "path": "SKILL.md",
-      "line_start": 34,
-      "line_end": 36,
+      "line_start": 37,
+      "line_end": 39,
       "language": "markdown",
       "purpose": "展示技能工作流前三步作为需求示例依据。",
       "content": "1. Create a temporary work directory.\n2. Read references/dsl-spec.md before writing DSL content.\n3. Write one complete DSL JSON file.",

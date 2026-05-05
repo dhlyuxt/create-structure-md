@@ -414,3 +414,55 @@ class Phase2SemanticValidationTests(unittest.TestCase):
             document["runtime_view"]["runtime_units"]["rows"][0]["entrypoint"] = "不适用：由调用方提供"
 
         self.assert_invalid(mutate, "entrypoint must be exactly 不适用 without inline reason")
+
+
+class Phase2ExamplesAndReferenceTests(unittest.TestCase):
+    EXAMPLES = [
+        ROOT / "examples/minimal-from-code.dsl.json",
+        ROOT / "examples/minimal-from-requirements.dsl.json",
+    ]
+
+    def test_examples_validate_with_phase2_shape(self):
+        for path in self.EXAMPLES:
+            completed = run_validator(path)
+            with self.subTest(path=path.name):
+                self.assertEqual(0, completed.returncode, completed.stderr)
+
+    def test_reference_docs_describe_phase2_contracts(self):
+        expectations = {
+            "references/dsl-spec.md": [
+                "module_design.modules[]",
+                "source_scope",
+                "public_interfaces",
+                "internal_mechanism",
+                "known_limitations",
+                "entrypoint_not_applicable_reason",
+                "external_environment_reason",
+            ],
+            "references/document-structure.md": [
+                "4.x.1 模块定位与源码/产物范围",
+                "4.x.2 配置",
+                "4.x.3 依赖",
+                "4.x.4 数据对象",
+                "4.x.5 对外接口",
+                "4.x.6 实现机制说明",
+                "4.x.7 已知限制",
+                "运行单元 | 类型 | 入口 | 职责 | 关联模块 | 备注",
+            ],
+            "references/review-checklist.md": [
+                "Chapter 4 seven fixed subsections",
+                "public interface index and details",
+                "Section 5.2 simplified runtime unit table",
+            ],
+            "SKILL.md": [
+                "does not analyze repositories",
+                "4.x.1 模块定位与源码/产物范围",
+                "public_interfaces",
+                "entrypoint: \"不适用\"",
+            ],
+        }
+        for relative_path, phrases in expectations.items():
+            text = (ROOT / relative_path).read_text(encoding="utf-8")
+            for phrase in phrases:
+                with self.subTest(path=relative_path, phrase=phrase):
+                    self.assertIn(phrase, text)
