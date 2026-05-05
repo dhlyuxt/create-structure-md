@@ -581,11 +581,20 @@ class Phase4StrictRenderedMarkdownTests(unittest.TestCase):
         self.assertEqual("", stderr)
         self.assertEqual(1, run_validate.call_count)
         argv = run_validate.call_args.args[0]
-        self.assertIn("--from-markdown", argv)
-        self.assertIn(str(Path(markdown_path).resolve(strict=False)), argv)
+        self.assertEqual(sys.executable, argv[0])
+        self.assertEqual(
+            str((ROOT / "scripts/validate_mermaid.py").resolve(strict=False)),
+            str(Path(argv[1]).resolve(strict=False)),
+        )
+        from_markdown_index = argv.index("--from-markdown")
+        self.assertEqual(str(Path(markdown_path).resolve(strict=False)), argv[from_markdown_index + 1])
         self.assertIn("--strict", argv)
-        self.assertIn("--work-dir", argv)
-        self.assertIn(str((Path(tmpdir) / "mermaid-work" / "post-render").resolve(strict=False)), argv)
+        self.assertNotIn("--from-dsl", argv)
+        work_dir_index = argv.index("--work-dir")
+        self.assertEqual(
+            str((Path(tmpdir) / "mermaid-work" / "post-render").resolve(strict=False)),
+            argv[work_dir_index + 1],
+        )
 
 
 class Phase4RealStrictRenderedMarkdownTests(unittest.TestCase):
