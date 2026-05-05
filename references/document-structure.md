@@ -47,7 +47,7 @@ Fixed subchapter numbering is part of the rendered contract. Chapters 1, 2, and 
 
 ## Chapter-By-Chapter Rendering Positions
 
-Chapter 1 renders document metadata from `document`. Chapter 2 renders prepared system overview content. Chapter 3 renders architecture overview, module list, module relationship Mermaid, and supplemental architecture diagrams. Chapter 4 renders each module's V2 module model as seven fixed subsections: module positioning and source/output scope, configuration, dependencies, data objects, public interfaces, internal mechanism, and known limitations. Chapter 5 renders runtime overview, runtime units, runtime flow Mermaid, runtime sequence Mermaid, and supplemental runtime diagrams. Chapter 6 renders configuration items, structural data/artifacts, dependencies, and supplemental diagrams. Chapter 7 renders collaboration overview, collaboration rows, collaboration Mermaid, and supplemental diagrams. Chapter 8 renders flow overview, flow list, and per-flow details. Chapter 9 renders risks, assumptions, low-confidence summaries, and improvement suggestions.
+Chapter 1 renders document metadata from `document`. Chapter 2 renders prepared system overview content. Chapter 3 renders architecture overview, module list, module relationship Mermaid, and supplemental architecture diagrams. Chapter 4 renders each module's V2 module model as seven fixed subsections: module positioning and source/output scope, configuration, dependencies, data objects, public interfaces, internal mechanism, and known limitations. Chapter 5 renders runtime overview, runtime units, runtime flow Mermaid, runtime sequence Mermaid, and supplemental runtime diagrams. Chapter 6 renders configuration items, structural data/artifacts, dependencies, and supplemental diagrams. Chapter 7 renders collaboration overview, collaboration rows, collaboration Mermaid, and supplemental diagrams. Chapter 8 renders flow overview, flow list, and per-flow details. Chapter 9 renders risks, assumptions, low-confidence summaries, and structure issues in a fixed order.
 
 ## Fixed Table Visible Columns
 
@@ -68,7 +68,18 @@ When `--evidence-mode inline` is used, table-row support-data placement happens 
 
 ## Chapter 9 Rendering Behavior
 
-Chapter 9 rendering behavior is review-oriented. Risks render under `风险`, assumptions render under `假设`, and low-confidence summaries render only for design content that belongs in the whitelist. Evidence, traceability, source snippets, risks, assumptions, and Mermaid diagram nodes are excluded from the low-confidence summary whitelist.
+Chapter 9 rendering behavior is review-oriented. Risks render under `9.1 风险清单`, assumptions render under `9.2 假设清单`, and low-confidence summaries render under `9.3 低置信度项目` only for design content that belongs in the whitelist. Evidence, traceability, source snippets, risks, assumptions, and Mermaid diagram nodes are excluded from the low-confidence summary whitelist.
+
+## Chapter 9 Order
+
+Chapter 9 renders in this fixed order:
+
+1. `9.1 风险清单`
+2. `9.2 假设清单`
+3. `9.3 低置信度项目`
+4. `9.4 结构问题与改进建议`
+
+Section 9.4 renders `structure_issues_and_suggestions.summary` before the shared content blocks.
 
 ## Evidence Rendering Mode
 

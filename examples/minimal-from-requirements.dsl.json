@@ -580,7 +580,22 @@
     "extra_tables": [],
     "extra_diagrams": []
   },
-  "structure_issues_and_suggestions": "",
+  "structure_issues_and_suggestions": {
+    "summary": "当前结构内容由上游需求整理准备，create-structure-md 负责校验并渲染为 Markdown。",
+    "blocks": [
+      {
+        "block_id": "ISSUE-TEXT-001",
+        "block_type": "text",
+        "title": "输入完整性依赖",
+        "text": "如果 DSL 缺少某个模块、流程或依赖信息，渲染器不会从需求文本中推理补齐。",
+        "confidence": "observed",
+        "evidence_refs": [],
+        "traceability_refs": [],
+        "source_snippet_refs": []
+      }
+    ],
+    "not_applicable_reason": ""
+  },
   "evidence": [
     {
       "id": "EV-REQ-INPUT",
@@ -635,8 +650,8 @@
     {
       "id": "SNIP-WORKFLOW",
       "path": "SKILL.md",
-      "line_start": 37,
-      "line_end": 39,
+      "line_start": 40,
+      "line_end": 42,
       "language": "markdown",
       "purpose": "展示技能工作流前三步作为需求示例依据。",
       "content": "1. Create a temporary work directory.\n2. Read references/dsl-spec.md before writing DSL content.\n3. Write one complete DSL JSON file.",

@@ -44,6 +44,10 @@
 - Confirm optional, required, and extra diagram rules were checked.
 - Confirm fixed table columns are owned by renderer/schema/reference docs, not DSL instances.
 - When inline evidence mode was requested, confirm extra table evidence renders after the table; confirm support metadata names are not visible column keys and extra diagrams render only when non-empty.
+- Confirm Chapter 4 mechanism details and Chapter 9 structure issues use the same content-block behavior.
+- Confirm every non-empty content-block section includes at least one text block.
+- Confirm content-block table rows do not carry support refs.
+- Confirm Chapter 9 renders risks, assumptions, low-confidence items, then structure issues.
 
 ## V2 Foundation Checks
 

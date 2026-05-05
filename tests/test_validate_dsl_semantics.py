@@ -503,12 +503,13 @@ class ChapterTwoThroughSixTests(unittest.TestCase):
             document = valid_document()
             blocks = document["module_design"]["modules"][0]["internal_mechanism"]["mechanism_details"][0]["blocks"]
             for block in blocks:
-                block["text"] = " "
+                if block["block_type"] == "text":
+                    block["text"] = " "
             path = write_json(tmpdir, "mechanism-empty-text.dsl.json", document)
             completed = run_validator(path)
         self.assertEqual(1, completed.returncode)
         self.assertIn("$.module_design.modules[0].internal_mechanism.mechanism_details[0].blocks", completed.stderr)
-        self.assertIn("mechanism detail must include at least one non-empty text block", completed.stderr)
+        self.assertIn("content block section must include at least one non-empty text block", completed.stderr)
 
     def test_runtime_entrypoint_must_be_non_empty(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1156,7 +1157,7 @@ class SourceSnippetValidationTests(unittest.TestCase):
 
 
 class MarkdownSafetyAndLowConfidenceTests(unittest.TestCase):
-    def test_chapter_nine_rejects_headings_tables_fences_html_and_graphs(self):
+    def test_chapter_nine_summary_and_text_blocks_reject_markdown_structure(self):
         cases = [
             "# 标题",
             "| A | B |\n|---|---|",
@@ -1167,25 +1168,38 @@ class MarkdownSafetyAndLowConfidenceTests(unittest.TestCase):
             "<!-- raw comment -->",
             "graph TD\n  A-->B",
         ]
-        for content in cases:
-            with tempfile.TemporaryDirectory() as tmpdir:
-                document = valid_document()
-                document["structure_issues_and_suggestions"] = content
-                path = write_json(tmpdir, "chapter9.dsl.json", document)
-                completed = run_validator(path)
-            with self.subTest(content=content):
-                self.assertEqual(1, completed.returncode)
-                self.assertIn("$.structure_issues_and_suggestions", completed.stderr)
-                self.assertIn("unsafe Markdown structure", completed.stderr)
+        targets = [
+            (
+                "summary",
+                lambda document, value: document["structure_issues_and_suggestions"].__setitem__("summary", value),
+                "$.structure_issues_and_suggestions.summary",
+            ),
+            (
+                "text",
+                lambda document, value: document["structure_issues_and_suggestions"]["blocks"][0].__setitem__("text", value),
+                "$.structure_issues_and_suggestions.blocks[0].text",
+            ),
+        ]
+        for label, apply_value, error_path in targets:
+            for content in cases:
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    document = valid_document()
+                    apply_value(document, content)
+                    path = write_json(tmpdir, f"chapter9-{label}.dsl.json", document)
+                    completed = run_validator(path)
+                with self.subTest(label=label, content=content):
+                    self.assertEqual(1, completed.returncode)
+                    self.assertIn(error_path, completed.stderr)
+                    self.assertIn("unsafe Markdown structure", completed.stderr)
 
     def test_chapter_nine_unsafe_content_reports_once(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             document = valid_document()
-            document["structure_issues_and_suggestions"] = "# 标题"
+            document["structure_issues_and_suggestions"]["blocks"][0]["text"] = "# 标题"
             path = write_json(tmpdir, "chapter9-once.dsl.json", document)
             completed = run_validator(path)
         self.assertEqual(1, completed.returncode)
-        self.assertEqual(1, completed.stderr.count("$.structure_issues_and_suggestions"))
+        self.assertEqual(1, completed.stderr.count("$.structure_issues_and_suggestions.blocks[0].text"))
         self.assertEqual(1, completed.stderr.count("unsafe Markdown structure"))
 
     def test_design_text_rejects_prototypes_and_definition_like_lines_outside_snippets(self):

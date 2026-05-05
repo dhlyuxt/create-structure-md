@@ -47,6 +47,15 @@ When a runtime unit has no concrete entrypoint, set `entrypoint` to exactly `不
 
 Design objects may carry common support metadata: `confidence`, `evidence_refs`, `traceability_refs`, `source_snippet_refs`, `risk_refs`, and `assumption_refs`. Metadata is never a visible fixed table column unless the document-structure contract explicitly allows a review-oriented chapter 9 rendering. Confidence values are for review summaries, not for replacing required design text.
 
+## Reusable Content Blocks
+
+V2 Phase 3 content block sections use `blocks[]` with `block_type` values `text`, `diagram`, and `table`.
+Each non-empty content-block section must include at least one text block. Block-level `evidence_refs`,
+`traceability_refs`, and `source_snippet_refs` are valid metadata and are hidden by default in rendered Markdown.
+
+Content-block tables attach support data to the block as a whole. Their rows must use declared column keys only and
+must not include `evidence_refs`, `traceability_refs`, or `source_snippet_refs`.
+
 ## ID Prefix Conventions
 
 IDs must be stable within one DSL file and use readable prefixes. Recommended prefixes are exactly: `MOD-`, `CAP-`, `RUN-`, `FLOW-`, `CFG-`, `DATA-`, `DEP-`, `COL-`, `STEP-`, `BR-`, `MER-`, `TBL-`, `EV-`, `TR-`, `RISK-`, `ASM-`, `SNIP-`. In order, these cover modules, capabilities, runtime units, key flows, configuration items, structural data/artifacts, dependencies, collaboration scenarios, flow steps, flow branches or exceptions, Mermaid diagrams, extra tables, evidence, traceability, risks, assumptions, and source snippets. Prefixes help reviewers read references, but uniqueness and schema constraints remain authoritative.
@@ -95,5 +104,5 @@ Support data supplies confidence, evidence, traceability, source snippets, risks
 - Snippet code fences are chosen so snippet content cannot break the fence.
 - Extra table rows may use declared content column keys plus `evidence_refs`; extra table `columns[].key` must not use support metadata names such as `evidence_refs`, `traceability_refs`, `source_snippet_refs`, or `confidence`.
 - Extra diagrams are optional by omission, must be full diagram objects when present, and must have non-empty Mermaid source.
-- Risks and assumptions render under chapter 9 `风险` and `假设`; compact support refs on those rows appear only with `--evidence-mode inline`.
+- Risks and assumptions render under chapter 9 fixed subsections `9.1 风险清单` and `9.2 假设清单`; compact support refs on those rows appear only with `--evidence-mode inline`.
 - Low-confidence summary excludes evidence, traceability, source snippets, risks, assumptions, and Mermaid diagrams.

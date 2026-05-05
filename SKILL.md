@@ -22,6 +22,9 @@ Before creating DSL JSON, Codex must already have enough information to populate
 - Public function, method, library API, workflow, command-line, and contract interfaces belong under `public_interfaces`.
 - public interfaces
 - internal mechanisms
+- reusable content-block sections use `blocks[]` with `block_type` values `text`, `diagram`, and `table`; every non-empty content-block section includes at least one text block.
+- `structure_issues_and_suggestions` is a Phase 3 object with `summary`, `blocks`, and `not_applicable_reason`, not a free-form Markdown string.
+- Chapter 9 renders risks, assumptions, low-confidence items, then structure issues in the fixed `9.1` through `9.4` order.
 - Section 5.2 runtime units use visible columns `运行单元 | 类型 | 入口 | 职责 | 关联模块 | 备注`; if no concrete entrypoint exists, set `entrypoint: "不适用"` and put the reason in `notes`.
 - runtime units and runtime flow
 - configuration, structural data/artifact, and dependency information when applicable

@@ -574,7 +574,22 @@
     "extra_tables": [],
     "extra_diagrams": []
   },
-  "structure_issues_and_suggestions": "",
+  "structure_issues_and_suggestions": {
+    "summary": "当前结构内容由上游代码理解准备，create-structure-md 负责校验并渲染为 Markdown。",
+    "blocks": [
+      {
+        "block_id": "ISSUE-TEXT-001",
+        "block_type": "text",
+        "title": "输入完整性依赖",
+        "text": "如果 DSL 缺少某个模块、流程或依赖信息，渲染器不会从仓库源码中推理补齐。",
+        "confidence": "observed",
+        "evidence_refs": [],
+        "traceability_refs": [],
+        "source_snippet_refs": []
+      }
+    ],
+    "not_applicable_reason": ""
+  },
   "evidence": [],
   "traceability": [],
   "risks": [],
