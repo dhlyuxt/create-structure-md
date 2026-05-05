@@ -1647,15 +1647,18 @@ class ChapterNineRenderingTests(unittest.TestCase):
         document = valid_document()
         document["architecture_views"]["module_intro"]["rows"][0]["confidence"] = "unknown"
         document["module_design"]["modules"][0]["public_interfaces"]["interfaces"][0]["confidence"] = "unknown"
+        document["module_design"]["modules"][0]["known_limitations"]["rows"][0]["confidence"] = "unknown"
         document["key_flows"]["flows"][0]["steps"][0]["confidence"] = "unknown"
         markdown = module.render_markdown(document)
         section = markdown[markdown.index("## 9. 结构问题与改进建议") :]
         self.assertIn("### 低置信度项", section)
         self.assertIn("$.architecture_views.module_intro.rows[0]", section)
         self.assertIn("$.module_design.modules[0].public_interfaces.interfaces[0]", section)
+        self.assertIn("$.module_design.modules[0].known_limitations.rows[0]", section)
         self.assertIn("$.key_flows.flows[0].steps[0]", section)
         self.assertIn("技能文档生成模块", section)
         self.assertIn("structure-design.schema.json", section)
+        self.assertIn("不会从仓库源码自动推理缺失设计内容。", section)
         self.assertIn("准备结构化 DSL JSON。", section)
         self.assertNotIn("未识别到明确的结构问题与改进建议。", section)
 

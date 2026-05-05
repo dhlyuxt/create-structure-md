@@ -1179,6 +1179,12 @@ def collect_low_confidence_items(document):
                 f"[{module_index}].public_interfaces.interfaces[{interface_index}]",
                 interface,
             )
+        for row_index, row in enumerate(module.get("known_limitations", {}).get("rows", [])):
+            add_item(
+                "$.module_design.modules"
+                f"[{module_index}].known_limitations.rows[{row_index}]",
+                row,
+            )
 
     for index, row in enumerate(document.get("runtime_view", {}).get("runtime_units", {}).get("rows", [])):
         add_item(f"$.runtime_view.runtime_units.rows[{index}]", row)
