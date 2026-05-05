@@ -220,3 +220,115 @@ class Phase4ExpectedDiagramCollectorTests(unittest.TestCase):
         diagrams = phase4.collect_expected_diagrams(document)
 
         self.assertNotIn("MER-CONTRACT-SHOULD-NOT-RENDER", {diagram.diagram_id for diagram in diagrams})
+
+
+def complete_review_artifact(source_dsl, diagram_ids):
+    return {
+        "artifact_schema_version": "1.0",
+        "reviewer": "independent_subagent",
+        "source_dsl": str(source_dsl),
+        "checked_diagram_ids": sorted(diagram_ids),
+        "accepted_diagram_ids": sorted(diagram_ids),
+        "revised_diagram_ids": [],
+        "split_diagram_ids": [],
+        "skipped_diagrams": [],
+        "remaining_readability_risks": [],
+    }
+
+
+class Phase4ReadabilityArtifactTests(unittest.TestCase):
+    def expected_ids(self):
+        phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_readability_artifact_under_test")
+        return {
+            diagram.diagram_id
+            for diagram in phase4.collect_expected_diagrams(valid_document())
+            if diagram.should_render
+        }
+
+    def test_complete_artifact_validates(self):
+        phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_readability_artifact_valid_under_test")
+        artifact = complete_review_artifact(FIXTURE, self.expected_ids())
+
+        errors = phase4.validate_mermaid_review_artifact(valid_document(), FIXTURE, artifact)
+
+        self.assertEqual([], errors)
+
+    def test_relative_source_dsl_resolves_against_artifact_directory(self):
+        phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_readability_artifact_relative_under_test")
+        tmpdir = Path(tempfile.mkdtemp(prefix="phase4-artifact-"))
+        dsl_path = write_json(tmpdir, "structure.dsl.json", valid_document())
+        artifact_path = tmpdir / "mermaid-readability-review.json"
+        artifact = complete_review_artifact(dsl_path, self.expected_ids())
+        artifact["source_dsl"] = "structure.dsl.json"
+
+        errors = phase4.validate_mermaid_review_artifact(
+            valid_document(),
+            dsl_path,
+            artifact,
+            artifact_base_dir=artifact_path.parent,
+        )
+
+        self.assertEqual([], errors)
+
+    def test_missing_artifact_is_error(self):
+        phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_readability_artifact_missing_under_test")
+
+        errors = phase4.validate_mermaid_review_artifact(valid_document(), FIXTURE, None)
+
+        self.assertIn("readability review artifact is missing", errors)
+
+    def test_mismatched_source_dsl_is_error(self):
+        phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_readability_artifact_source_under_test")
+        artifact = complete_review_artifact(ROOT / "other.dsl.json", self.expected_ids())
+
+        errors = phase4.validate_mermaid_review_artifact(valid_document(), FIXTURE, artifact)
+
+        self.assertIn(
+            "source_dsl does not match the DSL input used for expected diagram collection",
+            errors,
+        )
+
+    def test_malformed_source_dsl_type_is_error(self):
+        phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_readability_artifact_source_type_under_test")
+        artifact = complete_review_artifact(FIXTURE, self.expected_ids())
+        artifact["source_dsl"] = []
+
+        errors = phase4.validate_mermaid_review_artifact(valid_document(), FIXTURE, artifact)
+
+        self.assertIn("source_dsl must be a non-empty string", errors)
+
+    def test_incomplete_coverage_is_error(self):
+        phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_readability_artifact_coverage_under_test")
+        expected_ids = self.expected_ids()
+        missing_id = sorted(expected_ids)[0]
+        artifact = complete_review_artifact(FIXTURE, expected_ids - {missing_id})
+
+        errors = phase4.validate_mermaid_review_artifact(valid_document(), FIXTURE, artifact)
+
+        self.assertTrue(any(missing_id in error for error in errors), errors)
+
+    def test_skipped_diagram_requires_non_empty_reason(self):
+        phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_readability_artifact_skip_reason_under_test")
+        expected_ids = self.expected_ids()
+        skipped_id = sorted(expected_ids)[0]
+        artifact = complete_review_artifact(FIXTURE, expected_ids - {skipped_id})
+        artifact["skipped_diagrams"] = [{"diagram_id": skipped_id, "reason": " "}]
+
+        errors = phase4.validate_mermaid_review_artifact(valid_document(), FIXTURE, artifact)
+
+        self.assertIn(f"skipped diagram must provide reason: {skipped_id}", errors)
+
+    def test_rendered_diagram_cannot_be_skipped_by_review_artifact(self):
+        phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_readability_artifact_rendered_skip_under_test")
+        expected_ids = self.expected_ids()
+        skipped_id = sorted(expected_ids)[0]
+        artifact = complete_review_artifact(FIXTURE, expected_ids - {skipped_id})
+        artifact["skipped_diagrams"] = [{"diagram_id": skipped_id, "reason": "not needed"}]
+
+        errors = phase4.validate_mermaid_review_artifact(valid_document(), FIXTURE, artifact)
+
+        self.assertIn(
+            "skipped_diagrams contains diagram IDs that cannot be skipped because their owning section is applicable: "
+            f"{skipped_id}",
+            errors,
+        )

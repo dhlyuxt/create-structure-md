@@ -26,6 +26,38 @@ MERMAID_OPENING_FENCE_RE = re.compile(r"^ {0,3}```mermaid[ \t]*$")
 FENCE_OPENING_RE = re.compile(r"^ {0,3}(```+|~~~+)[ \t]*(.*?)[ \t]*$")
 FENCE_CLOSING_RE = re.compile(r"^ {0,3}(```+|~~~+)[ \t]*$")
 EXECUTABLE_INTERFACE_TYPES = {"command_line", "function", "method", "library_api", "workflow"}
+REVIEW_REQUIRED_KEYS = {
+    "artifact_schema_version",
+    "reviewer",
+    "source_dsl",
+    "checked_diagram_ids",
+    "accepted_diagram_ids",
+    "revised_diagram_ids",
+    "split_diagram_ids",
+    "skipped_diagrams",
+    "remaining_readability_risks",
+}
+
+
+def load_json_file(path, label="JSON file"):
+    path = Path(path)
+    if not path.exists():
+        raise Phase4GateError(f"{label} does not exist: {path}")
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise Phase4GateError(f"{label} could not be read: {path}: {exc}") from exc
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise Phase4GateError(f"{label} is malformed JSON: {path}: {exc}") from exc
+
+
+def normalize_path(value, base_dir=None):
+    path = Path(value).expanduser()
+    if base_dir is not None and not path.is_absolute():
+        path = Path(base_dir).expanduser() / path
+    return str(path.resolve(strict=False))
 
 
 def json_path(*parts):
@@ -283,3 +315,131 @@ def collect_expected_diagrams(document):
     _collect_key_flows(records, document)
     _collect_structure_issues(records, document)
     return records
+
+
+def _require_string_list(artifact, key, errors):
+    values = artifact.get(key)
+    if not isinstance(values, list) or not all(
+        isinstance(value, str) and value.strip() for value in values
+    ):
+        errors.append(f"{key} must be a list of non-empty strings")
+        return set()
+    return {value.strip() for value in values}
+
+
+def _split_ids_are_derived_from_checked(split_ids, checked_ids):
+    unresolved_ids = set()
+    for split_id in split_ids:
+        if split_id in checked_ids:
+            continue
+        if any(split_id.startswith(f"{checked_id}::") for checked_id in checked_ids):
+            continue
+        unresolved_ids.add(split_id)
+    return unresolved_ids
+
+
+def validate_mermaid_review_artifact(document, source_dsl_path, artifact, artifact_base_dir=None):
+    if artifact is None:
+        return ["readability review artifact is missing"]
+    if not isinstance(artifact, dict):
+        return ["readability review artifact must be a JSON object"]
+
+    errors = []
+    missing_keys = sorted(REVIEW_REQUIRED_KEYS - set(artifact))
+    if missing_keys:
+        return [f"readability review artifact missing keys: {', '.join(missing_keys)}"]
+
+    if artifact.get("artifact_schema_version") != "1.0":
+        errors.append("artifact_schema_version must be 1.0")
+
+    reviewer = artifact.get("reviewer")
+    if not isinstance(reviewer, str) or not reviewer.strip():
+        errors.append("reviewer must be a non-empty string")
+
+    source_dsl = artifact.get("source_dsl")
+    if not isinstance(source_dsl, str) or not source_dsl.strip():
+        errors.append("source_dsl must be a non-empty string")
+    elif normalize_path(source_dsl, artifact_base_dir) != normalize_path(source_dsl_path):
+        errors.append("source_dsl does not match the DSL input used for expected diagram collection")
+
+    records = collect_expected_diagrams(document)
+    records_by_id = {record.diagram_id: record for record in records if record.diagram_id}
+    all_expected_ids = set(records_by_id)
+    rendered_ids = {
+        diagram_id
+        for diagram_id, record in records_by_id.items()
+        if record.should_render
+    }
+    skippable_ids = all_expected_ids - rendered_ids
+
+    checked_ids = _require_string_list(artifact, "checked_diagram_ids", errors)
+    accepted_ids = _require_string_list(artifact, "accepted_diagram_ids", errors)
+    revised_ids = _require_string_list(artifact, "revised_diagram_ids", errors)
+    split_ids = _require_string_list(artifact, "split_diagram_ids", errors)
+
+    skipped_ids = set()
+    skipped_diagrams = artifact.get("skipped_diagrams")
+    if not isinstance(skipped_diagrams, list):
+        errors.append("skipped_diagrams must be a list")
+    else:
+        for skipped_diagram in skipped_diagrams:
+            if not isinstance(skipped_diagram, dict):
+                errors.append("skipped diagram must be an object")
+                continue
+            diagram_id = skipped_diagram.get("diagram_id")
+            if not isinstance(diagram_id, str) or not diagram_id.strip():
+                errors.append("skipped diagram must provide diagram_id")
+                continue
+            diagram_id = diagram_id.strip()
+            skipped_ids.add(diagram_id)
+
+            reason = skipped_diagram.get("reason")
+            if not isinstance(reason, str) or not reason.strip():
+                errors.append(f"skipped diagram must provide reason: {diagram_id}")
+
+    covered_ids = checked_ids | skipped_ids
+    missing_coverage_ids = all_expected_ids - covered_ids
+    if missing_coverage_ids:
+        errors.append(
+            "readability review artifact does not cover expected diagrams: "
+            + ", ".join(sorted(missing_coverage_ids))
+        )
+
+    unknown_checked_ids = checked_ids - all_expected_ids
+    if unknown_checked_ids:
+        errors.append("checked_diagram_ids contains unknown diagram IDs: " + ", ".join(sorted(unknown_checked_ids)))
+
+    unknown_skipped_ids = skipped_ids - all_expected_ids
+    if unknown_skipped_ids:
+        errors.append("skipped_diagrams contains unknown diagram IDs: " + ", ".join(sorted(unknown_skipped_ids)))
+
+    rendered_skipped_ids = skipped_ids & rendered_ids
+    if rendered_skipped_ids:
+        errors.append(
+            "skipped_diagrams contains diagram IDs that cannot be skipped because their owning section is applicable: "
+            + ", ".join(sorted(rendered_skipped_ids))
+        )
+
+    skipped_without_reason_ids = {
+        diagram_id
+        for diagram_id in skipped_ids & skippable_ids
+        if not records_by_id[diagram_id].skip_reason
+    }
+    if skipped_without_reason_ids:
+        errors.append(
+            "skipped_diagrams contains IDs without an explicitly not-applicable owning section: "
+            + ", ".join(sorted(skipped_without_reason_ids))
+        )
+
+    unresolved_review_ids = (accepted_ids | revised_ids) - checked_ids
+    unresolved_review_ids |= _split_ids_are_derived_from_checked(split_ids, checked_ids)
+    if unresolved_review_ids:
+        errors.append(
+            "accepted/revised/split IDs must refer to checked diagrams: "
+            + ", ".join(sorted(unresolved_review_ids))
+        )
+
+    if not isinstance(artifact.get("remaining_readability_risks"), list):
+        errors.append("remaining_readability_risks must be a list")
+
+    return errors
