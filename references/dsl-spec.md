@@ -107,3 +107,11 @@ Support data supplies confidence, evidence, traceability, source snippets, risks
 - Extra diagrams are optional by omission, must be full diagram objects when present, and must have non-empty Mermaid source.
 - Risks and assumptions render under chapter 9 fixed subsections `9.1 风险清单` and `9.2 假设清单`; compact support refs on those rows appear only with `--evidence-mode inline`.
 - Low-confidence summary excludes evidence, traceability, source snippets, risks, assumptions, and Mermaid diagrams.
+
+## Expected Mermaid Diagram Paths
+
+The Phase 4 expected diagram collector gathers present Mermaid diagram objects from architecture relationship and extra diagrams, runtime flow/sequence/extra diagrams, configuration extra diagrams, collaboration relationship/extra diagrams, key-flow diagrams and extra diagrams, executable public interface execution flow diagrams, internal mechanism diagram content blocks, and Chapter 9 diagram content blocks.
+
+Removed V1 Chapter 4 paths are not V2 inputs: `module_design.modules[].internal_structure.diagram`, `module_design.modules[].external_capability_details.extra_diagrams[]`, and `module_design.modules[].extra_diagrams[]`.
+
+Mermaid readability review artifacts are workflow metadata and not DSL fields.

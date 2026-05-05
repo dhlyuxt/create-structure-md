@@ -65,11 +65,18 @@
 - Confirm Mermaid-only diagram output: every final diagram is a Markdown Mermaid code block.
 - Confirm supported MVP core Mermaid diagram types only are used.
 - Confirm required Mermaid diagrams are present.
-- Confirm DSL Mermaid sources passed strict validation, or record the user's explicit acceptance of static-only validation.
-- Confirm strict Mermaid validation ran with `--work-dir` unless the user accepted the static-only fallback.
+- Confirm an independent Mermaid readability review artifact was produced before strict validation.
+- Confirm the Mermaid readability artifact covers every expected DSL diagram ID or gives a non-empty skipped reason for an explicitly not-applicable owning section.
+- Confirm DSL Mermaid sources passed strict validation.
+- Confirm strict Mermaid validation ran with `--work-dir`.
 - Confirm rendered Markdown contains Mermaid fences only where Mermaid sources exist.
-- Confirm rendered Mermaid passes `validate_mermaid.py --from-markdown <output-file> --static`.
+- Confirm every Mermaid fence in rendered Markdown has an adjacent `diagram-id` metadata comment.
+- Confirm rendered diagram completeness passed and missing diagrams were not accepted by title-only matches.
+- Confirm strict rendered Markdown validation ran in strict mode.
+- Confirm rendered Mermaid passes `verify_v2_mermaid_gates.py --rendered-markdown <output-file> --post-render`.
 - Confirm post-render Markdown Mermaid validation was run.
+- Confirm Static-only Mermaid validation is not final acceptance.
+- Confirm `scripts/validate_mermaid.py` and `references/mermaid-rules.md` were not modified.
 - Confirm Graphviz fully removed from final output.
 - Confirm no final image artifacts were produced.
 - Confirm Graphviz, DOT, SVG, PNG, PDF, and exported image deliverables are absent.

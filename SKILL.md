@@ -39,16 +39,17 @@ If any required input is missing, stop and perform project or requirement unders
 
 1. Create a temporary work directory.
 2. Read references/dsl-spec.md before writing DSL content.
-3. Write one complete DSL JSON file.
-4. Run `python scripts/validate_dsl.py structure.dsl.json`.
+3. Write one complete DSL JSON file at `<temporary-work-directory>/structure.dsl.json`.
+4. Run `python scripts/validate_dsl.py <temporary-work-directory>/structure.dsl.json`.
 5. Read references/mermaid-rules.md before creating/revising Mermaid.
-6. Run `python scripts/validate_mermaid.py --from-dsl structure.dsl.json --strict --work-dir <temporary-work-directory>/mermaid`.
-7. Render exactly one document with `python scripts/render_markdown.py structure.dsl.json --output-dir <output-dir>`. Evidence support blocks are hidden by default; use `--evidence-mode inline` only when the user explicitly asks to preserve inline support data in final Markdown.
-8. Run `python scripts/validate_mermaid.py --from-markdown <output-file> --static`.
-9. Review with references/review-checklist.md.
-10. Report output path, temporary work directory, assumptions, low-confidence items, and static-only Mermaid acceptance.
+6. Dispatch an independent Mermaid readability review subagent. Review every expected Mermaid diagram for readability. Save the JSON artifact as `<temporary-work-directory>/mermaid-readability-review.json`. Write `<temporary-work-directory>/mermaid-readability-review.json`.
+7. Run `python scripts/verify_v2_mermaid_gates.py <temporary-work-directory>/structure.dsl.json --mermaid-review-artifact <temporary-work-directory>/mermaid-readability-review.json --pre-render --work-dir <temporary-work-directory>/mermaid`.
+8. Render exactly one document with `python scripts/render_markdown.py <temporary-work-directory>/structure.dsl.json --output-dir <output-dir>`. Evidence support blocks are hidden by default; use `--evidence-mode inline` only when the user explicitly asks to preserve inline support data in final Markdown.
+9. Run `python scripts/verify_v2_mermaid_gates.py <temporary-work-directory>/structure.dsl.json --mermaid-review-artifact <temporary-work-directory>/mermaid-readability-review.json --rendered-markdown <output-file> --post-render --work-dir <temporary-work-directory>/mermaid`.
+10. Review with references/review-checklist.md.
+11. Report output path, temporary work directory, assumptions, low-confidence items, and Mermaid gate results. Mermaid gate results include the Mermaid readability artifact path, rendered diagram completeness status, and strict rendered Markdown validation status.
 
-Strict Mermaid validation is the default. If local Mermaid CLI tooling unavailable, stop and ask user before static-only validation. A final report that relies on static-only validation must say Mermaid diagrams were not proven renderable by Mermaid CLI, tooling unavailable, and user explicitly accepts static-only validation.
+Strict Mermaid validation is the default. The Mermaid readability artifact is workflow metadata. Do not store it inside DSL JSON and do not render it into final Markdown. The artifact `source_dsl` value must identify the same DSL path passed to `verify_v2_mermaid_gates.py`; prefer `<temporary-work-directory>/structure.dsl.json` or an absolute path. Every rendered Mermaid fence must have an adjacent `<!-- diagram-id: ... -->` comment immediately before the fence. Static-only Mermaid validation is not final acceptance for V2 Phase 4.
 
 ## Output And Temporary Files
 
