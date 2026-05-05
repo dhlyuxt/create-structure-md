@@ -67,6 +67,9 @@ def schema_errors(document):
 
 
 class Phase3FixtureContractTests(unittest.TestCase):
+    def assert_markdown_contains(self, markdown, fragment):
+        self.assertNotEqual(-1, markdown.find(fragment), f"Missing markdown fragment: {fragment}")
+
     def test_valid_fixture_matches_phase3_schema_and_semantics(self):
         document = valid_document()
         self.assertEqual([], schema_errors(document))
@@ -86,21 +89,29 @@ class Phase3FixtureContractTests(unittest.TestCase):
         self.assertEqual("MER-BLOCK-STRUCTURE-ISSUES", issue_blocks[1]["diagram"]["id"])
         self.assertEqual("TBL-BLOCK-STRUCTURE-ISSUES", issue_blocks[2]["table"]["id"])
 
-    def test_chapter_4_and_chapter_9_render_blocks_through_shared_visible_contract(self):
+    def test_chapter_4_renders_content_blocks_through_shared_visible_contract(self):
+        renderer = load_renderer_module()
+        document = valid_document()
+        document["structure_issues_and_suggestions"] = "Legacy Chapter 9 placeholder."
+        markdown = renderer.render_markdown(document)
+
+        self.assert_markdown_contains(markdown, "DSL 校验管线说明")
+        self.assert_markdown_contains(markdown, 'A["DSL JSON"] --> B["Version gate"]')
+        self.assert_markdown_contains(markdown, "DSL 校验管线图")
+        self.assert_markdown_contains(markdown, "| 阶段 | 说明 |")
+
+    def test_chapter_9_renders_content_blocks_through_shared_visible_contract(self):
         renderer = load_renderer_module()
         markdown = renderer.render_markdown(valid_document())
 
-        self.assertIn("DSL 校验管线说明", markdown)
-        self.assertIn("DSL 校验管线图", markdown)
-        self.assertIn("```mermaid\nflowchart TD", markdown)
-        self.assertIn("| 阶段 | 说明 |", markdown)
-        self.assertIn("### 9.1 风险清单", markdown)
-        self.assertIn("### 9.2 假设清单", markdown)
-        self.assertIn("### 9.3 低置信度项目", markdown)
-        self.assertIn("### 9.4 结构问题与改进建议", markdown)
-        self.assertIn("结构问题概览", markdown)
-        self.assertIn("结构问题关系图", markdown)
-        self.assertIn("| 问题 | 改进方向 |", markdown)
+        self.assert_markdown_contains(markdown, "### 9.1 风险清单")
+        self.assert_markdown_contains(markdown, "### 9.2 假设清单")
+        self.assert_markdown_contains(markdown, "### 9.3 低置信度项目")
+        self.assert_markdown_contains(markdown, "### 9.4 结构问题与改进建议")
+        self.assert_markdown_contains(markdown, "结构问题概览")
+        self.assert_markdown_contains(markdown, 'A["Prepared DSL"] --> B["Validation"]')
+        self.assert_markdown_contains(markdown, "结构问题关系图")
+        self.assert_markdown_contains(markdown, "| 问题 | 改进方向 |")
 
     def test_chapter_9_sections_render_in_fixed_order(self):
         renderer = load_renderer_module()
@@ -111,5 +122,10 @@ class Phase3FixtureContractTests(unittest.TestCase):
             "### 9.3 低置信度项目",
             "### 9.4 结构问题与改进建议",
         ]
-        positions = [markdown.index(heading) for heading in headings]
+        positions = []
+        for heading in headings:
+            with self.subTest(heading=heading):
+                position = markdown.find(heading)
+                self.assertNotEqual(-1, position, f"Missing Chapter 9 heading: {heading}")
+                positions.append(position)
         self.assertEqual(sorted(positions), positions)
