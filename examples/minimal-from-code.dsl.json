@@ -374,9 +374,62 @@
                   "title": "DSL 校验管线说明",
                   "text": "校验入口先拒绝非 0.2.0 DSL，再执行 JSON Schema 检查和语义检查；只有通过校验的 DSL 才进入渲染流程。",
                   "confidence": "observed",
-                  "evidence_refs": [],
+                  "evidence_refs": [
+                    "EV-CODE-V2-BOUNDARY"
+                  ],
                   "traceability_refs": [],
                   "source_snippet_refs": []
+                },
+                {
+                  "block_id": "BLOCK-SKILL-VALIDATION-DIAGRAM",
+                  "block_type": "diagram",
+                  "title": "DSL 校验管线图",
+                  "confidence": "observed",
+                  "evidence_refs": [],
+                  "traceability_refs": [],
+                  "source_snippet_refs": [],
+                  "diagram": {
+                    "id": "MER-BLOCK-MECHANISM-FLOW",
+                    "kind": "content_block",
+                    "title": "DSL 校验管线图",
+                    "diagram_type": "flowchart",
+                    "description": "展示校验管线如何从 DSL 输入走向校验结果。",
+                    "source": "flowchart TD\n  A[\"DSL JSON\"] --> B[\"Version gate\"]\n  B --> C[\"Schema validation\"]\n  C --> D[\"Semantic validation\"]\n  D --> E[\"Validation result\"]",
+                    "confidence": "observed"
+                  }
+                },
+                {
+                  "block_id": "BLOCK-SKILL-VALIDATION-TABLE",
+                  "block_type": "table",
+                  "title": "DSL 校验管线阶段",
+                  "confidence": "observed",
+                  "evidence_refs": [],
+                  "traceability_refs": [],
+                  "source_snippet_refs": [],
+                  "table": {
+                    "id": "TBL-BLOCK-MECHANISM-STAGES",
+                    "title": "DSL 校验管线阶段",
+                    "columns": [
+                      {
+                        "key": "stage",
+                        "title": "阶段"
+                      },
+                      {
+                        "key": "description",
+                        "title": "说明"
+                      }
+                    ],
+                    "rows": [
+                      {
+                        "stage": "Version gate",
+                        "description": "拒绝非 0.2.0 DSL。"
+                      },
+                      {
+                        "stage": "Semantic validation",
+                        "description": "检查跨字段引用、not_applicable 互斥和内容安全。"
+                      }
+                    ]
+                  }
                 }
               ]
             }
@@ -397,7 +450,9 @@
           ],
           "not_applicable_reason": ""
         },
-        "evidence_refs": [],
+        "evidence_refs": [
+          "EV-CODE-V2-BOUNDARY"
+        ],
         "traceability_refs": [],
         "source_snippet_refs": [],
         "notes": [],
@@ -583,14 +638,72 @@
         "title": "输入完整性依赖",
         "text": "如果 DSL 缺少某个模块、流程或依赖信息，渲染器不会从仓库源码中推理补齐。",
         "confidence": "observed",
-        "evidence_refs": [],
+        "evidence_refs": [
+          "EV-CODE-V2-BOUNDARY"
+        ],
         "traceability_refs": [],
         "source_snippet_refs": []
+      },
+      {
+        "block_id": "ISSUE-DIAGRAM-001",
+        "block_type": "diagram",
+        "title": "结构问题关系图",
+        "confidence": "observed",
+        "evidence_refs": [],
+        "traceability_refs": [],
+        "source_snippet_refs": [],
+        "diagram": {
+          "id": "MER-BLOCK-STRUCTURE-ISSUES",
+          "kind": "content_block",
+          "title": "结构问题关系图",
+          "diagram_type": "flowchart",
+          "description": "展示上游内容完整性如何影响最终结构文档。",
+          "source": "flowchart TD\n  A[\"Prepared DSL\"] --> B[\"Validation\"]\n  B --> C[\"Markdown rendering\"]\n  A --> D[\"Missing content risk\"]",
+          "confidence": "observed"
+        }
+      },
+      {
+        "block_id": "ISSUE-TABLE-001",
+        "block_type": "table",
+        "title": "结构问题与改进方向",
+        "confidence": "observed",
+        "evidence_refs": [],
+        "traceability_refs": [],
+        "source_snippet_refs": [],
+        "table": {
+          "id": "TBL-BLOCK-STRUCTURE-ISSUES",
+          "title": "结构问题与改进方向",
+          "columns": [
+            {
+              "key": "issue",
+              "title": "问题"
+            },
+            {
+              "key": "improvement",
+              "title": "改进方向"
+            }
+          ],
+          "rows": [
+            {
+              "issue": "缺失仓库分析能力",
+              "improvement": "由上游 repo-analysis skill 或人工准备 DSL。"
+            }
+          ]
+        }
       }
     ],
     "not_applicable_reason": ""
   },
-  "evidence": [],
+  "evidence": [
+    {
+      "id": "EV-CODE-V2-BOUNDARY",
+      "kind": "source",
+      "title": "V2 prepared-content boundary",
+      "location": "SKILL.md",
+      "description": "The skill consumes prepared structure content and does not analyze repositories or infer missing design content.",
+      "confidence": "observed"
+    }
+  ],
   "traceability": [],
   "risks": [],
   "assumptions": [],

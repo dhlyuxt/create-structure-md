@@ -2014,7 +2014,12 @@ class RendererIntegrationTests(unittest.TestCase):
                         check=False,
                     )
                     self.assertEqual(0, completed.returncode, completed.stderr)
-                    self.assertEqual(1, len(list(Path(tmpdir).glob("*.md"))))
+                    markdown_paths = list(Path(tmpdir).glob("*.md"))
+                    self.assertEqual(1, len(markdown_paths))
+                    if relative_path == "examples/minimal-from-code.dsl.json":
+                        markdown = markdown_paths[0].read_text(encoding="utf-8")
+                        self.assertIn("<!-- diagram-id: MER-BLOCK-MECHANISM-FLOW -->", markdown)
+                        self.assertIn("<!-- diagram-id: MER-BLOCK-STRUCTURE-ISSUES -->", markdown)
 
     def test_synthetic_all_known_mermaid_paths_render_inside_fences(self):
         sources = {

@@ -472,6 +472,21 @@ class Phase7ExampleContractTests(unittest.TestCase):
                     with self.subTest(path=path.name, source_snippet=snippet["id"]):
                         self.assert_source_snippet_matches_file_slice(snippet)
 
+    def test_one_accepted_example_covers_rich_v2_content_blocks(self):
+        rich_examples = []
+        for path in EXAMPLE_PATHS:
+            document = self.load_example(path)
+            blocks = []
+            for module in document["module_design"]["modules"]:
+                for detail in module["internal_mechanism"]["mechanism_details"]:
+                    blocks.extend(detail["blocks"])
+            issue_blocks = document["structure_issues_and_suggestions"]["blocks"]
+            block_types = {block["block_type"] for block in blocks}
+            issue_block_types = {block["block_type"] for block in issue_blocks}
+            if {"text", "diagram", "table"} <= block_types and {"text", "diagram", "table"} <= issue_block_types:
+                rich_examples.append(path.name)
+        self.assertTrue(rich_examples, "at least one accepted example must cover rich V2 content blocks")
+
     def test_examples_collectively_exercise_support_data_and_low_confidence(self):
         examples = [self.load_example(path) for path in EXAMPLE_PATHS]
 
