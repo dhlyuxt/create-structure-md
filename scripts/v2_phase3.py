@@ -6,6 +6,7 @@ except ModuleNotFoundError:
 
 SUPPORT_REF_FIELDS = ("evidence_refs", "traceability_refs", "source_snippet_refs")
 RESERVED_CONTENT_BLOCK_TABLE_COLUMN_KEYS = (*SUPPORT_REF_FIELDS, "confidence")
+CONTENT_BLOCK_BASE_METADATA_FIELDS = ("block_id", "block_type", "title", "confidence")
 
 
 def _non_empty(value):
@@ -14,6 +15,10 @@ def _non_empty(value):
     if isinstance(value, list):
         return len(value) > 0
     return value is not None
+
+
+def _non_empty_string(value):
+    return isinstance(value, str) and bool(value.strip())
 
 
 def _duplicate_values(values):
@@ -87,16 +92,32 @@ def _is_non_empty_text_block(block):
 
 
 def _block_violations(block, base):
+    violations = _base_metadata_violations(block, base)
     block_type = block.get("block_type")
     if block_type == "text":
         if not _non_empty(block.get("text")):
-            return [RuleViolation(f"{base}.text", "text block text must be non-empty")]
-        return []
+            violations.append(RuleViolation(f"{base}.text", "text block text must be non-empty"))
+        return violations
     if block_type == "diagram":
-        return _diagram_block_violations(block, base)
+        violations.extend(_diagram_block_violations(block, base))
+        return violations
     if block_type == "table":
-        return _table_block_violations(block, base)
-    return []
+        violations.extend(_table_block_violations(block, base))
+        return violations
+    return violations
+
+
+def _base_metadata_violations(block, base):
+    violations = []
+    for field_name in CONTENT_BLOCK_BASE_METADATA_FIELDS:
+        if not _non_empty_string(block.get(field_name)):
+            violations.append(
+                RuleViolation(
+                    f"{base}.{field_name}",
+                    f"content block {field_name} must be non-empty",
+                )
+            )
+    return violations
 
 
 def _diagram_block_violations(block, base):

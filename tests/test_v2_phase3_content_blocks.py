@@ -57,6 +57,16 @@ def load_renderer_module():
     return module
 
 
+def load_phase3_module():
+    spec = importlib.util.spec_from_file_location(
+        "v2_phase3_content_blocks_under_test",
+        ROOT / "scripts/v2_phase3.py",
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def schema_errors(document):
     schema = load_json(SCHEMA)
     Draft202012Validator.check_schema(schema)
@@ -230,6 +240,25 @@ class Phase3SemanticValidationTests(unittest.TestCase):
         issue_block["block_id"] = mechanism_block["block_id"]
         completed = validation_stderr_for(document)
         self.assertEqual(0, completed.returncode, completed.stderr)
+
+    def test_content_block_base_metadata_requires_semantic_non_empty_strings(self):
+        phase3 = load_phase3_module()
+        cases = [
+            ("block_id", "$.structure_issues_and_suggestions.blocks[0].block_id"),
+            ("block_type", "$.structure_issues_and_suggestions.blocks[0].block_type"),
+            ("title", "$.structure_issues_and_suggestions.blocks[0].title"),
+            ("confidence", "$.structure_issues_and_suggestions.blocks[0].confidence"),
+        ]
+        for field_name, expected_path in cases:
+            document = valid_document()
+            document["structure_issues_and_suggestions"]["blocks"][0][field_name] = " \n\t "
+            with self.subTest(field=field_name):
+                messages = "\n".join(
+                    f"{violation.path}: {violation.message}"
+                    for violation in phase3.phase3_content_block_violations(document)
+                )
+                self.assertIn(expected_path, messages)
+                self.assertIn(f"content block {field_name} must be non-empty", messages)
 
     def test_diagram_block_requires_non_empty_source(self):
         def mutate(document):
@@ -468,3 +497,13 @@ class Phase3RenderingTests(unittest.TestCase):
         section_position = markdown.index("### 9.4 结构问题与改进建议")
         reason_position = markdown.index("未识别到结构问题。")
         self.assertLess(section_position, reason_position)
+
+    def test_chapter_9_whitespace_summary_renders_not_applicable_reason(self):
+        document = valid_document()
+        issues = document["structure_issues_and_suggestions"]
+        issues["summary"] = " \n\t "
+        issues["blocks"] = []
+        issues["not_applicable_reason"] = "未识别到结构问题。"
+        markdown = self.markdown(document)
+        section = markdown[markdown.index("### 9.4 结构问题与改进建议") :]
+        self.assertIn("未识别到结构问题。", section)

@@ -647,6 +647,13 @@ def render_paragraph(value, empty_text=""):
     return escape_plain_text(text)
 
 
+def render_non_blank_paragraph(value, empty_text=""):
+    text = stringify_markdown_value(value)
+    if text.strip() == "":
+        return empty_text
+    return escape_plain_text(text)
+
+
 def render_bullets(items):
     bullets = []
     for item in items or []:
@@ -1352,7 +1359,7 @@ def render_chapter_9(document, support_context):
 
     parts.append("### 9.4 结构问题与改进建议")
     if isinstance(structure_issues, dict):
-        summary = render_paragraph(structure_issues.get("summary", ""))
+        summary = render_non_blank_paragraph(structure_issues.get("summary", ""))
         if summary:
             parts.append(summary)
         rendered_blocks = render_content_blocks(structure_issues.get("blocks", []), support_context)
@@ -1360,7 +1367,7 @@ def render_chapter_9(document, support_context):
             parts.append(rendered_blocks)
         if not summary and not rendered_blocks:
             parts.append(
-                render_paragraph(
+                render_non_blank_paragraph(
                     structure_issues.get("not_applicable_reason", ""),
                     empty_text="未识别到明确的结构问题与改进建议。",
                 )
