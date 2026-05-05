@@ -85,17 +85,19 @@ def _diagram_record(diagram, path, owner_path, should_render=True, skip_reason="
 
 
 def has_gated_content(value):
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, list):
+        return len(value) > 0
     if isinstance(value, dict):
         return any(
             has_gated_content(child)
             for key, child in value.items()
             if key != "not_applicable_reason"
         )
-    if isinstance(value, list):
-        return any(has_gated_content(item) for item in value)
-    if isinstance(value, str):
-        return bool(value.strip())
-    return bool(value)
+    return True
 
 
 def explicit_not_applicable_skip_reason(section):
@@ -416,6 +418,7 @@ def validate_mermaid_review_artifact(document, source_dsl_path, artifact, artifa
     split_ids = _require_string_list(artifact, "split_diagram_ids", errors)
 
     skipped_ids = set()
+    skipped_id_values = []
     skipped_diagrams = artifact.get("skipped_diagrams")
     if not isinstance(skipped_diagrams, list):
         errors.append("skipped_diagrams must be a list")
@@ -429,11 +432,18 @@ def validate_mermaid_review_artifact(document, source_dsl_path, artifact, artifa
                 errors.append("skipped diagram must provide diagram_id")
                 continue
             diagram_id = diagram_id.strip()
+            skipped_id_values.append(diagram_id)
             skipped_ids.add(diagram_id)
 
             reason = skipped_diagram.get("reason")
             if not isinstance(reason, str) or not reason.strip():
                 errors.append(f"skipped diagram must provide reason: {diagram_id}")
+        duplicate_skipped_ids = _duplicate_values(skipped_id_values)
+        if duplicate_skipped_ids:
+            errors.append(
+                "skipped_diagrams contains duplicate diagram IDs: "
+                + ", ".join(duplicate_skipped_ids)
+            )
 
     covered_ids = checked_ids | skipped_ids
     missing_coverage_ids = all_expected_ids - covered_ids

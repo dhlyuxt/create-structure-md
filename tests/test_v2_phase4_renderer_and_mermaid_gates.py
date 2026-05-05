@@ -292,6 +292,17 @@ class Phase4ReadabilityArtifactTests(unittest.TestCase):
 
         self.assertIn(f"checked_diagram_ids contains duplicate diagram IDs: {checked_id}", errors)
 
+    def test_has_gated_content_matches_foundation_semantics(self):
+        phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_gated_content_semantics_under_test")
+
+        self.assertFalse(phase4.has_gated_content(None))
+        self.assertFalse(phase4.has_gated_content(""))
+        self.assertFalse(phase4.has_gated_content([]))
+        self.assertFalse(phase4.has_gated_content({}))
+        self.assertTrue(phase4.has_gated_content([""]))
+        self.assertTrue(phase4.has_gated_content({"items": [""]}))
+        self.assertTrue(phase4.has_gated_content(0))
+
     def test_relative_source_dsl_resolves_against_artifact_directory(self):
         phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_readability_artifact_relative_under_test")
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -372,3 +383,17 @@ class Phase4ReadabilityArtifactTests(unittest.TestCase):
             f"{skipped_id}",
             errors,
         )
+
+    def test_skipped_diagrams_reject_duplicate_ids(self):
+        phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_readability_artifact_duplicate_skipped_under_test")
+        expected_ids = self.expected_ids()
+        skipped_id = sorted(expected_ids)[0]
+        artifact = complete_review_artifact(FIXTURE, expected_ids - {skipped_id})
+        artifact["skipped_diagrams"] = [
+            {"diagram_id": skipped_id, "reason": "not applicable"},
+            {"diagram_id": skipped_id, "reason": "duplicate"},
+        ]
+
+        errors = phase4.validate_mermaid_review_artifact(valid_document(), FIXTURE, artifact)
+
+        self.assertIn(f"skipped_diagrams contains duplicate diagram IDs: {skipped_id}", errors)
