@@ -502,7 +502,7 @@ class RendererV2VersionTests(unittest.TestCase):
     def test_renderer_rejects_v1_before_output_filename_validation_or_rendering(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             completed = subprocess.run(
-                [PYTHON, str(RENDERER), str(ROOT / "tests/fixtures/valid-phase2.dsl.json"), "--output-dir", tmpdir],
+                [PYTHON, str(RENDERER), str(ROOT / "tests/fixtures/rejected-v1-phase2.dsl.json"), "--output-dir", tmpdir],
                 cwd=ROOT,
                 text=True,
                 capture_output=True,

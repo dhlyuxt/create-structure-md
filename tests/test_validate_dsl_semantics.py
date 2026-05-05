@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 VALIDATOR = ROOT / "scripts/validate_dsl.py"
 FIXTURE = ROOT / "tests/fixtures/valid-v2-foundation.dsl.json"
-REJECTED_V1_FIXTURE = ROOT / "tests/fixtures/valid-phase2.dsl.json"
+REJECTED_V1_FIXTURE = ROOT / "tests/fixtures/rejected-v1-phase2.dsl.json"
 PYTHON = sys.executable
 
 

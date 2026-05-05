@@ -46,7 +46,7 @@ SCRIPT_CASES = []
 
 SCHEMA_PATH = ROOT / "schemas/structure-design.schema.json"
 VALID_V2_FIXTURE = ROOT / "tests/fixtures/valid-v2-foundation.dsl.json"
-REJECTED_V1_FIXTURE = ROOT / "tests/fixtures/valid-phase2.dsl.json"
+REJECTED_V1_FIXTURE = ROOT / "tests/fixtures/rejected-v1-phase2.dsl.json"
 EXAMPLE_PATHS = [
     ROOT / "examples/minimal-from-code.dsl.json",
     ROOT / "examples/minimal-from-requirements.dsl.json",
@@ -235,7 +235,7 @@ class V2VersionSchemaTests(unittest.TestCase):
         validator().validate(valid_example())
 
     def test_v1_fixture_is_rejected_by_schema(self):
-        document = load_json("tests/fixtures/valid-phase2.dsl.json")
+        document = load_json("tests/fixtures/rejected-v1-phase2.dsl.json")
         assert_invalid(
             self,
             document,
