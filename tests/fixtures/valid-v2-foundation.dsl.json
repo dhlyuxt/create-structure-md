@@ -377,6 +377,57 @@
                   "evidence_refs": [],
                   "traceability_refs": [],
                   "source_snippet_refs": []
+                },
+                {
+                  "block_id": "BLOCK-SKILL-VALIDATION-DIAGRAM",
+                  "block_type": "diagram",
+                  "title": "DSL 校验管线图",
+                  "confidence": "observed",
+                  "evidence_refs": [],
+                  "traceability_refs": [],
+                  "source_snippet_refs": [],
+                  "diagram": {
+                    "id": "MER-BLOCK-MECHANISM-FLOW",
+                    "kind": "content_block",
+                    "title": "DSL 校验管线图",
+                    "diagram_type": "flowchart",
+                    "description": "展示校验管线如何从 DSL 输入走向校验结果。",
+                    "source": "flowchart TD\n  A[\"DSL JSON\"] --> B[\"Version gate\"]\n  B --> C[\"Schema validation\"]\n  C --> D[\"Semantic validation\"]\n  D --> E[\"Validation result\"]",
+                    "confidence": "observed"
+                  }
+                },
+                {
+                  "block_id": "BLOCK-SKILL-VALIDATION-TABLE",
+                  "block_type": "table",
+                  "title": "DSL 校验管线阶段",
+                  "confidence": "observed",
+                  "evidence_refs": [],
+                  "traceability_refs": [],
+                  "source_snippet_refs": [],
+                  "table": {
+                    "id": "TBL-BLOCK-MECHANISM-STAGES",
+                    "title": "DSL 校验管线阶段",
+                    "columns": [
+                      {
+                        "key": "stage",
+                        "title": "阶段"
+                      },
+                      {
+                        "key": "description",
+                        "title": "说明"
+                      }
+                    ],
+                    "rows": [
+                      {
+                        "stage": "Version gate",
+                        "description": "拒绝非 0.2.0 DSL。"
+                      },
+                      {
+                        "stage": "Semantic validation",
+                        "description": "检查跨字段引用、not_applicable 互斥和内容安全。"
+                      }
+                    ]
+                  }
                 }
               ]
             }
@@ -614,7 +665,69 @@
     "extra_tables": [],
     "extra_diagrams": []
   },
-  "structure_issues_and_suggestions": "",
+  "structure_issues_and_suggestions": {
+    "summary": "结构问题概览：当前 V2 DSL 仍依赖上游提供完整结构内容，create-structure-md 只负责校验和渲染。",
+    "blocks": [
+      {
+        "block_id": "ISSUE-TEXT-001",
+        "block_type": "text",
+        "title": "上游内容完整性",
+        "text": "如果上游分析或人工整理没有提供完整 DSL，最终结构文档也会缺失对应章节内容。",
+        "confidence": "observed",
+        "evidence_refs": [],
+        "traceability_refs": [],
+        "source_snippet_refs": []
+      },
+      {
+        "block_id": "ISSUE-DIAGRAM-001",
+        "block_type": "diagram",
+        "title": "结构问题关系图",
+        "confidence": "observed",
+        "evidence_refs": [],
+        "traceability_refs": [],
+        "source_snippet_refs": [],
+        "diagram": {
+          "id": "MER-BLOCK-STRUCTURE-ISSUES",
+          "kind": "content_block",
+          "title": "结构问题关系图",
+          "diagram_type": "flowchart",
+          "description": "展示上游内容完整性如何影响最终结构文档。",
+          "source": "flowchart TD\n  A[\"Prepared DSL\"] --> B[\"Validation\"]\n  B --> C[\"Markdown rendering\"]\n  A --> D[\"Missing content risk\"]",
+          "confidence": "observed"
+        }
+      },
+      {
+        "block_id": "ISSUE-TABLE-001",
+        "block_type": "table",
+        "title": "结构问题与改进方向",
+        "confidence": "observed",
+        "evidence_refs": [],
+        "traceability_refs": [],
+        "source_snippet_refs": [],
+        "table": {
+          "id": "TBL-BLOCK-STRUCTURE-ISSUES",
+          "title": "结构问题与改进方向",
+          "columns": [
+            {
+              "key": "issue",
+              "title": "问题"
+            },
+            {
+              "key": "improvement",
+              "title": "改进方向"
+            }
+          ],
+          "rows": [
+            {
+              "issue": "缺失仓库分析能力",
+              "improvement": "由上游 repo-analysis skill 或人工准备 DSL。"
+            }
+          ]
+        }
+      }
+    ],
+    "not_applicable_reason": ""
+  },
   "evidence": [],
   "traceability": [],
   "risks": [],
