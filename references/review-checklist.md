@@ -7,9 +7,10 @@
 - Confirm the final report includes the final output path and temporary work directory.
 - Confirm the final report lists assumptions and low-confidence items, or explicitly states that none were identified.
 - Confirm assumptions and low-confidence items are reported when present.
-- Confirm static-only Mermaid fallback reporting states the CLI renderability limitation, tooling unavailability, and user acceptance when static-only validation was used.
-- If static-only validation was used, confirm the final report states that strict validation was not performed, local Mermaid CLI tooling unavailable was the reason, and the user accepted static-only validation for this run.
-- Confirm strict Mermaid validation is the default final-generation gate unless the user accepted static-only validation.
+- Confirm the final report states Mermaid gate results, including Mermaid readability artifact path, rendered diagram completeness status, and strict rendered Markdown validation status.
+- Confirm static-only Mermaid checks, if mentioned, are reported as non-final diagnostics and not as final acceptance for V2 Phase 4.
+- If strict validation did not run, confirm the final report states that final Mermaid gate acceptance is incomplete and why.
+- Confirm strict Mermaid validation is the default final-generation gate, and Static-only Mermaid validation is not final acceptance for V2 Phase 4.
 - Confirm the module- or system-specific output file path is reported.
 - Confirm generic filename rejection is reported when the renderer or validator refuses a generic-only filename.
 - Confirm default output overwrite protection is reported when an existing file blocks rendering.

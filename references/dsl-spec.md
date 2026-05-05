@@ -112,6 +112,22 @@ Support data supplies confidence, evidence, traceability, source snippets, risks
 
 The Phase 4 expected diagram collector gathers present Mermaid diagram objects from architecture relationship and extra diagrams, runtime flow/sequence/extra diagrams, configuration extra diagrams, collaboration relationship/extra diagrams, key-flow diagrams and extra diagrams, executable public interface execution flow diagrams, internal mechanism diagram content blocks, and Chapter 9 diagram content blocks.
 
+Positive V2 JSON paths collected as expected Mermaid diagram inputs are:
+
+- `architecture_views.module_relationship_diagram`
+- `architecture_views.extra_diagrams[]`
+- `runtime_view.runtime_flow_diagram`
+- `runtime_view.runtime_sequence_diagram`
+- `runtime_view.extra_diagrams[]`
+- `configuration_data_dependencies.extra_diagrams[]`
+- `cross_module_collaboration.collaboration_relationship_diagram`
+- `cross_module_collaboration.extra_diagrams[]`
+- `key_flows.flows[].diagram`
+- `key_flows.extra_diagrams[]`
+- executable `module_design.modules[].public_interfaces.interfaces[].execution_flow_diagram`
+- internal mechanism diagram content blocks shaped as `module_design.modules[].internal_mechanism.mechanism_details[].blocks[]` entries where `block_type` is `diagram` and the Mermaid object is in `blocks[].diagram`
+- Chapter 9 diagram content blocks shaped as `structure_issues_and_suggestions.blocks[]` entries where `block_type` is `diagram` and the Mermaid object is in `blocks[].diagram`
+
 Removed V1 Chapter 4 paths are not V2 inputs: `module_design.modules[].internal_structure.diagram`, `module_design.modules[].external_capability_details.extra_diagrams[]`, and `module_design.modules[].extra_diagrams[]`.
 
 Mermaid readability review artifacts are workflow metadata and not DSL fields.
