@@ -104,6 +104,113 @@ class Phase4RendererMetadataTests(unittest.TestCase):
             module.render_mermaid_block(diagram)
 
 
+class Phase4RenderedCompletenessTests(unittest.TestCase):
+    def render_valid_document(self, document=None, **kwargs):
+        renderer = load_script(
+            "scripts/render_markdown.py",
+            "phase4_rendered_completeness_renderer_under_test",
+        )
+        return renderer.render_markdown(document or valid_document(), **kwargs)
+
+    def assert_error_contains(self, errors, *parts):
+        self.assertTrue(
+            any(all(part in error for part in parts) for error in errors),
+            errors,
+        )
+
+    def test_rendered_completeness_passes_for_renderer_output(self):
+        phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_rendered_completeness_pass_under_test")
+        document = valid_document()
+        markdown = self.render_valid_document(document)
+
+        errors = phase4.rendered_diagram_completeness_errors(document, markdown)
+
+        self.assertEqual([], errors)
+
+    def test_rendered_completeness_catches_missing_interface_diagram(self):
+        phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_rendered_completeness_interface_under_test")
+        document = valid_document()
+        markdown = self.render_valid_document(document)
+        markdown = markdown.replace(
+            "<!-- diagram-id: MER-IFACE-SKILL-RENDER-CLI -->\n```mermaid",
+            "```mermaid",
+            1,
+        )
+
+        errors = phase4.rendered_diagram_completeness_errors(document, markdown)
+
+        self.assert_error_contains(
+            errors,
+            "MER-IFACE-SKILL-RENDER-CLI",
+            "$.module_design.modules[0].public_interfaces.interfaces[1].execution_flow_diagram",
+        )
+
+    def test_rendered_completeness_catches_missing_internal_mechanism_diagram(self):
+        phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_rendered_completeness_mechanism_under_test")
+        document = valid_document()
+        markdown = self.render_valid_document(document)
+        markdown = markdown.replace("MER-BLOCK-MECHANISM-FLOW", "MER-WRONG-TITLE-ONLY", 1)
+
+        errors = phase4.rendered_diagram_completeness_errors(document, markdown)
+
+        self.assert_error_contains(errors, "MER-BLOCK-MECHANISM-FLOW")
+
+    def test_rendered_completeness_catches_missing_chapter_9_diagram(self):
+        phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_rendered_completeness_chapter9_under_test")
+        document = valid_document()
+        markdown = self.render_valid_document(document)
+        markdown = markdown.replace("MER-BLOCK-STRUCTURE-ISSUES", "MER-TITLE-MATCH-ONLY", 1)
+
+        errors = phase4.rendered_diagram_completeness_errors(document, markdown)
+
+        self.assert_error_contains(errors, "MER-BLOCK-STRUCTURE-ISSUES")
+
+    def test_rendered_completeness_rejects_duplicate_metadata(self):
+        phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_rendered_completeness_duplicate_under_test")
+        document = valid_document()
+        markdown = self.render_valid_document(document)
+        markdown = markdown.replace(
+            "<!-- diagram-id: MER-RUNTIME-FLOW -->",
+            "<!-- diagram-id: MER-ARCH-MODULES -->",
+            1,
+        )
+
+        errors = phase4.rendered_diagram_completeness_errors(document, markdown)
+
+        self.assert_error_contains(errors, "MER-ARCH-MODULES", "appears 2 times")
+
+    def test_rendered_completeness_ignores_mermaid_text_inside_longer_source_snippet_fence(self):
+        phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_rendered_completeness_snippet_under_test")
+        document = valid_document()
+        module = document["module_design"]["modules"][0]
+        module.setdefault("evidence_refs", []).append("EV-MERMAID-SNIPPET")
+        module.setdefault("source_snippet_refs", []).append("SNIP-MERMAID-FENCE")
+        document["evidence"].append(
+            {
+                "id": "EV-MERMAID-SNIPPET",
+                "title": "Mermaid-looking source snippet",
+                "location": "tests/fixtures/valid-v2-foundation.dsl.json",
+                "description": "Inline support includes a source snippet with a nested mermaid-looking fence.",
+            }
+        )
+        document["source_snippets"].append(
+            {
+                "id": "SNIP-MERMAID-FENCE",
+                "path": "notes/example.md",
+                "line_start": 1,
+                "line_end": 5,
+                "language": "markdown",
+                "purpose": "Exercise fence-aware rendered Mermaid extraction.",
+                "content": "Example:\n```mermaid\nflowchart TD\n  A --> B\n```\nEnd.",
+            }
+        )
+        markdown = self.render_valid_document(document, evidence_mode="inline")
+
+        errors = phase4.rendered_diagram_completeness_errors(document, markdown)
+
+        self.assertEqual([], errors)
+
+
 class Phase4ExpectedDiagramCollectorTests(unittest.TestCase):
     def diagram(self, diagram_id):
         return {

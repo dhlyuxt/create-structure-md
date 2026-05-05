@@ -21,7 +21,7 @@ class Phase4GateError(Exception):
 
 
 SAFE_DIAGRAM_ID_RE = re.compile(r"^(?!.*--)[A-Za-z0-9_.:-]+$")
-DIAGRAM_ID_COMMENT_RE = re.compile(r"^<!-- diagram-id: ((?!.*--)[A-Za-z0-9_.:-]+) -->$")
+DIAGRAM_ID_COMMENT_RE = re.compile(r"^<!-- diagram-id: ((?![A-Za-z0-9_.:-]*--)[A-Za-z0-9_.:-]+) -->$")
 MERMAID_OPENING_FENCE_RE = re.compile(r"^ {0,3}```mermaid[ \t]*$")
 FENCE_OPENING_RE = re.compile(r"^ {0,3}(```+|~~~+)[ \t]*(.*?)[ \t]*$")
 FENCE_CLOSING_RE = re.compile(r"^ {0,3}(```+|~~~+)[ \t]*$")
@@ -317,6 +317,82 @@ def collect_expected_diagrams(document):
     _collect_key_flows(records, document)
     _collect_structure_issues(records, document)
     return records
+
+
+def extract_rendered_mermaid_metadata(markdown_text):
+    lines = markdown_text.splitlines()
+    records = []
+    mermaid_fence_count = 0
+    in_fence = False
+    opening_marker = ""
+    for index, line in enumerate(lines):
+        if not in_fence:
+            opening = FENCE_OPENING_RE.match(line)
+            if not opening:
+                continue
+            in_fence = True
+            opening_marker = opening.group(1)
+            info = opening.group(2).split(None, 1)[0].lower() if opening.group(2) else ""
+            if info == "mermaid":
+                mermaid_fence_count += 1
+                previous_line = lines[index - 1] if index > 0 else ""
+                match = DIAGRAM_ID_COMMENT_RE.match(previous_line)
+                records.append(
+                    {
+                        "diagram_id": match.group(1) if match else "",
+                        "line": index + 1,
+                        "has_adjacent_metadata": match is not None,
+                    }
+                )
+            continue
+        closing = FENCE_CLOSING_RE.match(line)
+        if (
+            closing
+            and closing.group(1)[0] == opening_marker[0]
+            and len(closing.group(1)) >= len(opening_marker)
+        ):
+            in_fence = False
+            opening_marker = ""
+    return records, mermaid_fence_count
+
+
+def rendered_diagram_completeness_errors(document, markdown_text):
+    errors = []
+    expected_records = [
+        record for record in collect_expected_diagrams(document) if record.should_render
+    ]
+    expected_ids = [record.diagram_id for record in expected_records if record.diagram_id]
+    duplicate_expected_ids = _duplicate_values(expected_ids)
+    if duplicate_expected_ids:
+        errors.append("duplicate expected diagram IDs: " + ", ".join(duplicate_expected_ids))
+
+    expected_by_id = {record.diagram_id: record for record in expected_records}
+    rendered_records, mermaid_fence_count = extract_rendered_mermaid_metadata(markdown_text)
+
+    if mermaid_fence_count < len(expected_records):
+        errors.append(
+            f"rendered Mermaid fence count {mermaid_fence_count} is less than expected diagram count "
+            f"{len(expected_records)}"
+        )
+
+    rendered_counts = {}
+    for record in rendered_records:
+        if not record["has_adjacent_metadata"]:
+            errors.append(f"Mermaid fence at line {record['line']} is missing adjacent diagram-id metadata")
+            continue
+        rendered_counts[record["diagram_id"]] = rendered_counts.get(record["diagram_id"], 0) + 1
+
+    for diagram_id, expected in expected_by_id.items():
+        count = rendered_counts.get(diagram_id, 0)
+        if count == 0:
+            errors.append(f"missing rendered diagram {diagram_id} at {expected.json_path}: {expected.title}")
+        elif count != 1:
+            errors.append(f"rendered diagram {diagram_id} appears {count} times; expected exactly once")
+
+    unexpected = sorted(set(rendered_counts) - set(expected_by_id))
+    if unexpected:
+        errors.append("rendered Markdown contains unexpected diagram IDs: " + ", ".join(unexpected))
+    return errors
 
 
 def _duplicate_values(values):
