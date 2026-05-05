@@ -352,7 +352,7 @@ def _split_ids_are_derived_from_checked(split_ids, checked_ids, errors):
             continue
 
         derived_from_checked_id = False
-        for checked_id in checked_ids:
+        for checked_id in sorted(checked_ids, key=lambda value: (-len(value), value)):
             prefix = f"{checked_id}::"
             if not split_id.startswith(prefix):
                 continue

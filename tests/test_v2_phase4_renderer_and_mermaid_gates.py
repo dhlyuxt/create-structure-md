@@ -282,6 +282,29 @@ class Phase4ReadabilityArtifactTests(unittest.TestCase):
 
         self.assertIn(f"split_diagram_ids must use a non-empty derived suffix: {checked_id}::", errors)
 
+    def test_split_diagram_ids_use_longest_checked_prefix_for_overlaps(self):
+        phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_readability_artifact_overlap_split_under_test")
+        errors = []
+
+        unresolved_ids = phase4._split_ids_are_derived_from_checked(
+            {"MER-A::B::"},
+            ["MER-A", "MER-A::B"],
+            errors,
+        )
+
+        self.assertEqual(set(), unresolved_ids)
+        self.assertIn("split_diagram_ids must use a non-empty derived suffix: MER-A::B::", errors)
+
+        valid_errors = []
+        valid_unresolved_ids = phase4._split_ids_are_derived_from_checked(
+            {"MER-A::B::C"},
+            ["MER-A", "MER-A::B"],
+            valid_errors,
+        )
+
+        self.assertEqual(set(), valid_unresolved_ids)
+        self.assertEqual([], valid_errors)
+
     def test_checked_diagram_ids_reject_duplicates(self):
         phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_readability_artifact_duplicate_checked_under_test")
         checked_id = sorted(self.expected_ids())[0]
