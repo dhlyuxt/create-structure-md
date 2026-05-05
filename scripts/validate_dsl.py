@@ -199,7 +199,6 @@ def format_schema_error(error):
 PREFIX_BY_KIND = {
     "module": "MOD-",
     "core_capability": "CAP-",
-    "provided_capability": "CAP-",
     "runtime_unit": "RUN-",
     "configuration_item": "CFG-",
     "data_artifact": "DATA-",
@@ -271,7 +270,6 @@ REFERENCE_FIELD_RULES = [
 TRACEABILITY_TARGET_KIND = {
     "module": "module",
     "core_capability": "core_capability",
-    "provided_capability": "provided_capability",
     "runtime_unit": "runtime_unit",
     "flow": "flow",
     "flow_step": "flow_step",

@@ -776,24 +776,26 @@ class SchemaSupportDataTests(unittest.TestCase):
                     )
 
     def test_traceability_target_type_enum_is_enforced(self):
-        document = valid_example()
-        document["traceability"] = [
-            {
-                "id": "TR-001",
-                "source_external_id": "REQ-001",
-                "source_type": "requirement",
-                "target_type": "unknown_target",
-                "target_id": "MOD-001",
-                "description": ""
-            }
-        ]
-        assert_invalid(
-            self,
-            document,
-            "is not one of",
-            expected_validator="enum",
-            expected_path=["traceability", 0, "target_type"],
-        )
+        for target_type in ["unknown_target", "provided_capability"]:
+            document = valid_example()
+            document["traceability"] = [
+                {
+                    "id": "TR-001",
+                    "source_external_id": "REQ-001",
+                    "source_type": "requirement",
+                    "target_type": target_type,
+                    "target_id": "MOD-001",
+                    "description": ""
+                }
+            ]
+            with self.subTest(target_type=target_type):
+                assert_invalid(
+                    self,
+                    document,
+                    "is not one of",
+                    expected_validator="enum",
+                    expected_path=["traceability", 0, "target_type"],
+                )
 
 
 class SchemaExampleValidationTests(unittest.TestCase):

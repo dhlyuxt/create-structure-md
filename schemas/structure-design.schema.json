@@ -912,7 +912,7 @@
         "source_type": { "type": "string", "enum": ["requirement", "note", "code", "user_input"] },
         "target_type": {
           "type": "string",
-          "enum": ["module", "core_capability", "provided_capability", "runtime_unit", "flow", "flow_step", "flow_branch", "collaboration", "configuration_item", "data_artifact", "dependency", "risk", "assumption", "source_snippet"]
+          "enum": ["module", "core_capability", "runtime_unit", "flow", "flow_step", "flow_branch", "collaboration", "configuration_item", "data_artifact", "dependency", "risk", "assumption", "source_snippet"]
         },
         "target_id": { "$ref": "#/$defs/nonEmptyString" },
         "description": { "type": "string" }
