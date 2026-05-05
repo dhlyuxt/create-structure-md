@@ -1110,19 +1110,17 @@ class SupportDataTablePlacementTests(unittest.TestCase):
 
 
 class NodeLevelSupportPlacementTests(unittest.TestCase):
-    def test_module_design_and_provided_capability_support_render_near_nodes(self):
+    def test_module_design_support_renders_near_module_node(self):
         module = load_renderer_module()
         document = valid_document()
         module_item = document["module_design"]["modules"][0]
-        capability = module_item["external_capability_details"]["provided_capabilities"]["rows"][0]
         module_item["evidence_refs"] = ["EV-MODULE"]
         module_item["source_snippet_refs"] = ["SNIP-MODULE"]
-        capability["traceability_refs"] = []
         document["evidence"] = [
             {"id": "EV-MODULE", "kind": "analysis", "title": "模块设计依据", "location": "design note", "description": "", "confidence": "observed"},
         ]
         document["traceability"] = [
-            {"id": "TR-CAP", "source_external_id": "REQ-CAP", "source_type": "requirement", "target_type": "provided_capability", "target_id": "CAP-MOD-SKILL-001", "description": "能力追踪。"},
+            {"id": "TR-MODULE", "source_external_id": "REQ-MODULE", "source_type": "requirement", "target_type": "module", "target_id": "MOD-SKILL", "description": "模块追踪。"},
         ]
         document["source_snippets"] = [
             {"id": "SNIP-MODULE", "path": "SKILL.md", "line_start": 1, "line_end": 4, "language": "markdown", "purpose": "模块说明证据。", "content": "---\nname: create-structure-md\n---", "confidence": "observed"},
@@ -1132,12 +1130,11 @@ class NodeLevelSupportPlacementTests(unittest.TestCase):
         module_section = section_between(markdown, "### 4.1 技能文档生成模块", "## 5. 运行时视图")
 
         self.assertIn("依据：EV-MODULE（模块设计依据，design note）", module_section)
+        self.assertIn("支持数据（MOD-SKILL / 技能文档生成模块）", module_section)
+        self.assertIn("关联来源：REQ-MODULE（模块追踪。）", module_section)
         self.assertIn("Source: SKILL.md:1-4", module_section)
-        self.assertIn("支持数据（CAP-MOD-SKILL-001 / 文档 DSL 处理）", module_section)
-        self.assertIn("关联来源：REQ-CAP（能力追踪。）", module_section)
-        self.assertEqual([], capability["traceability_refs"])
-        capability_table = section_between(module_section, "#### 4.1.4 对外接口需求清单", "#### 4.1.5 模块内部结构关系图")
-        self.assertNotIn("| REQ-CAP |", capability_table)
+        module_scope_section = section_between(module_section, "#### 4.1.1 模块定位与源码/产物范围", "#### 4.1.2 配置")
+        self.assertNotIn("| REQ-MODULE |", module_scope_section)
 
     def test_flow_detail_step_and_branch_support_render_near_flow_sections(self):
         module = load_renderer_module()
@@ -1210,12 +1207,13 @@ class ChapterOneToFourRenderingTests(unittest.TestCase):
                 "### 3.4 补充架构图表",
                 "## 4. 模块设计",
                 "### 4.1 技能文档生成模块",
-                "#### 4.1.1 模块概述",
-                "#### 4.1.2 模块职责",
-                "#### 4.1.3 对外能力说明",
-                "#### 4.1.4 对外接口需求清单",
-                "#### 4.1.5 模块内部结构关系图",
-                "#### 4.1.6 补充说明",
+                "#### 4.1.1 模块定位与源码/产物范围",
+                "#### 4.1.2 配置",
+                "#### 4.1.3 依赖",
+                "#### 4.1.4 数据对象",
+                "#### 4.1.5 对外接口",
+                "#### 4.1.6 实现机制说明",
+                "#### 4.1.7 已知限制",
             ],
         )
         chapter_1 = section_between(markdown, "## 1. 文档信息", "## 2. 系统概览")
@@ -1258,10 +1256,23 @@ class ChapterOneToFourRenderingTests(unittest.TestCase):
         document["architecture_views"]["module_intro"]["rows"].append(second_module)
 
         second_design = deepcopy(document["module_design"]["modules"][0])
+
+        def rewrite_skill_ids(value):
+            if isinstance(value, dict):
+                for key, child in value.items():
+                    if isinstance(child, str):
+                        value[key] = child.replace("SKILL", "SECOND")
+                    else:
+                        rewrite_skill_ids(child)
+            elif isinstance(value, list):
+                for child in value:
+                    rewrite_skill_ids(child)
+
+        rewrite_skill_ids(second_design)
         second_design["module_id"] = "MOD-SECOND"
         second_design["name"] = "第二模块"
         second_design["summary"] = "第二模块概述。"
-        second_design["internal_structure"]["diagram"]["id"] = "MER-MOD-SECOND-STRUCT"
+        second_design["public_interfaces"]["interfaces"][1]["execution_flow_diagram"]["id"] = "MER-IFACE-SECOND-FLOW"
         document["module_design"]["modules"] = [second_design, document["module_design"]["modules"][0]]
 
         markdown = module.render_markdown(document)
@@ -1273,7 +1284,7 @@ class ChapterOneToFourRenderingTests(unittest.TestCase):
         document["module_design"]["modules"][0]["name"] = "安全模块\n## 注入标题\n```html\n<div>raw</div>\n```"
 
         markdown = module.render_markdown(document)
-        section = section_between(markdown, "## 4. 模块设计", "#### 4.1.1 模块概述")
+        section = section_between(markdown, "## 4. 模块设计", "#### 4.1.1 模块定位与源码/产物范围")
 
         self.assertIn("### 4.1 安全模块", section)
         self.assertNotIn("\n## 注入标题", section)
@@ -1281,22 +1292,26 @@ class ChapterOneToFourRenderingTests(unittest.TestCase):
         self.assertNotIn("```html", section)
         self.assertNotIn("<div>raw</div>", section)
 
-    def test_chapter_4_provided_capabilities_table_uses_fixed_visible_columns_only(self):
+    def test_chapter_4_module_tables_use_fixed_visible_columns_only(self):
         module = load_renderer_module()
         markdown = module.render_markdown(valid_document())
-        section = section_between(markdown, "#### 4.1.4 对外接口需求清单", "#### 4.1.5 模块内部结构关系图")
-        self.assertIn("| 能力名称 | 接口风格 | 描述 | 输入 | 输出 | 备注 |", section)
-        self.assertNotIn("capability_id", section)
-        self.assertNotIn("CAP-MOD-SKILL-001", section)
+        section = section_between(markdown, "#### 4.1.2 配置", "#### 4.1.5 对外接口")
+        self.assertIn("| 原型 | 当前/默认值 | 来源 | 含义 |", section)
+        self.assertIn("| 名称 | 类型 | 关系 | 用途 | 失败行为 |", section)
+        self.assertIn("| 名称 | 类型 | 角色 | 生产方 | 消费方 | 结构/契约 |", section)
+        self.assertNotIn("MPARAM-SKILL-OUTPUT-DIR", section)
+        self.assertNotIn("MDEP-SKILL-JSONSCHEMA", section)
+        self.assertNotIn("DATA-SKILL-DSL", section)
         self.assertNotIn("confidence", section)
 
-    def test_chapter_4_empty_internal_diagram_renders_textual_structure_without_mermaid_block(self):
+    def test_chapter_4_internal_mechanism_renders_text_blocks_without_anchor_ids(self):
         module = load_renderer_module()
         markdown = module.render_markdown(valid_document())
-        section = section_between(markdown, "#### 4.1.5 模块内部结构关系图", "#### 4.1.6 补充说明")
-        self.assertIn("schema 描述 DSL 结构", section)
-        self.assertNotIn("单模块示例中使用文字结构说明即可。", section)
-        self.assertNotIn("```mermaid", section)
+        section = section_between(markdown, "#### 4.1.6 实现机制说明", "#### 4.1.7 已知限制")
+        self.assertIn("| 机制 | 用途 | 输入 | 处理方式 | 输出 | 结构意义 |", section)
+        self.assertIn("DSL 校验管线说明", section)
+        self.assertNotIn("IFACE-SKILL-VALIDATE-CLI", section)
+        self.assertNotIn("DATA-SKILL-DSL", section)
 
     def test_architecture_extras_render_tables_and_diagrams_without_empty_state(self):
         module = load_renderer_module()
@@ -1369,7 +1384,9 @@ class ChapterFiveToEightRenderingTests(unittest.TestCase):
         module = load_renderer_module()
         markdown = module.render_markdown(valid_document())
         section = section_between(markdown, "### 5.2 运行单元说明", "### 5.3 运行时流程图")
-        self.assertIn("| 运行单元 | 类型 | 入口 | 入口不适用原因 | 职责 | 关联模块 | 外部环境原因 | 备注 |", section)
+        self.assertIn("| 运行单元 | 类型 | 入口 | 职责 | 关联模块 | 备注 |", section)
+        self.assertNotIn("入口不适用原因", section)
+        self.assertNotIn("外部环境原因", section)
         self.assertNotIn("unit_id", section)
         self.assertNotIn("RUN-GENERATE", section)
         self.assertNotIn("MOD-SKILL", section)
@@ -1629,16 +1646,16 @@ class ChapterNineRenderingTests(unittest.TestCase):
         module = load_renderer_module()
         document = valid_document()
         document["architecture_views"]["module_intro"]["rows"][0]["confidence"] = "unknown"
-        document["module_design"]["modules"][0]["external_capability_details"]["provided_capabilities"]["rows"][0]["confidence"] = "unknown"
+        document["module_design"]["modules"][0]["public_interfaces"]["interfaces"][0]["confidence"] = "unknown"
         document["key_flows"]["flows"][0]["steps"][0]["confidence"] = "unknown"
         markdown = module.render_markdown(document)
         section = markdown[markdown.index("## 9. 结构问题与改进建议") :]
         self.assertIn("### 低置信度项", section)
         self.assertIn("$.architecture_views.module_intro.rows[0]", section)
-        self.assertIn("$.module_design.modules[0].external_capability_details.provided_capabilities.rows[0]", section)
+        self.assertIn("$.module_design.modules[0].public_interfaces.interfaces[0]", section)
         self.assertIn("$.key_flows.flows[0].steps[0]", section)
         self.assertIn("技能文档生成模块", section)
-        self.assertIn("文档 DSL 处理", section)
+        self.assertIn("structure-design.schema.json", section)
         self.assertIn("准备结构化 DSL JSON。", section)
         self.assertNotIn("未识别到明确的结构问题与改进建议。", section)
 
@@ -1739,11 +1756,9 @@ def collect_non_empty_mermaid_sources(document):
 
     module_design = document.get("module_design", {})
     for module_item in module_design.get("modules", []):
-        internal_structure = module_item.get("internal_structure", {})
-        add_diagram(internal_structure.get("diagram"))
-        external_details = module_item.get("external_capability_details", {})
-        add_diagram_array(external_details.get("extra_diagrams"))
-        add_diagram_array(module_item.get("extra_diagrams"))
+        public_interfaces = module_item.get("public_interfaces", {})
+        for interface in public_interfaces.get("interfaces", []):
+            add_diagram(interface.get("execution_flow_diagram"))
 
     runtime = document.get("runtime_view", {})
     add_diagram(runtime.get("runtime_flow_diagram"))
@@ -1872,9 +1887,8 @@ class RendererIntegrationTests(unittest.TestCase):
         sources = {
             "architecture module_relationship": synthetic_flowchart_source("ARCHREL"),
             "architecture extra_diagrams": synthetic_flowchart_source("ARCHEXTRA"),
-            "module internal_structure.diagram": synthetic_flowchart_source("MODINTERNAL"),
-            "module external_capability_details.extra_diagrams": synthetic_flowchart_source("MODEXTERNAL"),
-            "module extra_diagrams": synthetic_flowchart_source("MODEXTRA"),
+            "module public_interface render flow": synthetic_flowchart_source("IFACEFLOW"),
+            "module public_interface validate flow": synthetic_flowchart_source("IFACEVALIDATE"),
             "runtime_flow": synthetic_flowchart_source("RUNTIMEFLOW"),
             "runtime_sequence": "sequenceDiagram\n  participant SeqA\n  participant SeqB\n  SeqA->>SeqB: RuntimeSequence",
             "runtime extra": synthetic_flowchart_source("RUNTIMEEXTRA"),
@@ -1894,12 +1908,11 @@ class RendererIntegrationTests(unittest.TestCase):
         document["architecture_views"]["extra_diagrams"] = [
             synthetic_diagram("MER-SYN-ARCH-EXTRA", sources["architecture extra_diagrams"])
         ]
-        module_item["internal_structure"]["diagram"]["source"] = sources["module internal_structure.diagram"]
-        module_item["external_capability_details"]["extra_diagrams"] = [
-            synthetic_diagram("MER-SYN-MOD-EXTERNAL", sources["module external_capability_details.extra_diagrams"])
+        module_item["public_interfaces"]["interfaces"][1]["execution_flow_diagram"]["source"] = sources[
+            "module public_interface render flow"
         ]
-        module_item["extra_diagrams"] = [
-            synthetic_diagram("MER-SYN-MOD-EXTRA", sources["module extra_diagrams"])
+        module_item["public_interfaces"]["interfaces"][2]["execution_flow_diagram"]["source"] = sources[
+            "module public_interface validate flow"
         ]
         document["runtime_view"]["runtime_flow_diagram"]["source"] = sources["runtime_flow"]
         document["runtime_view"]["runtime_sequence_diagram"] = synthetic_diagram(
@@ -1926,7 +1939,7 @@ class RendererIntegrationTests(unittest.TestCase):
         ]
 
         expected_sources = list(sources.values())
-        self.assertEqual(13, len(expected_sources))
+        self.assertEqual(12, len(expected_sources))
         with tempfile.TemporaryDirectory() as tmpdir:
             dsl_path = write_json(tmpdir, "all-known-mermaid-paths.dsl.json", document)
             completed = subprocess.run(
@@ -1944,9 +1957,9 @@ class RendererIntegrationTests(unittest.TestCase):
             parsed_diagrams, extraction_report = validator_module.extract_diagrams_from_markdown(markdown)
             self.assertEqual([], extraction_report.errors)
             parsed_sources = [diagram.source for diagram in parsed_diagrams]
-            self.assertEqual(13, len(parsed_sources))
+            self.assertEqual(12, len(parsed_sources))
             self.assertCountEqual(expected_sources, parsed_sources)
-            self.assertEqual(13, markdown.count("```mermaid"))
+            self.assertEqual(12, markdown.count("```mermaid"))
 
             mermaid = subprocess.run(
                 [PYTHON, str(VALIDATOR), "--from-markdown", str(output_path), "--static"],

@@ -103,6 +103,72 @@ class Phase2FixtureContractTests(unittest.TestCase):
         self.assertNotIn("外部环境原因", markdown)
 
 
+class Phase2RenderingTests(unittest.TestCase):
+    def markdown(self, document=None):
+        renderer = load_renderer_module()
+        return renderer.render_markdown(document or valid_document())
+
+    def test_source_scope_renders_expected_parts(self):
+        markdown = self.markdown()
+        self.assertIn("| 文件 | 角色 | 语言 | 备注 |", markdown)
+        self.assertIn("schemas/structure-design.schema.json", markdown)
+        self.assertIn("结构化设计 DSL JSON", markdown)
+        self.assertIn("document.output_file 指定的 Markdown 文件", markdown)
+        self.assertIn("不负责仓库分析", markdown)
+
+    def test_configuration_dependency_data_and_limit_tables_hide_internal_ids(self):
+        markdown = self.markdown()
+        self.assertIn("| 原型 | 当前/默认值 | 来源 | 含义 |", markdown)
+        self.assertIn("| 名称 | 类型 | 关系 | 用途 | 失败行为 |", markdown)
+        self.assertIn("| 名称 | 类型 | 角色 | 生产方 | 消费方 | 结构/契约 |", markdown)
+        self.assertIn("| 限制 | 影响 | 缓解/后续 |", markdown)
+        self.assertNotIn("MPARAM-SKILL-OUTPUT-DIR", markdown)
+        self.assertNotIn("MDEP-SKILL-JSONSCHEMA", markdown)
+        self.assertNotIn("DATA-SKILL-DSL", markdown)
+        self.assertNotIn("LIMIT-SKILL-NO-REPO-ANALYSIS", markdown)
+
+    def test_public_interface_details_render_in_index_order(self):
+        document = valid_document()
+        public_interfaces = document["module_design"]["modules"][0]["public_interfaces"]
+        kept_interface_ids = {"IFACE-SKILL-VALIDATE-CLI", "IFACE-SKILL-DSL-CONTRACT"}
+        public_interfaces["interface_index"]["rows"] = [
+            row for row in public_interfaces["interface_index"]["rows"] if row["interface_id"] in kept_interface_ids
+        ]
+        public_interfaces["interfaces"] = [
+            interface for interface in public_interfaces["interfaces"] if interface["interface_id"] in kept_interface_ids
+        ]
+        public_interfaces["interfaces"] = list(reversed(public_interfaces["interfaces"]))
+        markdown = self.markdown(document)
+
+        validate_position = markdown.find("##### 4.1.5.1 validate_dsl.py")
+        schema_position = markdown.find("##### 4.1.5.2 structure-design.schema.json")
+        self.assertNotEqual(-1, validate_position)
+        self.assertNotEqual(-1, schema_position)
+        self.assertLess(validate_position, schema_position)
+        self.assertIn("```mermaid\nflowchart TD", markdown)
+        self.assertIn("契约范围：覆盖 create-structure-md V2 DSL JSON 输入。", markdown)
+        self.assertIn("必填项：dsl_version、document、module_design", markdown)
+
+    def test_public_interfaces_not_applicable_reason_renders_when_empty(self):
+        document = valid_document()
+        public_interfaces = document["module_design"]["modules"][0]["public_interfaces"]
+        public_interfaces["summary"] = ""
+        public_interfaces["interface_index"]["rows"] = []
+        public_interfaces["interfaces"] = []
+        public_interfaces["not_applicable_reason"] = "该模块没有对外接口。"
+
+        markdown = self.markdown(document)
+        self.assertIn("该模块没有对外接口。", markdown)
+
+    def test_internal_mechanism_details_render_in_index_order_and_hide_anchors(self):
+        markdown = self.markdown()
+        self.assertIn("| 机制 | 用途 | 输入 | 处理方式 | 输出 | 结构意义 |", markdown)
+        self.assertIn("###### 4.1.6.1 DSL 校验管线", markdown)
+        self.assertIn("DSL 校验管线说明", markdown)
+        self.assertNotIn("IFACE-SKILL-VALIDATE-CLI", markdown)
+        self.assertNotIn("DATA-SKILL-DSL", markdown)
+
+
 class Phase2SchemaShapeTests(unittest.TestCase):
     def assert_schema_invalid(self, document, path_fragment):
         errors = schema_errors(document)

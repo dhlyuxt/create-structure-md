@@ -44,11 +44,63 @@ RUNTIME_UNIT_COLUMNS = [
     ("unit_name", "运行单元"),
     ("unit_type", "类型"),
     ("entrypoint", "入口"),
-    ("entrypoint_not_applicable_reason", "入口不适用原因"),
     ("responsibility", "职责"),
     ("related_module_ids", "关联模块"),
-    ("external_environment_reason", "外部环境原因"),
     ("notes", "备注"),
+]
+
+SOURCE_FILE_COLUMNS = [("path", "文件"), ("role", "角色"), ("language", "语言"), ("notes", "备注")]
+MODULE_PARAMETER_COLUMNS = [
+    ("prototype", "原型"),
+    ("value_or_default", "当前/默认值"),
+    ("value_source", "来源"),
+    ("meaning", "含义"),
+]
+MODULE_DEPENDENCY_COLUMNS = [
+    ("name", "名称"),
+    ("dependency_type", "类型"),
+    ("usage_relation", "关系"),
+    ("required_for", "用途"),
+    ("failure_behavior", "失败行为"),
+]
+MODULE_DATA_OBJECT_COLUMNS = [
+    ("name", "名称"),
+    ("data_type", "类型"),
+    ("role", "角色"),
+    ("producer", "生产方"),
+    ("consumer", "消费方"),
+    ("shape_or_contract", "结构/契约"),
+]
+INTERFACE_INDEX_COLUMNS = [
+    ("interface_name", "接口名称"),
+    ("description", "接口功能描述"),
+    ("interface_type", "接口类型"),
+]
+INTERFACE_PARAMETER_COLUMNS = [
+    ("parameter_name", "参数名"),
+    ("parameter_type", "参数类型"),
+    ("description", "参数描述"),
+    ("direction", "输入/输出"),
+]
+INTERFACE_RETURN_COLUMNS = [
+    ("return_name", "返回名"),
+    ("return_type", "返回类型"),
+    ("description", "描述"),
+    ("condition", "条件"),
+]
+INTERFACE_ERROR_COLUMNS = [("condition", "条件"), ("behavior", "行为")]
+MECHANISM_INDEX_COLUMNS = [
+    ("mechanism_name", "机制"),
+    ("purpose", "用途"),
+    ("input", "输入"),
+    ("processing", "处理方式"),
+    ("output", "输出"),
+    ("structural_significance", "结构意义"),
+]
+KNOWN_LIMITATION_COLUMNS = [
+    ("limitation", "限制"),
+    ("impact", "影响"),
+    ("mitigation_or_next_step", "缓解/后续"),
 ]
 
 CONFIGURATION_ITEM_COLUMNS = [
@@ -135,6 +187,7 @@ LOW_CONFIDENCE_COLUMNS = [
 
 LOW_CONFIDENCE_LABEL_KEYS = [
     "module_name",
+    "interface_name",
     "name",
     "capability_name",
     "unit_name",
@@ -143,6 +196,7 @@ LOW_CONFIDENCE_LABEL_KEYS = [
     "dependency_name",
     "scenario",
     "flow_name",
+    "limitation",
     "description",
     "condition",
     "summary",
@@ -652,97 +706,207 @@ def ordered_module_designs(document):
     return ordered
 
 
-def render_external_capability_summary(summary):
-    parts = [render_paragraph(summary.get("description", ""))]
-    consumers = render_bullets(summary.get("consumers", []))
-    if consumers:
-        parts.append("使用方：\n" + consumers)
-    interface_style = render_paragraph(summary.get("interface_style", ""))
-    if interface_style:
-        parts.append(f"接口风格：{interface_style}")
-    boundary_notes = render_bullets(summary.get("boundary_notes", []))
-    if boundary_notes:
-        parts.append("边界说明：\n" + boundary_notes)
+def render_not_applicable_table(section, columns, empty_text):
+    rows = section.get("rows", []) if section else []
+    if rows:
+        return render_fixed_table(rows, columns)
+    reason = section.get("not_applicable_reason", "") if section else ""
+    return render_paragraph(reason, empty_text=empty_text)
+
+
+def render_source_scope(scope):
+    parts = [
+        render_paragraph(scope.get("summary", "")),
+        render_fixed_table_or_empty(scope.get("primary_files", []), SOURCE_FILE_COLUMNS, "无主要文件。"),
+    ]
+    consumed_inputs = render_bullets(scope.get("consumed_inputs", []))
+    if consumed_inputs:
+        parts.append("消费输入：\n" + consumed_inputs)
+    owned_outputs = render_bullets(scope.get("owned_outputs", []))
+    if owned_outputs:
+        parts.append("拥有输出：\n" + owned_outputs)
+    out_of_scope = render_bullets(scope.get("out_of_scope", []))
+    if out_of_scope:
+        parts.append("不负责范围：\n" + out_of_scope)
     return "\n\n".join(part for part in parts if part != "")
 
 
-def render_internal_structure(internal_structure):
-    diagram = internal_structure.get("diagram", {})
-    rendered_diagram = render_mermaid_block(diagram)
-    if rendered_diagram:
-        return rendered_diagram
+def render_location(location):
+    if not location:
+        return ""
+    file_path = stringify_markdown_value(location.get("file_path", "")).strip()
+    symbol = stringify_markdown_value(location.get("symbol", "")).strip()
+    line_start = stringify_markdown_value(location.get("line_start", "")).strip()
+    line_end = stringify_markdown_value(location.get("line_end", "")).strip()
+    if not file_path:
+        return ""
+    rendered = file_path
+    if symbol:
+        rendered += f"#{symbol}"
+    if line_start or line_end:
+        rendered += f":{line_start}-{line_end}"
+    return escape_plain_text(rendered).strip()
+
+
+def render_labeled_paragraph(label, value):
+    rendered = render_paragraph(value)
+    if not rendered:
+        return ""
+    return f"{label}：{rendered}"
+
+
+def render_labeled_bullets(label, values):
+    bullets = render_bullets(values)
+    if not bullets:
+        return ""
+    return f"{label}：\n{bullets}"
+
+
+def render_executable_interface_detail(interface):
+    location = render_location(interface.get("location", {}))
     parts = [
-        render_paragraph(internal_structure.get("textual_structure", "")),
-        render_paragraph(internal_structure.get("not_applicable_reason", "")),
+        render_labeled_paragraph("原型", interface.get("prototype", "")),
+        render_labeled_paragraph("用途", interface.get("purpose", "")),
+        f"位置：{location}" if location else "",
+        render_not_applicable_table(interface.get("parameters", {}), INTERFACE_PARAMETER_COLUMNS, "无参数。"),
+        render_not_applicable_table(interface.get("return_values", {}), INTERFACE_RETURN_COLUMNS, "无返回值。"),
+        render_mermaid_block(interface.get("execution_flow_diagram", {})),
+        render_labeled_bullets("副作用", interface.get("side_effects", [])),
+        render_fixed_table_or_empty(interface.get("error_behavior", []), INTERFACE_ERROR_COLUMNS, "无错误行为。"),
+        render_labeled_bullets("使用方", interface.get("consumers", [])),
     ]
     return "\n\n".join(part for part in parts if part != "")
 
 
-def render_module_supplement(module, support_context):
-    details = module.get("external_capability_details", {})
+def render_contract_interface_detail(interface):
+    contract = interface.get("contract", {})
+    location = render_location(interface.get("location", {}))
+    required_items = stringify_markdown_value(contract.get("required_items", []))
+    parts = [
+        render_labeled_paragraph("用途", interface.get("purpose", "")),
+        f"位置：{location}" if location else "",
+        render_labeled_paragraph("契约范围", contract.get("contract_scope", "")),
+        render_labeled_paragraph("契约位置", contract.get("contract_location", "")),
+        f"必填项：{escape_plain_text(required_items).strip()}" if required_items else "",
+        render_labeled_bullets("约束", contract.get("constraints", [])),
+        render_labeled_bullets("使用方", contract.get("consumers", [])),
+        render_labeled_paragraph("校验行为", contract.get("validation_behavior", "")),
+    ]
+    return "\n\n".join(part for part in parts if part != "")
+
+
+def render_public_interfaces(public_interfaces, chapter_index):
+    index_rows = public_interfaces.get("interface_index", {}).get("rows", [])
+    interfaces = public_interfaces.get("interfaces", [])
+    if not index_rows and not interfaces:
+        return render_paragraph(public_interfaces.get("not_applicable_reason", ""), empty_text="无对外接口。")
+
+    executable_types = {"command_line", "function", "method", "library_api", "workflow"}
+    detail_by_id = {interface.get("interface_id"): interface for interface in interfaces}
+    parts = [
+        render_paragraph(public_interfaces.get("summary", "")),
+        render_fixed_table_or_empty(index_rows, INTERFACE_INDEX_COLUMNS, "无接口索引。"),
+    ]
+    for detail_index, row in enumerate(index_rows, start=1):
+        interface = detail_by_id.get(row.get("interface_id"))
+        if interface is None:
+            continue
+        interface_name = escape_heading_label(row.get("interface_name", ""))
+        parts.append(f"##### 4.{chapter_index}.5.{detail_index} {interface_name}")
+        if interface.get("interface_type") in executable_types:
+            parts.append(render_executable_interface_detail(interface))
+        else:
+            parts.append(render_contract_interface_detail(interface))
+    return "\n\n".join(part for part in parts if part != "")
+
+
+def render_mechanism_text_block(block):
     parts = []
-    details_extras = render_extras(
-        details.get("extra_tables", []),
-        details.get("extra_diagrams", []),
-        empty_text="",
-        support_context=support_context,
-    )
-    if details_extras:
-        parts.append(details_extras)
-    module_extras = render_extras(
-        module.get("extra_tables", []),
-        module.get("extra_diagrams", []),
-        empty_text="",
-        support_context=support_context,
-    )
-    if module_extras:
-        parts.append(module_extras)
-    notes = render_bullets(module.get("notes", []))
-    if notes:
-        parts.append(notes)
-    if not parts:
-        return "无补充内容。"
+    title = render_paragraph(block.get("title", ""))
+    if title:
+        parts.append(f"**{title}**")
+    text = render_paragraph(block.get("text", ""))
+    if text:
+        parts.append(text)
     return "\n\n".join(parts)
 
 
+def render_internal_mechanism(internal_mechanism, chapter_index):
+    index_rows = internal_mechanism.get("mechanism_index", {}).get("rows", [])
+    details = internal_mechanism.get("mechanism_details", [])
+    if not index_rows and not details:
+        return render_paragraph(internal_mechanism.get("not_applicable_reason", ""), empty_text="无实现机制说明。")
+
+    detail_by_id = {detail.get("mechanism_id"): detail for detail in details}
+    parts = [
+        render_paragraph(internal_mechanism.get("summary", "")),
+        render_not_applicable_table(
+            internal_mechanism.get("mechanism_index", {}),
+            MECHANISM_INDEX_COLUMNS,
+            "无实现机制索引。",
+        ),
+    ]
+    for detail_index, row in enumerate(index_rows, start=1):
+        detail = detail_by_id.get(row.get("mechanism_id"))
+        if detail is None:
+            continue
+        mechanism_name = escape_heading_label(row.get("mechanism_name", ""))
+        parts.append(f"###### 4.{chapter_index}.6.{detail_index} {mechanism_name}")
+        for block in detail.get("blocks", []):
+            if block.get("block_type") == "text":
+                parts.append(render_mechanism_text_block(block))
+    return "\n\n".join(part for part in parts if part != "")
+
+
 def render_module_design_section(module, index, support_context):
-    details = module.get("external_capability_details", {})
-    provided = details.get("provided_capabilities", {})
-    module_support = render_node_support(
+    raw_module_support = render_node_support(
         module,
         support_context,
         target_type="module",
         target_id=module.get("module_id", ""),
     )
+    module_support = ""
+    if raw_module_support:
+        label = row_display_label(module, "module_id", "name")
+        module_support = f"支持数据（{escape_plain_text(label).strip()}）\n\n{raw_module_support}"
     parts = [
         subchapter_heading(4, index, escape_heading_label(module.get("name", ""))),
-        nested_heading(4, index, 1, "模块概述"),
+        nested_heading(4, index, 1, "模块定位与源码/产物范围"),
         render_paragraph(module.get("summary", "")),
+        render_source_scope(module.get("source_scope", {})),
         module_support,
-        nested_heading(4, index, 2, "模块职责"),
-        render_bullets(module.get("responsibilities", [])),
-        nested_heading(4, index, 3, "对外能力说明"),
-        render_external_capability_summary(module.get("external_capability_summary", {})),
-        nested_heading(4, index, 4, "对外接口需求清单"),
-        render_fixed_table_with_support(
-            provided.get("rows", []),
-            [
-                ("capability_name", "能力名称"),
-                ("interface_style", "接口风格"),
-                ("description", "描述"),
-                ("inputs", "输入"),
-                ("outputs", "输出"),
-                ("notes", "备注"),
-            ],
-            support_context,
-            id_key="capability_id",
-            label_key="capability_name",
-            target_type="provided_capability",
+        nested_heading(4, index, 2, "配置"),
+        render_paragraph(module.get("configuration", {}).get("summary", "")),
+        render_not_applicable_table(
+            module.get("configuration", {}).get("parameters", {}),
+            MODULE_PARAMETER_COLUMNS,
+            "无模块配置。",
         ),
-        nested_heading(4, index, 5, "模块内部结构关系图"),
-        render_internal_structure(module.get("internal_structure", {})),
-        nested_heading(4, index, 6, "补充说明"),
-        render_module_supplement(module, support_context),
+        nested_heading(4, index, 3, "依赖"),
+        render_paragraph(module.get("dependencies", {}).get("summary", "")),
+        render_not_applicable_table(
+            module.get("dependencies", {}),
+            MODULE_DEPENDENCY_COLUMNS,
+            "无模块依赖。",
+        ),
+        nested_heading(4, index, 4, "数据对象"),
+        render_paragraph(module.get("data_objects", {}).get("summary", "")),
+        render_not_applicable_table(
+            module.get("data_objects", {}),
+            MODULE_DATA_OBJECT_COLUMNS,
+            "无数据对象。",
+        ),
+        nested_heading(4, index, 5, "对外接口"),
+        render_public_interfaces(module.get("public_interfaces", {}), index),
+        nested_heading(4, index, 6, "实现机制说明"),
+        render_internal_mechanism(module.get("internal_mechanism", {}), index),
+        nested_heading(4, index, 7, "已知限制"),
+        render_paragraph(module.get("known_limitations", {}).get("summary", "")),
+        render_not_applicable_table(
+            module.get("known_limitations", {}),
+            KNOWN_LIMITATION_COLUMNS,
+            "无已知限制。",
+        ),
     ]
     return "\n\n".join(part for part in parts if part != "")
 
@@ -1008,14 +1172,12 @@ def collect_low_confidence_items(document):
 
     for module_index, module in enumerate(document.get("module_design", {}).get("modules", [])):
         add_item(f"$.module_design.modules[{module_index}]", module)
-        capability_rows = (
-            module.get("external_capability_details", {}).get("provided_capabilities", {}).get("rows", [])
-        )
-        for row_index, row in enumerate(capability_rows):
+        interfaces = module.get("public_interfaces", {}).get("interfaces", [])
+        for interface_index, interface in enumerate(interfaces):
             add_item(
                 "$.module_design.modules"
-                f"[{module_index}].external_capability_details.provided_capabilities.rows[{row_index}]",
-                row,
+                f"[{module_index}].public_interfaces.interfaces[{interface_index}]",
+                interface,
             )
 
     for index, row in enumerate(document.get("runtime_view", {}).get("runtime_units", {}).get("rows", [])):
