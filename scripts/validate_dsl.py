@@ -22,6 +22,11 @@ except ModuleNotFoundError:
         v2_global_rule_violations,
     )
 
+try:
+    from v2_phase2 import phase2_module_model_violations, phase2_module_model_warnings
+except ModuleNotFoundError:
+    from scripts.v2_phase2 import phase2_module_model_violations, phase2_module_model_warnings
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = ROOT / "schemas/structure-design.schema.json"
@@ -103,11 +108,11 @@ LOW_CONFIDENCE_COLLECTIONS = [
     ("$.architecture_views.module_intro.rows", lambda doc: doc["architecture_views"]["module_intro"]["rows"]),
     ("$.module_design.modules", lambda doc: doc["module_design"]["modules"]),
     (
-        "$.module_design.modules[{module_index}].external_capability_details.provided_capabilities.rows",
+        "$.module_design.modules[{module_index}].public_interfaces.interfaces",
         lambda doc: [
             (module_index, row_index, row)
             for module_index, module in enumerate(doc["module_design"]["modules"])
-            for row_index, row in enumerate(module["external_capability_details"]["provided_capabilities"]["rows"])
+            for row_index, row in enumerate(module["public_interfaces"]["interfaces"])
         ],
     ),
     ("$.runtime_view.runtime_units.rows", lambda doc: doc["runtime_view"]["runtime_units"]["rows"]),
@@ -224,7 +229,15 @@ REGISTERED_REFERENCE_PATHS = [
     re.compile(r"^\$\.architecture_views\.module_intro\.rows\[\d+\]\.module_id$"),
     re.compile(r"^\$\.system_overview\.core_capabilities\[\d+\]\.capability_id$"),
     re.compile(r"^\$\.module_design\.modules\[\d+\]\.module_id$"),
-    re.compile(r"^\$\.module_design\.modules\[\d+\]\.external_capability_details\.provided_capabilities\.rows\[\d+\]\.capability_id$"),
+    re.compile(r"^\$\.module_design\.modules\[\d+\]\.configuration\.parameters\.rows\[\d+\]\.parameter_id$"),
+    re.compile(r"^\$\.module_design\.modules\[\d+\]\.dependencies\.rows\[\d+\]\.(dependency_id|target_module_id|target_data_id)$"),
+    re.compile(r"^\$\.module_design\.modules\[\d+\]\.data_objects\.rows\[\d+\]\.data_id$"),
+    re.compile(r"^\$\.module_design\.modules\[\d+\]\.public_interfaces\.interface_index\.rows\[\d+\]\.interface_id$"),
+    re.compile(r"^\$\.module_design\.modules\[\d+\]\.public_interfaces\.interfaces\[\d+\]\.interface_id$"),
+    re.compile(r"^\$\.module_design\.modules\[\d+\]\.internal_mechanism\.mechanism_index\.rows\[\d+\]\.mechanism_id$"),
+    re.compile(r"^\$\.module_design\.modules\[\d+\]\.internal_mechanism\.mechanism_details\[\d+\]\.mechanism_id$"),
+    re.compile(r"^\$\.module_design\.modules\[\d+\]\.internal_mechanism\.mechanism_details\[\d+\]\.blocks\[\d+\]\.block_id$"),
+    re.compile(r"^\$\.module_design\.modules\[\d+\]\.known_limitations\.rows\[\d+\]\.limitation_id$"),
     re.compile(r"^\$\.runtime_view\.runtime_units\.rows\[\d+\]\.(unit_id|related_module_ids)$"),
     re.compile(r"^\$\.configuration_data_dependencies\.configuration_items\.rows\[\d+\]\.config_id$"),
     re.compile(r"^\$\.configuration_data_dependencies\.structural_data_artifacts\.rows\[\d+\]\.artifact_id$"),
@@ -365,8 +378,8 @@ class ValidationContext:
         for i, item in enumerate(doc["system_overview"]["core_capabilities"]):
             self.register("core_capability", item["capability_id"], f"$.system_overview.core_capabilities[{i}].capability_id")
         for m_i, module in enumerate(doc["module_design"]["modules"]):
-            for c_i, row in enumerate(module["external_capability_details"]["provided_capabilities"]["rows"]):
-                self.register("provided_capability", row["capability_id"], f"$.module_design.modules[{m_i}].external_capability_details.provided_capabilities.rows[{c_i}].capability_id")
+            for d_i, row in enumerate(module["dependencies"]["rows"]):
+                self.register("dependency", row["dependency_id"], f"$.module_design.modules[{m_i}].dependencies.rows[{d_i}].dependency_id")
         for i, row in enumerate(doc["runtime_view"]["runtime_units"]["rows"]):
             self.register("runtime_unit", row["unit_id"], f"$.runtime_view.runtime_units.rows[{i}].unit_id")
         for i, row in enumerate(doc["configuration_data_dependencies"]["configuration_items"]["rows"]):
@@ -560,13 +573,9 @@ def check_chapter_4(document, context):
     for i, module in enumerate(design_modules):
         base = f"$.module_design.modules[{i}]"
         context.require_ref("module", module["module_id"], f"{base}.module_id", "module")
-        require_non_empty_list(context.report, f"{base}.responsibilities", module["responsibilities"], "module responsibilities")
-        require_non_empty(context.report, f"{base}.external_capability_summary.description", module["external_capability_summary"]["description"], "external capability summary description")
-        rows = module["external_capability_details"]["provided_capabilities"]["rows"]
-        require_non_empty_list(context.report, f"{base}.external_capability_details.provided_capabilities.rows", rows, "provided capability rows")
-        internal = module["internal_structure"]
-        if is_blank(internal["diagram"].get("source", "")) and is_blank(internal["textual_structure"]):
-            context.report.error(f"{base}.internal_structure", "requires diagram source or textual_structure", "not_applicable_reason alone does not satisfy the internal structure rule")
+        for field_name in ["module_id", "name", "module_kind", "summary"]:
+            require_non_empty(context.report, f"{base}.{field_name}", module[field_name], field_name)
+        require_non_empty(context.report, f"{base}.source_scope.summary", module["source_scope"]["summary"], "source_scope summary")
 
 
 def check_chapter_5(document, context):
@@ -576,12 +585,9 @@ def check_chapter_5(document, context):
     require_non_empty_list(context.report, "$.runtime_view.runtime_units.rows", units, "runtime units")
     for i, unit in enumerate(units):
         base = f"$.runtime_view.runtime_units.rows[{i}]"
+        require_non_empty(context.report, f"{base}.entrypoint", unit["entrypoint"], "runtime unit entrypoint")
         for ref_i, module_id in enumerate(unit["related_module_ids"]):
             context.require_ref("module", module_id, f"{base}.related_module_ids[{ref_i}]", "module")
-        if is_blank(unit["entrypoint"]):
-            require_non_empty(context.report, f"{base}.entrypoint_not_applicable_reason", unit["entrypoint_not_applicable_reason"], "entrypoint_not_applicable_reason")
-        if not unit["related_module_ids"]:
-            require_non_empty(context.report, f"{base}.external_environment_reason", unit["external_environment_reason"], "external_environment_reason")
     diagram_source_required(context.report, "$.runtime_view.runtime_flow_diagram", runtime["runtime_flow_diagram"], "runtime flow diagram")
     sequence = runtime.get("runtime_sequence_diagram")
     if sequence and not is_blank(sequence.get("source", "")) and not sequence["source"].lstrip().startswith("sequenceDiagram"):
@@ -762,8 +768,6 @@ def current_traceability_target(path, value):
         return ("module", value["module_id"])
     if "capability_id" in value and ".system_overview.core_capabilities" in path:
         return ("core_capability", value["capability_id"])
-    if "capability_id" in value and ".provided_capabilities.rows" in path:
-        return ("provided_capability", value["capability_id"])
     if "unit_id" in value:
         return ("runtime_unit", value["unit_id"])
     if "collaboration_id" in value:
@@ -915,14 +919,12 @@ def real_diagram_field_patterns(field_name):
     escaped_field_name = re.escape(field_name)
     return [
         rf"^\$\.architecture_views\.module_relationship_diagram\.{escaped_field_name}$",
-        rf"^\$\.module_design\.modules\[\d+\]\.internal_structure\.diagram\.{escaped_field_name}$",
+        rf"^\$\.module_design\.modules\[\d+\]\.public_interfaces\.interfaces\[\d+\]\.execution_flow_diagram\.{escaped_field_name}$",
         rf"^\$\.runtime_view\.runtime_flow_diagram\.{escaped_field_name}$",
         rf"^\$\.runtime_view\.runtime_sequence_diagram\.{escaped_field_name}$",
         rf"^\$\.cross_module_collaboration\.collaboration_relationship_diagram\.{escaped_field_name}$",
         rf"^\$\.key_flows\.flows\[\d+\]\.diagram\.{escaped_field_name}$",
         rf"^\$\.architecture_views\.extra_diagrams\[\d+\]\.{escaped_field_name}$",
-        rf"^\$\.module_design\.modules\[\d+\]\.external_capability_details\.extra_diagrams\[\d+\]\.{escaped_field_name}$",
-        rf"^\$\.module_design\.modules\[\d+\]\.extra_diagrams\[\d+\]\.{escaped_field_name}$",
         rf"^\$\.runtime_view\.extra_diagrams\[\d+\]\.{escaped_field_name}$",
         rf"^\$\.configuration_data_dependencies\.extra_diagrams\[\d+\]\.{escaped_field_name}$",
         rf"^\$\.cross_module_collaboration\.extra_diagrams\[\d+\]\.{escaped_field_name}$",
@@ -935,6 +937,8 @@ def check_markdown_safety(document, context):
         if not isinstance(value, str):
             continue
         if path.startswith("$.source_snippets["):
+            continue
+        if path.endswith(".prototype"):
             continue
         if is_mermaid_source_path(path):
             if "```" in value:
@@ -992,8 +996,16 @@ def check_v2_global_foundation_rules(document, report):
         report.error(violation.path, violation.message)
 
 
+def check_v2_phase2_module_model(document, report):
+    for violation in phase2_module_model_violations(document):
+        report.error(violation.path, violation.message)
+    for warning in phase2_module_model_warnings(document):
+        report.warn(warning.path, warning.message)
+
+
 def run_semantic_checks(document, context, *, allow_long_snippets):
     check_v2_global_foundation_rules(document, context.report)
+    check_v2_phase2_module_model(document, context.report)
     check_chapter_rules(document, context)
     check_extra_tables(document, context)
     check_traceability(document, context)

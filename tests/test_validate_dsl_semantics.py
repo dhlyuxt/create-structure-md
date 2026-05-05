@@ -498,32 +498,28 @@ class ChapterTwoThroughSixTests(unittest.TestCase):
         self.assertIn("$.module_design.modules", completed.stderr)
         self.assertIn("must match chapter 3 modules one-to-one", completed.stderr)
 
-    def test_internal_structure_requires_diagram_source_or_text(self):
+    def test_internal_mechanism_requires_non_empty_text_block(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             document = valid_document()
-            internal = document["module_design"]["modules"][0]["internal_structure"]
-            internal["diagram"]["source"] = ""
-            internal["textual_structure"] = ""
-            internal["not_applicable_reason"] = "使用文字说明"
-            path = write_json(tmpdir, "internal-empty.dsl.json", document)
+            blocks = document["module_design"]["modules"][0]["internal_mechanism"]["mechanism_details"][0]["blocks"]
+            for block in blocks:
+                block["text"] = " "
+            path = write_json(tmpdir, "mechanism-empty-text.dsl.json", document)
             completed = run_validator(path)
         self.assertEqual(1, completed.returncode)
-        self.assertIn("$.module_design.modules[0].internal_structure", completed.stderr)
-        self.assertIn("requires diagram source or textual_structure", completed.stderr)
+        self.assertIn("$.module_design.modules[0].internal_mechanism.mechanism_details[0].blocks", completed.stderr)
+        self.assertIn("mechanism detail must include at least one non-empty text block", completed.stderr)
 
-    def test_runtime_entrypoint_and_related_modules_empty_reasons(self):
+    def test_runtime_entrypoint_must_be_non_empty(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             document = valid_document()
             unit = document["runtime_view"]["runtime_units"]["rows"][0]
             unit["entrypoint"] = ""
-            unit["entrypoint_not_applicable_reason"] = ""
-            unit["related_module_ids"] = []
-            unit["external_environment_reason"] = ""
-            path = write_json(tmpdir, "runtime-reasons.dsl.json", document)
+            path = write_json(tmpdir, "runtime-entrypoint-empty.dsl.json", document)
             completed = run_validator(path)
         self.assertEqual(1, completed.returncode)
-        self.assertIn("$.runtime_view.runtime_units.rows[0].entrypoint_not_applicable_reason", completed.stderr)
-        self.assertIn("$.runtime_view.runtime_units.rows[0].external_environment_reason", completed.stderr)
+        self.assertIn("$.runtime_view.runtime_units.rows[0].entrypoint", completed.stderr)
+        self.assertIn("runtime unit entrypoint must be non-empty", completed.stderr)
 
     def test_required_diagrams_and_optional_extra_diagrams_need_source(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -583,8 +579,7 @@ class ChapterSevenAndEightTests(unittest.TestCase):
         second = deepcopy(document["module_design"]["modules"][0])
         second["module_id"] = "MOD-RENDER"
         second["name"] = "渲染模块"
-        second["external_capability_details"]["provided_capabilities"]["rows"][0]["capability_id"] = "CAP-RENDER"
-        second["internal_structure"]["diagram"]["id"] = "MER-MOD-RENDER-STRUCT"
+        second["public_interfaces"]["interfaces"][1]["execution_flow_diagram"]["id"] = "MER-IFACE-SECOND-VALIDATE"
         document["module_design"]["modules"].append(second)
         document["architecture_views"]["module_relationship_diagram"]["source"] += "\n  MOD-SKILL --> MOD-RENDER"
         return document
@@ -915,7 +910,6 @@ class ExtraTableAndTraceabilityTests(unittest.TestCase):
         cases = [
             ("module", "MOD-SKILL", lambda document: document["module_design"]["modules"][0]),
             ("core_capability", "CAP-001", lambda document: document["system_overview"]["core_capabilities"][0]),
-            ("provided_capability", "CAP-MOD-SKILL-001", lambda document: document["module_design"]["modules"][0]["external_capability_details"]["provided_capabilities"]["rows"][0]),
             ("runtime_unit", "RUN-GENERATE", lambda document: document["runtime_view"]["runtime_units"]["rows"][0]),
             ("configuration_item", "CFG-001", lambda document: document["configuration_data_dependencies"]["configuration_items"]["rows"][0]),
             ("data_artifact", "DATA-001", lambda document: document["configuration_data_dependencies"]["structural_data_artifacts"]["rows"][0]),
@@ -1309,7 +1303,7 @@ class MarkdownSafetyAndLowConfidenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             document = valid_document()
             document["architecture_views"]["module_intro"]["rows"][0]["confidence"] = "unknown"
-            document["module_design"]["modules"][0]["external_capability_details"]["provided_capabilities"]["rows"][0]["confidence"] = "unknown"
+            document["module_design"]["modules"][0]["public_interfaces"]["interfaces"][0]["confidence"] = "unknown"
             document["evidence"] = [{
                 "id": "EV-UNKNOWN",
                 "kind": "note",
@@ -1325,7 +1319,7 @@ class MarkdownSafetyAndLowConfidenceTests(unittest.TestCase):
         self.assertIn("WARNING", completed.stdout)
         self.assertIn("low-confidence item", completed.stdout)
         self.assertIn("$.architecture_views.module_intro.rows[0]", completed.stdout)
-        self.assertIn("$.module_design.modules[0].external_capability_details.provided_capabilities.rows[0]", completed.stdout)
+        self.assertIn("$.module_design.modules[0].public_interfaces.interfaces[0]", completed.stdout)
         self.assertNotIn("$.evidence[0]", completed.stdout)
         self.assertIn("Summarize in chapter 9", completed.stdout)
 

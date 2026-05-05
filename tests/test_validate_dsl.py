@@ -510,15 +510,15 @@ class SchemaChapterTwoThroughFourTests(unittest.TestCase):
             expected_path=["module_design", "modules", 0, "module_id"],
         )
 
-    def test_internal_structure_diagram_rejects_empty_object(self):
+    def test_executable_interface_diagram_rejects_empty_object(self):
         document = valid_example()
-        document["module_design"]["modules"][0]["internal_structure"]["diagram"] = {}
+        document["module_design"]["modules"][0]["public_interfaces"]["interfaces"][1]["execution_flow_diagram"] = {}
         assert_invalid(
             self,
             document,
             "is a required property",
             expected_validator="required",
-            expected_path=["module_design", "modules", 0, "internal_structure", "diagram"],
+            expected_path=["module_design", "modules", 0, "public_interfaces", "interfaces", 1, "execution_flow_diagram"],
         )
 
 
