@@ -65,7 +65,6 @@ def preserved_process_env(run_dir):
 
 MERMAID_BROWSER_LAUNCH_FAILURE_PATTERNS = [
     "Failed to launch the browser process",
-    "Operation not permitted",
     "No usable sandbox",
 ]
 
@@ -94,13 +93,8 @@ def strict_mermaid_cli_probe_result(run_dir):
     if completed.returncode == 0:
         return "ok", ""
     combined = completed.stdout + completed.stderr
-    browser_launch_failed = any(
-        pattern in combined
-        for pattern in MERMAID_BROWSER_LAUNCH_FAILURE_PATTERNS
-        if pattern != "Operation not permitted"
-    )
-    browser_sandbox_denied = "Operation not permitted" in combined
-    if browser_launch_failed and browser_sandbox_denied:
+    browser_launch_failed = any(pattern in combined for pattern in MERMAID_BROWSER_LAUNCH_FAILURE_PATTERNS)
+    if browser_launch_failed:
         return "skip", "mmdc browser launch unavailable in this environment"
     return "fail", combined
 

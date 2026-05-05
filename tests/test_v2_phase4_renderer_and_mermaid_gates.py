@@ -18,6 +18,24 @@ FIXTURE = ROOT / "tests/fixtures/valid-v2-foundation.dsl.json"
 PYTHON = sys.executable
 
 
+def preserved_process_env(tmpdir):
+    tmpdir = Path(tmpdir)
+    temp_dir = tmpdir / "tmp"
+    cache_dir = tmpdir / "xdg-cache"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    env = os.environ.copy()
+    env.update(
+        {
+            "TMPDIR": str(temp_dir),
+            "TMP": str(temp_dir),
+            "TEMP": str(temp_dir),
+            "XDG_CACHE_HOME": str(cache_dir),
+        }
+    )
+    return env
+
+
 def load_json(path):
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
@@ -600,7 +618,6 @@ class Phase4StrictRenderedMarkdownTests(unittest.TestCase):
 
 MERMAID_BROWSER_LAUNCH_FAILURE_PATTERNS = [
     "Failed to launch the browser process",
-    "Operation not permitted",
     "No usable sandbox",
 ]
 
@@ -627,6 +644,7 @@ def strict_mermaid_cli_probe_result(tmpdir):
             str(Path(tmpdir) / "probe-work"),
         ],
         cwd=ROOT,
+        env=preserved_process_env(tmpdir),
         text=True,
         capture_output=True,
         check=False,
@@ -634,13 +652,8 @@ def strict_mermaid_cli_probe_result(tmpdir):
     if completed.returncode == 0:
         return "ok", ""
     combined = completed.stdout + completed.stderr
-    browser_launch_failed = any(
-        pattern in combined
-        for pattern in MERMAID_BROWSER_LAUNCH_FAILURE_PATTERNS
-        if pattern != "Operation not permitted"
-    )
-    browser_sandbox_denied = "Operation not permitted" in combined
-    if browser_launch_failed and browser_sandbox_denied:
+    browser_launch_failed = any(pattern in combined for pattern in MERMAID_BROWSER_LAUNCH_FAILURE_PATTERNS)
+    if browser_launch_failed:
         return "skip", "mmdc browser launch unavailable in this environment"
     return "fail", combined
 
@@ -675,6 +688,7 @@ class Phase4RealStrictRenderedMarkdownTests(unittest.TestCase):
                     str(Path(tmpdir) / "mermaid-work"),
                 ],
                 cwd=ROOT,
+                env=preserved_process_env(tmpdir),
                 text=True,
                 capture_output=True,
                 check=False,
