@@ -468,7 +468,10 @@ def render_extras(extra_tables, extra_diagrams, empty_text="无补充内容。",
 
 
 def render_diagram_id_comment(diagram):
-    diagram_id = stringify_markdown_value((diagram or {}).get("id", "")).strip()
+    raw_diagram_id = (diagram or {}).get("id", "")
+    if not isinstance(raw_diagram_id, str):
+        raise RenderError("Mermaid diagram.id must be a string for diagram-id metadata")
+    diagram_id = raw_diagram_id.strip()
     if not diagram_id:
         raise RenderError("Mermaid diagram.id is required for diagram-id metadata")
     if not SAFE_DIAGRAM_ID_COMMENT_RE.fullmatch(diagram_id):

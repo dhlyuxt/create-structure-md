@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -54,6 +55,10 @@ def load_renderer_module():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def strip_diagram_id_metadata(markdown):
+    return re.sub(r"(?m)^<!-- diagram-id: [A-Za-z0-9_.:-]+ -->\n?", "", markdown)
 
 
 def schema_errors(document):
@@ -162,11 +167,12 @@ class Phase2RenderingTests(unittest.TestCase):
 
     def test_internal_mechanism_details_render_in_index_order_and_hide_anchors(self):
         markdown = self.markdown()
+        visible_markdown = strip_diagram_id_metadata(markdown)
         self.assertIn("| 机制 | 用途 | 输入 | 处理方式 | 输出 | 结构意义 |", markdown)
         self.assertIn("###### 4.1.6.1 DSL 校验管线", markdown)
         self.assertIn("DSL 校验管线说明", markdown)
-        self.assertNotIn("IFACE-SKILL-VALIDATE-CLI", markdown)
-        self.assertNotIn("DATA-SKILL-DSL", markdown)
+        self.assertNotIn("IFACE-SKILL-VALIDATE-CLI", visible_markdown)
+        self.assertNotIn("DATA-SKILL-DSL", visible_markdown)
 
 
 class Phase2SchemaShapeTests(unittest.TestCase):

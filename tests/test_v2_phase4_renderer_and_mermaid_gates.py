@@ -95,3 +95,10 @@ class Phase4RendererMetadataTests(unittest.TestCase):
 
         self.assertIn("<!-- diagram-id: MER-ARCH-MODULES -->\n```mermaid", hidden)
         self.assertIn("<!-- diagram-id: MER-ARCH-MODULES -->\n```mermaid", inline)
+
+    def test_diagram_id_metadata_rejects_non_string_id(self):
+        module = load_script("scripts/render_markdown.py", "phase4_render_markdown_id_type_under_test")
+        diagram = {"id": 123, "title": "", "description": "", "source": "flowchart TD\n  A --> B"}
+
+        with self.assertRaisesRegex(module.RenderError, "Mermaid diagram.id must be a string"):
+            module.render_mermaid_block(diagram)
