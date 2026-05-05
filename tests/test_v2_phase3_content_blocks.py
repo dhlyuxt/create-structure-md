@@ -348,3 +348,31 @@ class Phase3SemanticValidationTests(unittest.TestCase):
             document["structure_issues_and_suggestions"]["blocks"][0]["evidence_refs"] = ["EV-MISSING"]
 
         self.assert_invalid(mutate, "references unknown evidence ID EV-MISSING")
+
+    def test_extra_table_payload_blocks_are_not_registered_as_content_block_tables(self):
+        document = valid_document()
+        document["architecture_views"]["extra_tables"] = [
+            {
+                "id": "TBL-ARCH-PAYLOAD",
+                "title": "Payload Table",
+                "columns": [{"key": "payload", "title": "Payload"}],
+                "rows": [
+                    {
+                        "payload": {
+                            "blocks": [
+                                {
+                                    "table": {
+                                        "id": "BAD-PAYLOAD",
+                                        "title": "Payload",
+                                        "columns": [],
+                                        "rows": [],
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ],
+            }
+        ]
+        completed = validation_stderr_for(document)
+        self.assertEqual(0, completed.returncode, completed.stderr)

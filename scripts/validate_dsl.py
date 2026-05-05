@@ -229,6 +229,15 @@ SUPPORT_REF_FIELDS = {
     "source_snippet_refs": "source_snippet",
 }
 
+CONTENT_BLOCK_TABLE_PATH_PATTERNS = (
+    r"^\$\.module_design\.modules\[\d+\]\.internal_mechanism\.mechanism_details\[\d+\]\.blocks\[\d+\]\.table$",
+    r"^\$\.structure_issues_and_suggestions\.blocks\[\d+\]\.table$",
+)
+CONTENT_BLOCK_TABLE_ROW_PATH_PATTERNS = (
+    r"^\$\.module_design\.modules\[\d+\]\.internal_mechanism\.mechanism_details\[\d+\]\.blocks\[\d+\]\.table\.rows\[\d+\]$",
+    r"^\$\.structure_issues_and_suggestions\.blocks\[\d+\]\.table\.rows\[\d+\]$",
+)
+
 REGISTERED_REFERENCE_PATHS = [
     re.compile(r"^\$\.architecture_views\.module_intro\.rows\[\d+\]\.module_id$"),
     re.compile(r"^\$\.system_overview\.core_capabilities\[\d+\]\.capability_id$"),
@@ -255,7 +264,8 @@ REGISTERED_REFERENCE_PATHS = [
     # traceability.target_id resolution depends on target_type and is deferred to Task 6.
     re.compile(r"^\$\.traceability\[\d+\]\.(id|source_external_id|target_id)$"),
     re.compile(r"^\$\.(evidence|risks|assumptions|source_snippets)\[\d+\]\.id$"),
-    re.compile(r"^\$.*\.blocks\[\d+\]\.table\.id$"),
+    re.compile(r"^\$\.module_design\.modules\[\d+\]\.internal_mechanism\.mechanism_details\[\d+\]\.blocks\[\d+\]\.table\.id$"),
+    re.compile(r"^\$\.structure_issues_and_suggestions\.blocks\[\d+\]\.table\.id$"),
     re.compile(r"^\$.*\.(?:extra_tables\[\d+\]|extra_diagrams\[\d+\]|.*diagram)\.id$"),
 ]
 
@@ -328,11 +338,11 @@ def is_extra_table_registration_path(path):
 
 
 def is_content_block_table_registration_path(path):
-    return re.search(r"\.blocks\[\d+\]\.table$", path) is not None
+    return any(re.match(pattern, path) for pattern in CONTENT_BLOCK_TABLE_PATH_PATTERNS)
 
 
 def is_content_block_table_row_path(path):
-    return re.search(r"\.blocks\[\d+\]\.table\.rows\[\d+\]$", path) is not None
+    return any(re.match(pattern, path) for pattern in CONTENT_BLOCK_TABLE_ROW_PATH_PATTERNS)
 
 
 class ValidationContext:
