@@ -278,20 +278,373 @@
         "not_applicable_reason": { "type": "string" }
       }
     },
+    "moduleSourceFile": {
+      "type": "object",
+      "required": ["path", "role", "language", "notes"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "$ref": "#/$defs/nonEmptyString" },
+        "role": { "$ref": "#/$defs/nonEmptyString" },
+        "language": { "$ref": "#/$defs/nonEmptyString" },
+        "notes": { "type": "string" }
+      }
+    },
+    "moduleSourceScope": {
+      "type": "object",
+      "required": ["summary", "primary_files", "consumed_inputs", "owned_outputs", "out_of_scope"],
+      "additionalProperties": false,
+      "properties": {
+        "summary": { "$ref": "#/$defs/nonEmptyString" },
+        "primary_files": { "type": "array", "items": { "$ref": "#/$defs/moduleSourceFile" } },
+        "consumed_inputs": { "$ref": "#/$defs/stringArray" },
+        "owned_outputs": { "$ref": "#/$defs/stringArray" },
+        "out_of_scope": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "moduleParameterRow": {
+      "type": "object",
+      "required": ["parameter_id", "prototype", "value_or_default", "value_source", "meaning", "confidence", "evidence_refs"],
+      "additionalProperties": false,
+      "properties": {
+        "parameter_id": { "$ref": "#/$defs/nonEmptyString" },
+        "prototype": { "$ref": "#/$defs/nonEmptyString" },
+        "value_or_default": { "type": "string" },
+        "value_source": { "$ref": "#/$defs/valueSource" },
+        "meaning": { "$ref": "#/$defs/nonEmptyString" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" }
+      }
+    },
+    "moduleParameterTable": {
+      "type": "object",
+      "required": ["rows", "not_applicable_reason"],
+      "additionalProperties": false,
+      "properties": {
+        "rows": { "type": "array", "items": { "$ref": "#/$defs/moduleParameterRow" } },
+        "not_applicable_reason": { "type": "string" }
+      }
+    },
+    "moduleConfiguration": {
+      "type": "object",
+      "required": ["summary", "parameters"],
+      "additionalProperties": false,
+      "properties": {
+        "summary": { "$ref": "#/$defs/nonEmptyString" },
+        "parameters": { "$ref": "#/$defs/moduleParameterTable" }
+      }
+    },
+    "moduleDependencyRow": {
+      "type": "object",
+      "required": ["dependency_id", "name", "dependency_type", "usage_relation", "target_module_id", "target_data_id", "system_dependency_ref", "required_for", "failure_behavior", "confidence", "evidence_refs"],
+      "additionalProperties": false,
+      "properties": {
+        "dependency_id": { "$ref": "#/$defs/nonEmptyString" },
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "dependency_type": { "$ref": "#/$defs/dependencyType" },
+        "usage_relation": { "$ref": "#/$defs/usageRelation" },
+        "target_module_id": { "type": "string" },
+        "target_data_id": { "type": "string" },
+        "system_dependency_ref": { "type": "string" },
+        "required_for": { "$ref": "#/$defs/nonEmptyString" },
+        "failure_behavior": { "$ref": "#/$defs/nonEmptyString" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" }
+      }
+    },
+    "moduleDependencies": {
+      "type": "object",
+      "required": ["summary", "rows", "not_applicable_reason"],
+      "additionalProperties": false,
+      "properties": {
+        "summary": { "$ref": "#/$defs/nonEmptyString" },
+        "rows": { "type": "array", "items": { "$ref": "#/$defs/moduleDependencyRow" } },
+        "not_applicable_reason": { "type": "string" }
+      }
+    },
+    "moduleDataObjectRow": {
+      "type": "object",
+      "required": ["data_id", "name", "data_type", "role", "producer", "consumer", "shape_or_contract", "confidence", "evidence_refs"],
+      "additionalProperties": false,
+      "properties": {
+        "data_id": { "$ref": "#/$defs/nonEmptyString" },
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "data_type": { "$ref": "#/$defs/nonEmptyString" },
+        "role": { "$ref": "#/$defs/nonEmptyString" },
+        "producer": { "$ref": "#/$defs/nonEmptyString" },
+        "consumer": { "$ref": "#/$defs/nonEmptyString" },
+        "shape_or_contract": { "$ref": "#/$defs/nonEmptyString" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" }
+      }
+    },
+    "moduleDataObjects": {
+      "type": "object",
+      "required": ["summary", "rows", "not_applicable_reason"],
+      "additionalProperties": false,
+      "properties": {
+        "summary": { "$ref": "#/$defs/nonEmptyString" },
+        "rows": { "type": "array", "items": { "$ref": "#/$defs/moduleDataObjectRow" } },
+        "not_applicable_reason": { "type": "string" }
+      }
+    },
+    "interfaceIndexRow": {
+      "type": "object",
+      "required": ["interface_id", "interface_name", "interface_type", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "interface_id": { "$ref": "#/$defs/nonEmptyString" },
+        "interface_name": { "$ref": "#/$defs/nonEmptyString" },
+        "interface_type": { "$ref": "#/$defs/interfaceType" },
+        "description": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "interfaceIndexTable": {
+      "type": "object",
+      "required": ["rows"],
+      "additionalProperties": false,
+      "properties": {
+        "rows": { "type": "array", "items": { "$ref": "#/$defs/interfaceIndexRow" } }
+      }
+    },
+    "interfaceLocation": {
+      "type": "object",
+      "required": ["file_path"],
+      "additionalProperties": false,
+      "properties": {
+        "file_path": { "$ref": "#/$defs/nonEmptyString" },
+        "symbol": { "type": "string" },
+        "line_start": { "type": ["integer", "null"], "minimum": 1 },
+        "line_end": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    },
+    "interfaceParameterRow": {
+      "type": "object",
+      "required": ["parameter_name", "parameter_type", "description", "direction"],
+      "additionalProperties": false,
+      "properties": {
+        "parameter_name": { "$ref": "#/$defs/nonEmptyString" },
+        "parameter_type": { "$ref": "#/$defs/nonEmptyString" },
+        "description": { "$ref": "#/$defs/nonEmptyString" },
+        "direction": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "interfaceParameterTable": {
+      "type": "object",
+      "required": ["rows", "not_applicable_reason"],
+      "additionalProperties": false,
+      "properties": {
+        "rows": { "type": "array", "items": { "$ref": "#/$defs/interfaceParameterRow" } },
+        "not_applicable_reason": { "type": "string" }
+      }
+    },
+    "interfaceReturnRow": {
+      "type": "object",
+      "required": ["return_name", "return_type", "description", "condition"],
+      "additionalProperties": false,
+      "properties": {
+        "return_name": { "$ref": "#/$defs/nonEmptyString" },
+        "return_type": { "$ref": "#/$defs/nonEmptyString" },
+        "description": { "$ref": "#/$defs/nonEmptyString" },
+        "condition": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "interfaceReturnTable": {
+      "type": "object",
+      "required": ["rows", "not_applicable_reason"],
+      "additionalProperties": false,
+      "properties": {
+        "rows": { "type": "array", "items": { "$ref": "#/$defs/interfaceReturnRow" } },
+        "not_applicable_reason": { "type": "string" }
+      }
+    },
+    "interfaceErrorBehavior": {
+      "type": "object",
+      "required": ["condition", "behavior"],
+      "additionalProperties": false,
+      "properties": {
+        "condition": { "$ref": "#/$defs/nonEmptyString" },
+        "behavior": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "interfaceContract": {
+      "type": "object",
+      "required": ["contract_scope", "contract_location", "required_items", "consumers", "validation_behavior"],
+      "additionalProperties": false,
+      "properties": {
+        "contract_scope": { "$ref": "#/$defs/nonEmptyString" },
+        "contract_location": { "$ref": "#/$defs/nonEmptyString" },
+        "required_items": { "$ref": "#/$defs/stringArray" },
+        "constraints": { "$ref": "#/$defs/stringArray" },
+        "consumers": { "$ref": "#/$defs/stringArray" },
+        "validation_behavior": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "interfaceDetail": {
+      "type": "object",
+      "required": ["interface_id", "interface_name", "interface_type", "purpose", "location", "confidence", "evidence_refs"],
+      "additionalProperties": false,
+      "properties": {
+        "interface_id": { "$ref": "#/$defs/nonEmptyString" },
+        "interface_name": { "$ref": "#/$defs/nonEmptyString" },
+        "interface_type": { "$ref": "#/$defs/interfaceType" },
+        "interface_type_reason": { "type": "string" },
+        "prototype": { "$ref": "#/$defs/nonEmptyString" },
+        "purpose": { "$ref": "#/$defs/nonEmptyString" },
+        "location": { "$ref": "#/$defs/interfaceLocation" },
+        "parameters": { "$ref": "#/$defs/interfaceParameterTable" },
+        "return_values": { "$ref": "#/$defs/interfaceReturnTable" },
+        "execution_flow_diagram": { "$ref": "#/$defs/diagram" },
+        "side_effects": { "$ref": "#/$defs/stringArray" },
+        "error_behavior": { "type": "array", "items": { "$ref": "#/$defs/interfaceErrorBehavior" } },
+        "consumers": { "$ref": "#/$defs/stringArray" },
+        "contract": { "$ref": "#/$defs/interfaceContract" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "interface_type": { "enum": ["command_line", "function", "method", "library_api", "workflow"] } }, "required": ["interface_type"] },
+          "then": { "required": ["prototype", "parameters", "return_values", "execution_flow_diagram", "side_effects", "error_behavior", "consumers"] }
+        },
+        {
+          "if": { "properties": { "interface_type": { "enum": ["schema_contract", "dsl_contract", "document_contract", "configuration_contract", "data_contract", "test_fixture"] } }, "required": ["interface_type"] },
+          "then": {
+            "required": ["contract"],
+            "not": {
+              "anyOf": [
+                { "required": ["parameters"] },
+                { "required": ["return_values"] },
+                { "required": ["execution_flow_diagram"] }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "publicInterfaces": {
+      "type": "object",
+      "required": ["summary", "interface_index", "interfaces", "not_applicable_reason"],
+      "additionalProperties": false,
+      "properties": {
+        "summary": { "$ref": "#/$defs/nonEmptyString" },
+        "interface_index": { "$ref": "#/$defs/interfaceIndexTable" },
+        "interfaces": { "type": "array", "items": { "$ref": "#/$defs/interfaceDetail" } },
+        "not_applicable_reason": { "type": "string" }
+      }
+    },
+    "typedRelatedAnchor": {
+      "type": "object",
+      "required": ["anchor_type", "value", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "anchor_type": { "$ref": "#/$defs/anchorType" },
+        "value": { "$ref": "#/$defs/nonEmptyString" },
+        "reason": { "type": "string" }
+      }
+    },
+    "mechanismIndexRow": {
+      "type": "object",
+      "required": ["mechanism_id", "mechanism_name", "purpose", "input", "processing", "output", "structural_significance", "related_anchors", "confidence", "evidence_refs", "traceability_refs", "source_snippet_refs"],
+      "additionalProperties": false,
+      "properties": {
+        "mechanism_id": { "$ref": "#/$defs/nonEmptyString" },
+        "mechanism_name": { "$ref": "#/$defs/nonEmptyString" },
+        "purpose": { "$ref": "#/$defs/nonEmptyString" },
+        "input": { "$ref": "#/$defs/nonEmptyString" },
+        "processing": { "$ref": "#/$defs/nonEmptyString" },
+        "output": { "$ref": "#/$defs/nonEmptyString" },
+        "structural_significance": { "$ref": "#/$defs/nonEmptyString" },
+        "related_anchors": { "type": "array", "items": { "$ref": "#/$defs/typedRelatedAnchor" } },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" },
+        "traceability_refs": { "$ref": "#/$defs/referenceArray" },
+        "source_snippet_refs": { "$ref": "#/$defs/referenceArray" }
+      }
+    },
+    "mechanismIndexTable": {
+      "type": "object",
+      "required": ["rows", "not_applicable_reason"],
+      "additionalProperties": false,
+      "properties": {
+        "rows": { "type": "array", "items": { "$ref": "#/$defs/mechanismIndexRow" } },
+        "not_applicable_reason": { "type": "string" }
+      }
+    },
+    "mechanismTextBlock": {
+      "type": "object",
+      "required": ["block_id", "block_type", "title", "text", "confidence", "evidence_refs", "traceability_refs", "source_snippet_refs"],
+      "additionalProperties": false,
+      "properties": {
+        "block_id": { "$ref": "#/$defs/nonEmptyString" },
+        "block_type": { "const": "text" },
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "text": { "$ref": "#/$defs/nonEmptyString" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" },
+        "traceability_refs": { "$ref": "#/$defs/referenceArray" },
+        "source_snippet_refs": { "$ref": "#/$defs/referenceArray" }
+      }
+    },
+    "mechanismDetail": {
+      "type": "object",
+      "required": ["mechanism_id", "blocks"],
+      "additionalProperties": false,
+      "properties": {
+        "mechanism_id": { "$ref": "#/$defs/nonEmptyString" },
+        "blocks": { "type": "array", "items": { "$ref": "#/$defs/mechanismTextBlock" } }
+      }
+    },
+    "internalMechanism": {
+      "type": "object",
+      "required": ["summary", "mechanism_index", "mechanism_details", "not_applicable_reason"],
+      "additionalProperties": false,
+      "properties": {
+        "summary": { "type": "string" },
+        "mechanism_index": { "$ref": "#/$defs/mechanismIndexTable" },
+        "mechanism_details": { "type": "array", "items": { "$ref": "#/$defs/mechanismDetail" } },
+        "not_applicable_reason": { "type": "string" }
+      }
+    },
+    "knownLimitationRow": {
+      "type": "object",
+      "required": ["limitation_id", "limitation", "impact", "mitigation_or_next_step", "confidence", "evidence_refs"],
+      "additionalProperties": false,
+      "properties": {
+        "limitation_id": { "$ref": "#/$defs/nonEmptyString" },
+        "limitation": { "$ref": "#/$defs/nonEmptyString" },
+        "impact": { "$ref": "#/$defs/nonEmptyString" },
+        "mitigation_or_next_step": { "$ref": "#/$defs/nonEmptyString" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" }
+      }
+    },
+    "knownLimitations": {
+      "type": "object",
+      "required": ["summary", "rows", "not_applicable_reason"],
+      "additionalProperties": false,
+      "properties": {
+        "summary": { "type": "string" },
+        "rows": { "type": "array", "items": { "$ref": "#/$defs/knownLimitationRow" } },
+        "not_applicable_reason": { "type": "string" }
+      }
+    },
     "moduleDesignItem": {
       "type": "object",
-      "required": ["module_id", "name", "summary", "responsibilities", "external_capability_summary", "external_capability_details", "internal_structure", "extra_tables", "extra_diagrams", "evidence_refs", "traceability_refs", "source_snippet_refs", "notes", "confidence"],
+      "required": ["module_id", "name", "module_kind", "summary", "source_scope", "configuration", "dependencies", "data_objects", "public_interfaces", "internal_mechanism", "known_limitations", "evidence_refs", "traceability_refs", "source_snippet_refs", "notes", "confidence"],
       "additionalProperties": false,
       "properties": {
         "module_id": { "$ref": "#/$defs/nonEmptyString" },
         "name": { "$ref": "#/$defs/nonEmptyString" },
+        "module_kind": { "$ref": "#/$defs/moduleKind" },
+        "module_kind_reason": { "type": "string" },
         "summary": { "$ref": "#/$defs/nonEmptyString" },
-        "responsibilities": { "$ref": "#/$defs/stringArray" },
-        "external_capability_summary": { "$ref": "#/$defs/externalCapabilitySummary" },
-        "external_capability_details": { "$ref": "#/$defs/externalCapabilityDetails" },
-        "internal_structure": { "$ref": "#/$defs/internalStructure" },
-        "extra_tables": { "$ref": "#/$defs/extraTables" },
-        "extra_diagrams": { "$ref": "#/$defs/extraDiagrams" },
+        "source_scope": { "$ref": "#/$defs/moduleSourceScope" },
+        "configuration": { "$ref": "#/$defs/moduleConfiguration" },
+        "dependencies": { "$ref": "#/$defs/moduleDependencies" },
+        "data_objects": { "$ref": "#/$defs/moduleDataObjects" },
+        "public_interfaces": { "$ref": "#/$defs/publicInterfaces" },
+        "internal_mechanism": { "$ref": "#/$defs/internalMechanism" },
+        "known_limitations": { "$ref": "#/$defs/knownLimitations" },
         "evidence_refs": { "$ref": "#/$defs/referenceArray" },
         "traceability_refs": { "$ref": "#/$defs/referenceArray" },
         "source_snippet_refs": { "$ref": "#/$defs/referenceArray" },
@@ -311,17 +664,15 @@
     },
     "runtimeUnitRow": {
       "type": "object",
-      "required": ["unit_id", "unit_name", "unit_type", "entrypoint", "entrypoint_not_applicable_reason", "responsibility", "related_module_ids", "external_environment_reason", "notes", "confidence", "evidence_refs", "traceability_refs", "source_snippet_refs"],
+      "required": ["unit_id", "unit_name", "unit_type", "entrypoint", "responsibility", "related_module_ids", "notes", "confidence", "evidence_refs", "traceability_refs", "source_snippet_refs"],
       "additionalProperties": false,
       "properties": {
         "unit_id": { "$ref": "#/$defs/nonEmptyString" },
         "unit_name": { "$ref": "#/$defs/nonEmptyString" },
         "unit_type": { "$ref": "#/$defs/nonEmptyString" },
         "entrypoint": { "type": "string" },
-        "entrypoint_not_applicable_reason": { "type": "string" },
         "responsibility": { "$ref": "#/$defs/nonEmptyString" },
         "related_module_ids": { "$ref": "#/$defs/referenceArray" },
-        "external_environment_reason": { "type": "string" },
         "notes": { "type": "string" },
         "confidence": { "$ref": "#/$defs/confidence" },
         "evidence_refs": { "$ref": "#/$defs/referenceArray" },
