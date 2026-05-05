@@ -500,26 +500,7 @@
         "contract": { "$ref": "#/$defs/interfaceContract" },
         "confidence": { "$ref": "#/$defs/confidence" },
         "evidence_refs": { "$ref": "#/$defs/referenceArray" }
-      },
-      "allOf": [
-        {
-          "if": { "properties": { "interface_type": { "enum": ["command_line", "function", "method", "library_api", "workflow"] } }, "required": ["interface_type"] },
-          "then": { "required": ["prototype", "parameters", "return_values", "execution_flow_diagram", "side_effects", "error_behavior", "consumers"] }
-        },
-        {
-          "if": { "properties": { "interface_type": { "enum": ["schema_contract", "dsl_contract", "document_contract", "configuration_contract", "data_contract", "test_fixture"] } }, "required": ["interface_type"] },
-          "then": {
-            "required": ["contract"],
-            "not": {
-              "anyOf": [
-                { "required": ["parameters"] },
-                { "required": ["return_values"] },
-                { "required": ["execution_flow_diagram"] }
-              ]
-            }
-          }
-        }
-      ]
+      }
     },
     "publicInterfaces": {
       "type": "object",
