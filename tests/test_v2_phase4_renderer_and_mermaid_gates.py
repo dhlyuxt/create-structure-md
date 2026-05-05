@@ -3,6 +3,7 @@ import importlib.util
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -597,12 +598,60 @@ class Phase4StrictRenderedMarkdownTests(unittest.TestCase):
         self.assertEqual(expected_argv, normalized_argv)
 
 
+MERMAID_BROWSER_LAUNCH_FAILURE_PATTERNS = [
+    "Failed to launch the browser process",
+    "Operation not permitted",
+    "No usable sandbox",
+]
+
+
+def strict_mermaid_cli_probe_result(tmpdir):
+    if shutil.which("mmdc") is None:
+        return "fail", "mmdc unavailable; strict Mermaid validation cannot be accepted"
+    if shutil.which("node") is None:
+        return "fail", "node unavailable; strict Mermaid validation cannot be accepted"
+
+    probe_markdown = Path(tmpdir) / "probe.md"
+    probe_markdown.write_text(
+        "```mermaid\nflowchart TD\n  A[Probe] --> B[OK]\n```\n",
+        encoding="utf-8",
+    )
+    completed = subprocess.run(
+        [
+            PYTHON,
+            str(ROOT / "scripts/validate_mermaid.py"),
+            "--from-markdown",
+            str(probe_markdown),
+            "--strict",
+            "--work-dir",
+            str(Path(tmpdir) / "probe-work"),
+        ],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if completed.returncode == 0:
+        return "ok", ""
+    combined = completed.stdout + completed.stderr
+    browser_launch_failed = any(
+        pattern in combined
+        for pattern in MERMAID_BROWSER_LAUNCH_FAILURE_PATTERNS
+        if pattern != "Operation not permitted"
+    )
+    browser_sandbox_denied = "Operation not permitted" in combined
+    if browser_launch_failed and browser_sandbox_denied:
+        return "skip", "mmdc browser launch unavailable in this environment"
+    return "fail", combined
+
+
 class Phase4RealStrictRenderedMarkdownTests(unittest.TestCase):
     def test_rendered_markdown_passes_real_strict_validation_when_cli_available(self):
-        import shutil
-
-        if shutil.which("node") is None or shutil.which("mmdc") is None:
-            self.skipTest("node or mmdc unavailable")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            probe_status, probe_detail = strict_mermaid_cli_probe_result(tmpdir)
+            if probe_status == "skip":
+                self.skipTest(probe_detail)
+            self.assertEqual("ok", probe_status, probe_detail)
 
         renderer = load_script("scripts/render_markdown.py", "render_markdown_real_strict_under_test")
         document = valid_document()

@@ -63,6 +63,48 @@ def preserved_process_env(run_dir):
     return env
 
 
+MERMAID_BROWSER_LAUNCH_FAILURE_PATTERNS = [
+    "Failed to launch the browser process",
+    "Operation not permitted",
+    "No usable sandbox",
+]
+
+
+def strict_mermaid_cli_probe_result(run_dir):
+    if shutil.which("mmdc") is None:
+        return "fail", "mmdc unavailable; strict Mermaid validation cannot be accepted"
+    if shutil.which("node") is None:
+        return "fail", "node unavailable; strict Mermaid validation cannot be accepted"
+
+    probe_dir = run_dir / "mermaid-probe"
+    probe_markdown = run_dir / "mermaid-probe.md"
+    probe_markdown.write_text(
+        "```mermaid\nflowchart TD\n  A[Probe] --> B[OK]\n```\n",
+        encoding="utf-8",
+    )
+    completed = run_command(
+        "scripts/validate_mermaid.py",
+        "--from-markdown",
+        probe_markdown,
+        "--strict",
+        "--work-dir",
+        probe_dir,
+        env=preserved_process_env(run_dir),
+    )
+    if completed.returncode == 0:
+        return "ok", ""
+    combined = completed.stdout + completed.stderr
+    browser_launch_failed = any(
+        pattern in combined
+        for pattern in MERMAID_BROWSER_LAUNCH_FAILURE_PATTERNS
+        if pattern != "Operation not permitted"
+    )
+    browser_sandbox_denied = "Operation not permitted" in combined
+    if browser_launch_failed and browser_sandbox_denied:
+        return "skip", "mmdc browser launch unavailable in this environment"
+    return "fail", combined
+
+
 def run_command(*args, env=None):
     return subprocess.run(
         [PYTHON, *map(str, args)],
@@ -756,10 +798,11 @@ class Phase7StrictMermaidAndFallbackTests(Phase7Phase4ArtifactMixin, unittest.Te
                     )
 
     def test_examples_pass_strict_mermaid_workflow_with_real_cli_when_available(self):
-        if shutil.which("mmdc") is None:
-            self.skipTest("mmdc unavailable")
-        if shutil.which("node") is None:
-            self.skipTest("node unavailable")
+        probe_run_dir = make_run_dir("strict-mermaid-probe")
+        probe_status, probe_detail = strict_mermaid_cli_probe_result(probe_run_dir)
+        if probe_status == "skip":
+            self.skipTest(probe_detail)
+        self.assertEqual("ok", probe_status, probe_detail)
 
         for dsl_path in EXAMPLE_PATHS:
             with self.subTest(path=dsl_path.name):
