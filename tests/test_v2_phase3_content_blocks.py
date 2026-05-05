@@ -428,9 +428,16 @@ class Phase3RenderingTests(unittest.TestCase):
         self.assertNotIn("#### 内部表元数据标题", markdown)
 
     def test_chapter_9_diagram_block_renders_under_structure_issues(self):
-        markdown = self.markdown()
+        document = valid_document()
+        block = document["structure_issues_and_suggestions"]["blocks"][1]
+        block["title"] = "可见结构问题图标题"
+        block["diagram"]["title"] = "内部结构问题图元数据标题"
+        block["diagram"]["description"] = "结构问题图说明仍渲染。"
+        markdown = self.markdown(document)
         section = markdown[markdown.index("### 9.4 结构问题与改进建议") :]
-        self.assertIn("#### 结构问题关系图", section)
+        self.assertIn("#### 可见结构问题图标题", section)
+        self.assertNotIn("内部结构问题图元数据标题", section)
+        self.assertIn("结构问题图说明仍渲染。", section)
         self.assertIn("```mermaid\nflowchart TD", section)
 
     def test_chapter_4_diagram_block_uses_block_title_without_breaking_heading_hierarchy(self):
@@ -438,9 +445,12 @@ class Phase3RenderingTests(unittest.TestCase):
         block = document["module_design"]["modules"][0]["internal_mechanism"]["mechanism_details"][0]["blocks"][1]
         block["title"] = "可见图标题"
         block["diagram"]["title"] = "内部图元数据标题"
+        block["diagram"]["description"] = "图说明仍渲染。"
         markdown = self.markdown(document)
         self.assertIn("**可见图标题**", markdown)
-        self.assertIn("内部图元数据标题", markdown)
+        self.assertNotIn("内部图元数据标题", markdown)
+        self.assertIn("图说明仍渲染。", markdown)
+        self.assertIn('A["DSL JSON"] --> B["Version gate"]', markdown)
 
     def test_chapter_9_summary_renders_before_blocks(self):
         markdown = self.markdown()

@@ -433,7 +433,9 @@ def render_content_block(block, support_context, title_style="heading4"):
     if block_type == "text":
         body = render_paragraph(block.get("text", ""))
     elif block_type == "diagram":
-        body = render_mermaid_block(block.get("diagram", {}))
+        untitled_diagram = dict(block.get("diagram", {}))
+        untitled_diagram["title"] = ""
+        body = render_mermaid_block(untitled_diagram)
     elif block_type == "table":
         body = render_content_block_table(block.get("table", {}))
     else:
