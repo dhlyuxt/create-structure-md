@@ -164,6 +164,12 @@
                 "description": "校验 DSL JSON 的 schema 和语义规则。"
               },
               {
+                "interface_id": "IFACE-SKILL-RENDER-CLI",
+                "interface_name": "render_markdown.py",
+                "interface_type": "command_line",
+                "description": "把通过校验的 DSL 渲染为最终 Markdown 文件。"
+              },
+              {
                 "interface_id": "IFACE-SKILL-DSL-CONTRACT",
                 "interface_name": "structure-design.schema.json",
                 "interface_type": "schema_contract",
@@ -200,6 +206,66 @@
                 ],
                 "validation_behavior": "违反契约时 validate_dsl.py 返回非 0。"
               },
+              "confidence": "observed",
+              "evidence_refs": []
+            },
+            {
+              "interface_id": "IFACE-SKILL-RENDER-CLI",
+              "interface_name": "render_markdown.py",
+              "interface_type": "command_line",
+              "prototype": "python3 scripts/render_markdown.py structure.dsl.json --output-dir <dir>",
+              "purpose": "把 DSL 渲染为最终 Markdown 文件。",
+              "location": {
+                "file_path": "scripts/render_markdown.py",
+                "symbol": "main",
+                "line_start": null,
+                "line_end": null
+              },
+              "parameters": {
+                "rows": [
+                  {
+                    "parameter_name": "structure.dsl.json",
+                    "parameter_type": "path",
+                    "description": "待渲染的 DSL JSON 文件路径。",
+                    "direction": "input"
+                  }
+                ],
+                "not_applicable_reason": ""
+              },
+              "return_values": {
+                "rows": [
+                  {
+                    "return_name": "exit_code",
+                    "return_type": "int",
+                    "description": "0 表示成功，非 0 表示失败。",
+                    "condition": "命令结束时返回。"
+                  }
+                ],
+                "not_applicable_reason": ""
+              },
+              "execution_flow_diagram": {
+                "id": "MER-IFACE-SKILL-RENDER-CLI",
+                "kind": "interface_execution_flow",
+                "title": "render_markdown.py 执行流程",
+                "diagram_type": "flowchart",
+                "description": "展示 Markdown 渲染流程。",
+                "source": "flowchart TD\n  A[\"Parse args\"] --> B[\"Load DSL\"]\n  B --> C[\"Render Markdown\"]\n  C --> D[\"Write output\"]",
+                "confidence": "observed"
+              },
+              "side_effects": [
+                "读取 DSL 文件",
+                "写入 Markdown 输出文件"
+              ],
+              "error_behavior": [
+                {
+                  "condition": "DSL 文件不可读",
+                  "behavior": "报告错误并返回非 0 退出码。"
+                }
+              ],
+              "consumers": [
+                "Codex",
+                "仓库维护者"
+              ],
               "confidence": "observed",
               "evidence_refs": []
             },

@@ -1,10 +1,7 @@
-import contextlib
 import importlib.util
-import io
 import json
 import subprocess
 import sys
-import tempfile
 import unittest
 from copy import deepcopy
 from pathlib import Path
@@ -24,12 +21,6 @@ def load_json(path):
 
 def valid_document():
     return deepcopy(load_json(FIXTURE))
-
-
-def write_json(tmpdir, name, document):
-    path = Path(tmpdir) / name
-    path.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
-    return path
 
 
 def run_validator(path):
@@ -52,27 +43,10 @@ def load_renderer_module():
     return module
 
 
-def load_validator_module():
-    spec = importlib.util.spec_from_file_location(
-        "validate_dsl_phase2_under_test",
-        ROOT / "scripts/validate_dsl.py",
-    )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
 def schema_errors(document):
     schema = load_json(SCHEMA)
     Draft202012Validator.check_schema(schema)
     return sorted(Draft202012Validator(schema).iter_errors(document), key=lambda error: list(error.path))
-
-
-def validation_stderr_for(document):
-    with tempfile.TemporaryDirectory() as tmpdir:
-        path = write_json(tmpdir, "case.dsl.json", document)
-        completed = run_validator(path)
-    return completed.returncode, completed.stderr, completed.stdout
 
 
 class Phase2FixtureContractTests(unittest.TestCase):
@@ -95,7 +69,14 @@ class Phase2FixtureContractTests(unittest.TestCase):
             "#### 4.1.6 实现机制说明",
             "#### 4.1.7 已知限制",
         ]
-        positions = [markdown.index(heading) for heading in headings]
+        positions = []
+        for heading in headings:
+            position = markdown.find(heading)
+            with self.subTest(heading=heading):
+                self.assertNotEqual(-1, position, f"missing Phase 2 heading: {heading}")
+            positions.append(position)
+        if -1 in positions:
+            return
         self.assertEqual(sorted(positions), positions)
         self.assertNotIn("模块职责", markdown)
         self.assertNotIn("对外能力说明", markdown)
