@@ -42,10 +42,12 @@ REQUIRED_INPUTS = [
 WORKFLOW_ORDER = [
     "Create a temporary work directory.",
     "Write one complete DSL JSON file",
-    "python scripts/validate_dsl.py structure.dsl.json",
-    "python scripts/validate_mermaid.py --from-dsl structure.dsl.json --strict",
-    "python scripts/render_markdown.py structure.dsl.json --output-dir",
-    "python scripts/validate_mermaid.py --from-markdown <output-file> --static",
+    "python scripts/validate_dsl.py <temporary-work-directory>/structure.dsl.json",
+    "Dispatch an independent Mermaid readability review",
+    "mermaid-readability-review.json",
+    "python scripts/verify_v2_mermaid_gates.py <temporary-work-directory>/structure.dsl.json --mermaid-review-artifact <temporary-work-directory>/mermaid-readability-review.json --pre-render --work-dir <temporary-work-directory>/mermaid",
+    "python scripts/render_markdown.py <temporary-work-directory>/structure.dsl.json --output-dir",
+    "python scripts/verify_v2_mermaid_gates.py <temporary-work-directory>/structure.dsl.json --mermaid-review-artifact <temporary-work-directory>/mermaid-readability-review.json --rendered-markdown <output-file> --post-render --work-dir <temporary-work-directory>/mermaid",
     "references/review-checklist.md",
     "Report output path",
 ]
@@ -284,11 +286,12 @@ class SkillBodyContractTests(unittest.TestCase):
                 positions.append(self.text.index(phrase))
         self.assertEqual(sorted(positions), positions)
 
-    def test_mermaid_strict_and_static_acceptance_rule_is_visible(self):
+    def test_mermaid_phase4_strict_gate_rule_is_visible(self):
         self.assertIn("Strict Mermaid validation is the default", self.text)
-        self.assertIn("If local Mermaid CLI tooling unavailable, stop and ask user before static-only validation", self.text)
-        self.assertIn("Mermaid diagrams were not proven renderable by Mermaid CLI", self.text)
-        self.assertIn("user explicitly accepts static-only validation", self.text)
+        self.assertIn("Mermaid readability artifact is workflow metadata", self.text)
+        self.assertIn("Every rendered Mermaid fence must have an adjacent", self.text)
+        self.assertIn("Static-only Mermaid validation is not final acceptance for V2 Phase 4", self.text)
+        self.assertNotIn("user explicitly accepts static-only validation", self.text)
 
     def test_output_and_temporary_directory_rules_are_visible(self):
         for phrase in [
@@ -1178,14 +1181,12 @@ class MermaidIntegrationRegressionTests(unittest.TestCase):
         self.assertIn("Graphviz", text)
         self.assertIn("DOT", text)
 
-    def test_review_checklist_keeps_strict_or_static_acceptance_boundary_visible(self):
+    def test_review_checklist_keeps_phase4_acceptance_boundary_visible(self):
         text = (ROOT / "references/review-checklist.md").read_text(encoding="utf-8")
         self.assertIn("strict validation", text)
-        self.assertIn("static-only validation", text)
-        self.assertIn("explicit acceptance", text)
-        self.assertIn("strict validation was not performed", text)
-        self.assertIn("local Mermaid CLI tooling unavailable", text)
-        self.assertIn("user accepted static-only validation", text)
+        self.assertIn("Mermaid readability artifact", text)
+        self.assertIn("rendered diagram completeness", text)
+        self.assertIn("Static-only Mermaid validation is not final acceptance", text)
 
 
 if __name__ == "__main__":

@@ -181,7 +181,9 @@ class Phase7ReferenceDocumentationTests(unittest.TestCase):
             "`--backup`",
             "Mermaid-only diagram output",
             "strict Mermaid validation",
-            "static-only Mermaid fallback reporting",
+            "Mermaid readability artifact",
+            "rendered diagram completeness",
+            "strict rendered Markdown validation",
             "Graphviz fully removed",
             "no final image artifacts",
             "no Jinja2",
@@ -197,18 +199,17 @@ class Phase7ReferenceDocumentationTests(unittest.TestCase):
     SKILL_WORKFLOW_PHRASES = [
         "Create a temporary work directory.",
         "Read references/dsl-spec.md before writing DSL content.",
-        "Write one complete DSL JSON file.",
-        "Run `python scripts/validate_dsl.py structure.dsl.json`.",
+        "Write one complete DSL JSON file at `<temporary-work-directory>/structure.dsl.json`.",
+        "Run `python scripts/validate_dsl.py <temporary-work-directory>/structure.dsl.json`.",
         "Read references/mermaid-rules.md before creating/revising Mermaid.",
-        "Run `python scripts/validate_mermaid.py --from-dsl structure.dsl.json --strict --work-dir <temporary-work-directory>/mermaid`.",
-        "Render exactly one document with `python scripts/render_markdown.py structure.dsl.json --output-dir <output-dir>`.",
-        "Run `python scripts/validate_mermaid.py --from-markdown <output-file> --static`.",
+        "Dispatch an independent Mermaid readability review subagent.",
+        "Write `<temporary-work-directory>/mermaid-readability-review.json`.",
+        "Run `python scripts/verify_v2_mermaid_gates.py <temporary-work-directory>/structure.dsl.json --mermaid-review-artifact <temporary-work-directory>/mermaid-readability-review.json --pre-render --work-dir <temporary-work-directory>/mermaid`.",
+        "Render exactly one document with `python scripts/render_markdown.py <temporary-work-directory>/structure.dsl.json --output-dir <output-dir>`.",
+        "Run `python scripts/verify_v2_mermaid_gates.py <temporary-work-directory>/structure.dsl.json --mermaid-review-artifact <temporary-work-directory>/mermaid-readability-review.json --rendered-markdown <output-file> --post-render --work-dir <temporary-work-directory>/mermaid`.",
         "Review with references/review-checklist.md.",
-        "Report output path, temporary work directory, assumptions, low-confidence items, and static-only Mermaid acceptance.",
-        "if local Mermaid CLI tooling unavailable, stop and ask user before static-only validation",
-        "Mermaid diagrams were not proven renderable by Mermaid CLI",
-        "tooling unavailable",
-        "user explicitly accepts static-only validation",
+        "Report output path, temporary work directory, assumptions, low-confidence items, and Mermaid gate results.",
+        "Static-only Mermaid validation is not final acceptance for V2 Phase 4",
         "references/dsl-spec.md",
         "references/document-structure.md",
         "references/mermaid-rules.md",
@@ -542,7 +543,34 @@ def assert_markers_in_order(testcase, text, markers):
     testcase.assertEqual(sorted(positions), positions)
 
 
-class Phase7EndToEndWorkflowTests(unittest.TestCase):
+class Phase7Phase4ArtifactMixin:
+    def write_phase4_review_artifact(self, dsl_path, document, run_dir):
+        phase4 = load_script_module("scripts/v2_phase4.py", "phase7_v2_phase4_under_test")
+        expected_ids = {
+            diagram.diagram_id
+            for diagram in phase4.collect_expected_diagrams(document)
+            if diagram.should_render
+        }
+        artifact = {
+            "artifact_schema_version": "1.0",
+            "reviewer": "phase7-e2e-test",
+            "source_dsl": str(dsl_path),
+            "checked_diagram_ids": sorted(expected_ids),
+            "accepted_diagram_ids": sorted(expected_ids),
+            "revised_diagram_ids": [],
+            "split_diagram_ids": [],
+            "skipped_diagrams": [],
+            "remaining_readability_risks": [],
+        }
+        artifact_path = run_dir / "mermaid-readability-review.json"
+        artifact_path.write_text(
+            json.dumps(artifact, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        return artifact_path
+
+
+class Phase7EndToEndWorkflowTests(Phase7Phase4ArtifactMixin, unittest.TestCase):
     def load_example(self, dsl_path):
         return json.loads(dsl_path.read_text(encoding="utf-8"))
 
@@ -578,7 +606,11 @@ class Phase7EndToEndWorkflowTests(unittest.TestCase):
             run_command("scripts/validate_mermaid.py", "--from-markdown", output_path, "--static"),
             f"validate_mermaid.py --from-markdown {output_path.name} --static",
         )
-        return document, output_path, output_path.read_text(encoding="utf-8")
+        markdown = output_path.read_text(encoding="utf-8")
+        phase4 = load_script_module("scripts/v2_phase4.py", "phase7_v2_phase4_completeness_under_test")
+        self.assertEqual([], phase4.rendered_diagram_completeness_errors(document, markdown))
+        self.assertIn("<!-- diagram-id:", markdown)
+        return document, output_path, markdown
 
     def test_static_workflow_validates_renders_and_revalidates_examples(self):
         for dsl_path in EXAMPLE_PATHS:
@@ -620,58 +652,62 @@ class Phase7EndToEndWorkflowTests(unittest.TestCase):
                 )
 
 
-class Phase7StrictMermaidAndFallbackTests(unittest.TestCase):
+class Phase7StrictMermaidAndFallbackTests(Phase7Phase4ArtifactMixin, unittest.TestCase):
     def test_examples_orchestrate_strict_mermaid_cli_invocations_when_cli_is_available(self):
-        module = load_script_module("scripts/validate_mermaid.py", "phase7_validate_mermaid_under_test")
-        mmdc_path = "/usr/local/bin/mmdc"
-
-        def fake_which(name):
-            return {
-                "node": "/usr/bin/node",
-                "mmdc": mmdc_path,
-            }.get(name)
-
-        completed = subprocess.CompletedProcess(["mmdc"], 0, stdout="", stderr="")
-        with (
-            mock.patch.object(module.shutil, "which", side_effect=fake_which),
-            mock.patch.object(module.subprocess, "run", return_value=completed) as run_mmdc,
-        ):
-            for dsl_path in EXAMPLE_PATHS:
-                with self.subTest(path=dsl_path.name):
-                    document = json.loads(dsl_path.read_text(encoding="utf-8"))
-                    diagrams = module.extract_diagrams_from_dsl(document)
-                    work_dir = make_run_dir(f"{dsl_path.stem}-strict-orchestration") / "mermaid-work"
-                    run_mmdc.reset_mock()
+        module = load_script_module("scripts/verify_v2_mermaid_gates.py", "phase7_verify_v2_mermaid_gates_under_test")
+        completed = subprocess.CompletedProcess(
+            [PYTHON, str(ROOT / "scripts/validate_mermaid.py")],
+            0,
+            stdout="Mermaid validation succeeded\n",
+            stderr="",
+        )
+        for dsl_path in EXAMPLE_PATHS:
+            with self.subTest(path=dsl_path.name):
+                document = json.loads(dsl_path.read_text(encoding="utf-8"))
+                run_dir = make_run_dir(f"{dsl_path.stem}-strict-orchestration")
+                render = run_command(
+                    "scripts/render_markdown.py",
+                    dsl_path,
+                    "--output-dir",
+                    run_dir,
+                    "--overwrite",
+                )
+                self.assertEqual(0, render.returncode, render.stderr)
+                output_path = run_dir / document["document"]["output_file"]
+                artifact_path = self.write_phase4_review_artifact(dsl_path, document, run_dir)
+                work_dir = run_dir / "mermaid"
+                with mock.patch.object(module.subprocess, "run", return_value=completed) as run_validator:
                     code, stdout, stderr = call_main(
                         module,
                         [
-                            "--from-dsl",
                             str(dsl_path),
-                            "--strict",
+                            "--mermaid-review-artifact",
+                            str(artifact_path),
+                            "--rendered-markdown",
+                            str(output_path),
+                            "--post-render",
                             "--work-dir",
                             str(work_dir),
                         ],
                     )
                     self.assertEqual(0, code, f"STDOUT:\n{stdout}\nSTDERR:\n{stderr}")
-                    self.assertIn("strict mode", stdout)
+                    self.assertIn("Mermaid validation succeeded", stdout)
                     self.assertEqual("", stderr)
-                    self.assertEqual(len(diagrams), run_mmdc.call_count)
-                    expected_calls = [
-                        mock.call(
-                            [
-                                mmdc_path,
-                                "-i",
-                                str(work_dir / f"{module.safe_artifact_stem(diagram)}.mmd"),
-                                "-o",
-                                str(work_dir / f"{module.safe_artifact_stem(diagram)}.svg"),
-                            ],
-                            text=True,
-                            capture_output=True,
-                            check=False,
-                        )
-                        for diagram in diagrams
-                    ]
-                    self.assertEqual(expected_calls, run_mmdc.call_args_list)
+                    run_validator.assert_called_once_with(
+                        [
+                            sys.executable,
+                            str(ROOT / "scripts/validate_mermaid.py"),
+                            "--from-markdown",
+                            str(output_path),
+                            "--strict",
+                            "--work-dir",
+                            str(work_dir / "post-render"),
+                        ],
+                        cwd=ROOT,
+                        text=True,
+                        capture_output=True,
+                        check=False,
+                    )
 
     def test_examples_pass_strict_mermaid_workflow_with_real_cli_when_available(self):
         if shutil.which("mmdc") is None:
@@ -682,23 +718,53 @@ class Phase7StrictMermaidAndFallbackTests(unittest.TestCase):
         for dsl_path in EXAMPLE_PATHS:
             with self.subTest(path=dsl_path.name):
                 run_dir = make_run_dir(f"{dsl_path.stem}-strict-real-cli")
-                work_dir = run_dir / "mermaid-work"
-                completed = run_command(
-                    "scripts/validate_mermaid.py",
-                    "--from-dsl",
+                document = json.loads(dsl_path.read_text(encoding="utf-8"))
+                artifact_path = self.write_phase4_review_artifact(dsl_path, document, run_dir)
+                work_dir = run_dir / "mermaid"
+                pre_render = run_command(
+                    "scripts/verify_v2_mermaid_gates.py",
                     dsl_path,
-                    "--strict",
+                    "--mermaid-review-artifact",
+                    artifact_path,
+                    "--pre-render",
                     "--work-dir",
                     work_dir,
                     env=preserved_process_env(run_dir),
                 )
                 self.assertEqual(
                     0,
-                    completed.returncode,
-                    f"STDOUT:\n{completed.stdout}\nSTDERR:\n{completed.stderr}",
+                    pre_render.returncode,
+                    f"STDOUT:\n{pre_render.stdout}\nSTDERR:\n{pre_render.stderr}",
+                )
+                render = run_command(
+                    "scripts/render_markdown.py",
+                    dsl_path,
+                    "--output-dir",
+                    run_dir,
+                    "--overwrite",
+                    env=preserved_process_env(run_dir),
+                )
+                self.assertEqual(0, render.returncode, render.stderr)
+                output_path = run_dir / document["document"]["output_file"]
+                post_render = run_command(
+                    "scripts/verify_v2_mermaid_gates.py",
+                    dsl_path,
+                    "--mermaid-review-artifact",
+                    artifact_path,
+                    "--rendered-markdown",
+                    output_path,
+                    "--post-render",
+                    "--work-dir",
+                    work_dir,
+                    env=preserved_process_env(run_dir),
+                )
+                self.assertEqual(
+                    0,
+                    post_render.returncode,
+                    f"STDOUT:\n{post_render.stdout}\nSTDERR:\n{post_render.stderr}",
                 )
 
-    def test_check_env_and_reference_docs_cover_static_only_fallback(self):
+    def test_check_env_and_reference_docs_cover_phase4_static_boundary(self):
         module = load_script_module("scripts/validate_mermaid.py", "phase7_validate_mermaid_env_under_test")
         with mock.patch.object(
             module.shutil,
@@ -719,17 +785,12 @@ class Phase7StrictMermaidAndFallbackTests(unittest.TestCase):
                 "references/review-checklist.md",
             ]
         ).casefold()
-        fallback_phrase_options = [
-            (
-                "ask the user before using static-only validation",
-                "ask user before using static-only validation",
-            ),
-            ("user accepted static-only validation",),
-            ("Mermaid diagrams were not proven renderable by Mermaid CLI",),
+        required_phrases = [
+            "Static-only Mermaid validation is not final acceptance for V2 Phase 4",
+            "Mermaid readability artifact",
+            "rendered diagram completeness",
+            "strict rendered Markdown validation",
         ]
-        for phrase_options in fallback_phrase_options:
-            with self.subTest(phrase=phrase_options[0]):
-                self.assertTrue(
-                    any(phrase.casefold() in combined_docs for phrase in phrase_options),
-                    f"missing one of: {phrase_options}",
-                )
+        for phrase in required_phrases:
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase.casefold(), combined_docs)

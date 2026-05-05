@@ -827,7 +827,7 @@ class MarkdownPrimitiveTests(unittest.TestCase):
             "source": "flowchart TD\n  A --> B",
         }
         rendered = module.render_mermaid_block(diagram, empty_text="无图。")
-        self.assertIn("```mermaid\nflowchart TD\n  A --> B\n```", rendered)
+        self.assertIn("<!-- diagram-id: MER-TEST -->\n```mermaid\nflowchart TD\n  A --> B\n```", rendered)
         self.assertEqual(1, rendered.count("```mermaid"))
         self.assertEqual(2, rendered.count("```"))
 
@@ -883,6 +883,15 @@ class MarkdownPrimitiveTests(unittest.TestCase):
                 self.assertNotIn("```python", rendered)
                 self.assertNotIn("javascript", rendered)
                 self.assertNotIn("py`thon", rendered)
+
+
+class RendererPhase4DiagramMetadataTests(unittest.TestCase):
+    def test_renderer_rejects_unsafe_diagram_id_metadata_comment(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["architecture_views"]["module_relationship_diagram"]["id"] = "MER-BAD--COMMENT"
+        with self.assertRaisesRegex(module.RenderError, "unsafe Mermaid diagram"):
+            module.render_markdown(document)
 
 
 class SupportDataPrimitiveTests(unittest.TestCase):
@@ -1379,7 +1388,10 @@ class ChapterOneToFourRenderingTests(unittest.TestCase):
         self.assertIn("| 项目 | 说明 |", section)
         self.assertIn("A\\|B", section)
         self.assertIn("#### 架构补充图", section)
-        self.assertIn("```mermaid\nflowchart TD\n  ExtraA[补充A] --> ExtraB[补充B]\n```", section)
+        self.assertIn(
+            "<!-- diagram-id: MER-ARCH-EXTRA -->\n```mermaid\nflowchart TD\n  ExtraA[补充A] --> ExtraB[补充B]\n```",
+            section,
+        )
         self.assertNotIn("无补充内容。", section)
 
 
@@ -1536,7 +1548,10 @@ class ChapterFiveToEightRenderingTests(unittest.TestCase):
         self.assertIn("| 项目 | 说明 |", intro_to_index)
         self.assertIn("A\\|B", intro_to_index)
         self.assertIn("#### 关键流程补充图", intro_to_index)
-        self.assertIn("```mermaid\nflowchart TD\n  FlowExtraA[流程补充A] --> FlowExtraB[流程补充B]\n```", intro_to_index)
+        self.assertIn(
+            "<!-- diagram-id: MER-FLOW-EXTRA -->\n```mermaid\nflowchart TD\n  FlowExtraA[流程补充A] --> FlowExtraB[流程补充B]\n```",
+            intro_to_index,
+        )
         self.assertNotIn("无补充内容。", intro_to_index)
         self.assertNotIn("### 8.1.1", intro_to_index)
         self.assertNotIn("### 8.2 补充", intro_to_index)
@@ -1939,6 +1954,7 @@ class RendererIntegrationTests(unittest.TestCase):
             expected_mermaid_sources = collect_non_empty_mermaid_sources(document)
             self.assertGreater(len(expected_mermaid_sources), 0)
             self.assertEqual(len(expected_mermaid_sources), markdown.count("```mermaid"))
+            self.assertIn("<!-- diagram-id:", markdown)
             for source in required_mermaid_sources(document):
                 with self.subTest(required_source=source.splitlines()[0]):
                     self.assertEqual(1, markdown.count(source))
@@ -2076,6 +2092,7 @@ class RendererIntegrationTests(unittest.TestCase):
             self.assertEqual(14, len(parsed_sources))
             self.assertCountEqual(expected_sources, parsed_sources)
             self.assertEqual(14, markdown.count("```mermaid"))
+            self.assertIn("<!-- diagram-id:", markdown)
 
             mermaid = subprocess.run(
                 [PYTHON, str(VALIDATOR), "--from-markdown", str(output_path), "--static"],
@@ -2202,6 +2219,7 @@ class RendererIntegrationTests(unittest.TestCase):
             self.assertIn("````python\n```nested```\nprint('safe fence')\n````", markdown)
             self.assertIn("#### Phase 6 补充表", markdown)
             self.assertIn("#### MER-PHASE-6-EXTRA", markdown)
+            self.assertIn("<!-- diagram-id: MER-PHASE-6-EXTRA -->\n```mermaid", markdown)
 
             mermaid = subprocess.run(
                 [PYTHON, str(VALIDATOR), "--from-markdown", str(output_path), "--static"],
