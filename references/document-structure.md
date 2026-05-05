@@ -93,7 +93,7 @@ The renderer writes into the requested output directory and does not overwrite a
 
 ## Mermaid And Tables
 
-Every non-empty DSL Mermaid source is rendered in exactly one Mermaid code fence. Every rendered Mermaid fence is preceded immediately by `<!-- diagram-id: MER-... -->`. The comment is structural Markdown source metadata, not evidence support data, and it renders regardless of `--evidence-mode`. Rendered diagram completeness checks match expected DSL diagram IDs to these metadata comments. Title-only matches do not count. After rendering, run `verify_v2_mermaid_gates.py --rendered-markdown <output-file> --post-render` to validate rendered diagram completeness and strict rendered Markdown validation.
+Every non-empty DSL Mermaid source is rendered in exactly one Mermaid code fence. Every rendered Mermaid fence is preceded immediately by `<!-- diagram-id: MER-... -->`. The comment is structural Markdown source metadata, not evidence support data, and it renders regardless of `--evidence-mode`. Rendered diagram completeness checks match expected DSL diagram IDs to these metadata comments. Title-only matches do not count. After rendering, run `verify_v2_mermaid_gates.py --rendered-markdown <output-file> --post-render` to validate rendered diagram completeness and strict rendered Markdown validation. The strict post-render gate covers `validate_mermaid.py --from-markdown <output-file>`.
 
 Tables use fixed visible table columns for each section. IDs, confidence, evidence refs, traceability refs, and source snippet refs are hidden from normal tables. They may appear only in chapter 9 risks, assumptions, and low-confidence summaries where review traceability is the purpose.
 

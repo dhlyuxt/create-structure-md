@@ -74,6 +74,7 @@
 - Confirm every Mermaid fence in rendered Markdown has an adjacent `diagram-id` metadata comment.
 - Confirm rendered diagram completeness passed and missing diagrams were not accepted by title-only matches.
 - Confirm strict rendered Markdown validation ran in strict mode.
+- Confirm strict rendered Markdown validation covers `validate_mermaid.py --from-markdown <output-file>`.
 - Confirm rendered Mermaid passes `verify_v2_mermaid_gates.py --rendered-markdown <output-file> --post-render`.
 - Confirm post-render Markdown Mermaid validation was run.
 - Confirm Static-only Mermaid validation is not final acceptance.

@@ -654,7 +654,7 @@
       "line_end": 42,
       "language": "markdown",
       "purpose": "展示技能工作流前三步作为需求示例依据。",
-      "content": "1. Create a temporary work directory.\n2. Read references/dsl-spec.md before writing DSL content.\n3. Write one complete DSL JSON file.",
+      "content": "1. Create a temporary work directory.\n2. Read references/dsl-spec.md before writing DSL content.\n3. Write one complete DSL JSON file at `<temporary-work-directory>/structure.dsl.json`.",
       "confidence": "observed"
     }
   ]
