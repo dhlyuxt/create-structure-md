@@ -24,9 +24,8 @@ def valid_document():
     return deepcopy(load_json(FIXTURE))
 
 
-def load_script(relative_path):
-    path = ROOT / relative_path
-    spec = importlib.util.spec_from_file_location(path.stem + "_under_test", path)
+def load_script(relative_path, module_name):
+    spec = importlib.util.spec_from_file_location(module_name, ROOT / relative_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -49,12 +48,32 @@ def call_main(module, argv):
     stderr = io.StringIO()
     with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
         code = module.main(argv)
-    return code, stdout.getvalue(), stderr.getvalue()
+    return code or 0, stdout.getvalue(), stderr.getvalue()
+
+
+class Phase4HarnessContractTests(unittest.TestCase):
+    def test_load_script_uses_explicit_module_name(self):
+        module = load_script("scripts/render_markdown.py", "phase4_renderer_contract_under_test")
+
+        self.assertEqual("phase4_renderer_contract_under_test", module.__name__)
+
+    def test_call_main_normalizes_none_exit_code_to_zero(self):
+        class NoneReturningModule:
+            @staticmethod
+            def main(argv):
+                print("stdout text")
+                print("stderr text", file=sys.stderr)
+
+        code, stdout, stderr = call_main(NoneReturningModule, ["input.dsl.json"])
+
+        self.assertEqual(0, code)
+        self.assertEqual("stdout text\n", stdout)
+        self.assertEqual("stderr text\n", stderr)
 
 
 class Phase4RendererMetadataTests(unittest.TestCase):
     def test_rendered_mermaid_fences_have_adjacent_diagram_id_metadata(self):
-        module = load_script("scripts/render_markdown.py")
+        module = load_script("scripts/render_markdown.py", "phase4_render_markdown_metadata_under_test")
         markdown = module.render_markdown(valid_document())
 
         for fragment in [
@@ -70,7 +89,7 @@ class Phase4RendererMetadataTests(unittest.TestCase):
                 self.assertIn(fragment, markdown)
 
     def test_diagram_id_metadata_is_not_controlled_by_evidence_mode(self):
-        module = load_script("scripts/render_markdown.py")
+        module = load_script("scripts/render_markdown.py", "phase4_render_markdown_evidence_under_test")
         hidden = module.render_markdown(valid_document(), evidence_mode="hidden")
         inline = module.render_markdown(valid_document(), evidence_mode="inline")
 
