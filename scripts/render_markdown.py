@@ -418,6 +418,41 @@ def render_extra_diagram(diagram):
     return f"#### {title}\n\n{render_mermaid_block(untitled_diagram)}"
 
 
+def render_content_block_table(table):
+    columns = [(column.get("key", ""), column.get("title", "")) for column in table.get("columns", [])]
+    return render_fixed_table(table.get("rows", []), columns)
+
+
+def render_content_block(block, support_context, title_style="heading4"):
+    title = escape_heading_label(block.get("title", ""))
+    if title_style == "bold":
+        heading = f"**{title}**"
+    else:
+        heading = f"#### {title}"
+    block_type = block.get("block_type")
+    if block_type == "text":
+        body = render_paragraph(block.get("text", ""))
+    elif block_type == "diagram":
+        body = render_mermaid_block(block.get("diagram", {}))
+    elif block_type == "table":
+        body = render_content_block_table(block.get("table", {}))
+    else:
+        raise RenderError(f"unsupported content block type: {block_type}")
+
+    rendered = "\n\n".join(part for part in [heading, body] if part)
+    support = render_node_support(block, support_context)
+    if support:
+        rendered = f"{rendered}\n\n支持数据（{title}）\n\n{support}"
+    return rendered
+
+
+def render_content_blocks(blocks, support_context, title_style="heading4"):
+    return "\n\n".join(
+        render_content_block(block, support_context, title_style=title_style)
+        for block in blocks or []
+    )
+
+
 def render_extras(extra_tables, extra_diagrams, empty_text="无补充内容。", support_context=None):
     parts = []
     for table in extra_tables or []:
@@ -838,20 +873,6 @@ def render_public_interfaces(public_interfaces, chapter_index, support_context):
     return "\n\n".join(part for part in parts if part != "")
 
 
-def render_mechanism_text_block(block, support_context):
-    parts = []
-    title = render_paragraph(block.get("title", ""))
-    if title:
-        parts.append(f"**{title}**")
-    text = render_paragraph(block.get("text", ""))
-    if text:
-        parts.append(text)
-    support = render_node_support(block, support_context)
-    if support:
-        parts.append(support)
-    return "\n\n".join(parts)
-
-
 def render_internal_mechanism(internal_mechanism, chapter_index, support_context):
     index_rows = internal_mechanism.get("mechanism_index", {}).get("rows", [])
     details = internal_mechanism.get("mechanism_details", [])
@@ -870,15 +891,14 @@ def render_internal_mechanism(internal_mechanism, chapter_index, support_context
             label_key="mechanism_name",
         ),
     ]
-    for detail_index, row in enumerate(index_rows, start=1):
-        detail = detail_by_id.get(row.get("mechanism_id"))
-        if detail is None:
-            continue
-        mechanism_name = escape_heading_label(row.get("mechanism_name", ""))
-        parts.append(f"###### 4.{chapter_index}.6.{detail_index} {mechanism_name}")
-        for block in detail.get("blocks", []):
-            if block.get("block_type") == "text":
-                parts.append(render_mechanism_text_block(block, support_context))
+    for detail_number, row in enumerate(index_rows, start=1):
+        detail = detail_by_id.get(row.get("mechanism_id"), {})
+        parts.append(
+            f"###### 4.{chapter_index}.6.{detail_number} {escape_heading_label(row.get('mechanism_name', ''))}"
+        )
+        rendered_blocks = render_content_blocks(detail.get("blocks", []), support_context, title_style="bold")
+        if rendered_blocks:
+            parts.append(rendered_blocks)
     return "\n\n".join(part for part in parts if part != "")
 
 
@@ -1281,19 +1301,16 @@ def render_collection_support(items, context, *, id_key, label_key, target_type)
 
 
 def render_chapter_9(document, support_context):
-    parts = [chapter_heading(9, "结构问题与改进建议")]
-    structure_issues = document.get("structure_issues_and_suggestions", "")
-    if isinstance(structure_issues, dict):
-        raise RenderError(
-            "structure_issues_and_suggestions object shape is not supported by the V2 renderer yet"
-        )
-    free_form_text = stringify_markdown_value(structure_issues).strip()
     risks = document.get("risks", [])
     assumptions = document.get("assumptions", [])
     low_confidence_items = collect_low_confidence_items(document)
+    structure_issues = document.get("structure_issues_and_suggestions", {})
 
-    if free_form_text:
-        parts.append(escape_plain_text(free_form_text))
+    parts = [
+        chapter_heading(9, "结构问题与改进建议"),
+        "### 9.1 风险清单",
+    ]
+
     if risks:
         risk_parts = [render_fixed_table(risks, RISK_COLUMNS)]
         support = render_collection_support(
@@ -1305,7 +1322,11 @@ def render_chapter_9(document, support_context):
         )
         if support:
             risk_parts.append(support)
-        parts.extend(["### 风险", "\n\n".join(risk_parts)])
+        parts.append("\n\n".join(risk_parts))
+    else:
+        parts.append("无风险清单。")
+
+    parts.append("### 9.2 假设清单")
     if assumptions:
         assumption_parts = [render_fixed_table(assumptions, ASSUMPTION_COLUMNS)]
         support = render_collection_support(
@@ -1317,13 +1338,35 @@ def render_chapter_9(document, support_context):
         )
         if support:
             assumption_parts.append(support)
-        parts.extend(["### 假设", "\n\n".join(assumption_parts)])
-    if low_confidence_items:
-        parts.extend(["### 低置信度项", render_fixed_table(low_confidence_items, LOW_CONFIDENCE_COLUMNS)])
-    if len(parts) == 1:
-        parts.append("未识别到明确的结构问题与改进建议。")
+        parts.append("\n\n".join(assumption_parts))
+    else:
+        parts.append("无假设清单。")
 
-    return "\n\n".join(parts)
+    parts.append("### 9.3 低置信度项目")
+    if low_confidence_items:
+        parts.append(render_fixed_table(low_confidence_items, LOW_CONFIDENCE_COLUMNS))
+    else:
+        parts.append("无低置信度项目。")
+
+    parts.append("### 9.4 结构问题与改进建议")
+    if isinstance(structure_issues, dict):
+        summary = render_paragraph(structure_issues.get("summary", ""))
+        if summary:
+            parts.append(summary)
+        rendered_blocks = render_content_blocks(structure_issues.get("blocks", []), support_context)
+        if rendered_blocks:
+            parts.append(rendered_blocks)
+        if not summary and not rendered_blocks:
+            parts.append(
+                render_paragraph(
+                    structure_issues.get("not_applicable_reason", ""),
+                    empty_text="未识别到明确的结构问题与改进建议。",
+                )
+            )
+    else:
+        raise RenderError("structure_issues_and_suggestions must use the V2 Phase 3 object shape")
+
+    return "\n\n".join(part for part in parts if part != "")
 
 
 def build_parser():

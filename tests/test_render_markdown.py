@@ -1308,6 +1308,9 @@ class ChapterOneToFourRenderingTests(unittest.TestCase):
         second_design["name"] = "第二模块"
         second_design["summary"] = "第二模块概述。"
         second_design["public_interfaces"]["interfaces"][1]["execution_flow_diagram"]["id"] = "MER-IFACE-SECOND-FLOW"
+        mechanism_blocks = second_design["internal_mechanism"]["mechanism_details"][0]["blocks"]
+        mechanism_blocks[1]["diagram"]["id"] = "MER-BLOCK-SECOND-MECHANISM-FLOW"
+        mechanism_blocks[2]["table"]["id"] = "TBL-BLOCK-SECOND-MECHANISM-STAGES"
         document["module_design"]["modules"] = [second_design, document["module_design"]["modules"][0]]
 
         markdown = module.render_markdown(document)
@@ -1613,37 +1616,42 @@ class ChapterFiveToEightRenderingTests(unittest.TestCase):
 
 
 class ChapterNineRenderingTests(unittest.TestCase):
-    def test_chapter_9_empty_state_appears_only_when_all_sources_are_empty(self):
-        module = load_renderer_module()
-        markdown = module.render_markdown(valid_document())
-        section = markdown[markdown.index("## 9. 结构问题与改进建议") :]
-        self.assertIn("未识别到明确的结构问题与改进建议。", section)
-        self.assertNotIn("### 风险", section)
-        self.assertNotIn("### 假设", section)
-        self.assertNotIn("### 低置信度项", section)
-
-    def test_free_form_chapter_9_text_is_escaped_and_cannot_create_headings(self):
+    def test_chapter_9_empty_structure_issues_reason_renders_when_all_sources_are_empty(self):
         module = load_renderer_module()
         document = valid_document()
-        document["structure_issues_and_suggestions"] = "# 伪造标题\n<script>alert(1)</script>\n- 保留为普通建议"
+        document["risks"] = []
+        document["assumptions"] = []
+        issues = document["structure_issues_and_suggestions"]
+        issues["summary"] = ""
+        issues["blocks"] = []
+        issues["not_applicable_reason"] = "未识别到结构问题。"
         markdown = module.render_markdown(document)
         section = markdown[markdown.index("## 9. 结构问题与改进建议") :]
+        self.assertIn("### 9.1 风险清单", section)
+        self.assertIn("无风险清单。", section)
+        self.assertIn("### 9.2 假设清单", section)
+        self.assertIn("无假设清单。", section)
+        self.assertIn("### 9.4 结构问题与改进建议", section)
+        self.assertIn("未识别到结构问题。", section)
+
+    def test_chapter_9_summary_and_text_blocks_are_escaped(self):
+        module = load_renderer_module()
+        document = valid_document()
+        document["structure_issues_and_suggestions"]["summary"] = "# 伪造标题"
+        document["structure_issues_and_suggestions"]["blocks"][0]["text"] = "<script>alert(1)</script>"
+        markdown = module.render_markdown(document)
+        section = markdown[markdown.index("### 9.4 结构问题与改进建议") :]
         self.assertNotIn("\n# 伪造标题", section)
         self.assertIn("\\# 伪造标题", section)
         self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", section)
-        self.assertNotIn("未识别到明确的结构问题与改进建议。", section)
 
-    def test_chapter_9_object_shape_fails_until_v2_rendering_is_supported(self):
+    def test_chapter_9_structure_issues_object_renders_summary_and_blocks(self):
         module = load_renderer_module()
         document = valid_document()
-        document["structure_issues_and_suggestions"] = {
-            "summary": "",
-            "blocks": [],
-            "not_applicable_reason": "当前阶段没有结构问题。",
-        }
-
-        with self.assertRaisesRegex(module.RenderError, "structure_issues_and_suggestions object shape"):
-            module.render_markdown(document)
+        markdown = module.render_markdown(document)
+        self.assertIn("### 9.4 结构问题与改进建议", markdown)
+        self.assertIn("结构问题概览", markdown)
+        self.assertIn("上游内容完整性", markdown)
 
     def test_risks_and_assumptions_render_under_owned_headings_without_empty_state(self):
         module = load_renderer_module()
@@ -1675,7 +1683,16 @@ class ChapterNineRenderingTests(unittest.TestCase):
         markdown = module.render_markdown(document)
         section = markdown[markdown.index("## 9. 结构问题与改进建议") :]
         self.assertNotIn("未识别到明确的结构问题与改进建议。", section)
-        assert_in_order(self, section, ["### 风险", "输出覆盖策略被误用。", "### 假设", "调用方已先执行 DSL 校验。"])
+        assert_in_order(
+            self,
+            section,
+            [
+                "### 9.1 风险清单",
+                "输出覆盖策略被误用。",
+                "### 9.2 假设清单",
+                "调用方已先执行 DSL 校验。",
+            ],
+        )
 
     def test_low_confidence_items_are_collected_from_whitelisted_design_items(self):
         module = load_renderer_module()
@@ -1691,7 +1708,7 @@ class ChapterNineRenderingTests(unittest.TestCase):
         document["key_flows"]["flows"][0]["steps"][0]["confidence"] = "unknown"
         markdown = module.render_markdown(document)
         section = markdown[markdown.index("## 9. 结构问题与改进建议") :]
-        self.assertIn("### 低置信度项", section)
+        self.assertIn("### 9.3 低置信度项目", section)
         self.assertIn("$.architecture_views.module_intro.rows[0]", section)
         self.assertIn("$.module_design.modules[0].configuration.parameters.rows[0]", section)
         self.assertIn("$.module_design.modules[0].dependencies.rows[0]", section)
@@ -1746,8 +1763,8 @@ class ChapterNineRenderingTests(unittest.TestCase):
         markdown = module.render_markdown(document, evidence_mode="inline")
         chapter_9 = markdown[markdown.index("## 9. 结构问题与改进建议") :]
 
-        self.assertIn("### 风险", chapter_9)
-        risk_section = section_between(chapter_9, "### 风险", "### 假设")
+        self.assertIn("### 9.1 风险清单", chapter_9)
+        risk_section = section_between(chapter_9, "### 9.1 风险清单", "### 9.2 假设清单")
         self.assertIn("| ID | 风险 | 影响 | 缓解措施 | 置信度 |", risk_section)
         self.assertIn("| RISK-001 | 输出覆盖策略被误用。 | 可能覆盖人工修改的文档。 | 默认拒绝覆盖。 | inferred |", risk_section)
         self.assertIn("支持数据（RISK-001 / 输出覆盖策略被误用。）", chapter_9)
@@ -1755,8 +1772,12 @@ class ChapterNineRenderingTests(unittest.TestCase):
         self.assertIn("关联来源：REQ-SAFE-WRITE（覆盖风险。）", chapter_9)
         self.assertEqual([], document["risks"][0]["traceability_refs"])
         self.assertIn("Source: scripts/render_markdown.py:1-2", chapter_9)
-        self.assertIn("### 假设", chapter_9)
-        assumption_section = section_between(chapter_9, "### 假设", "支持数据（ASM-001 / 调用方已先执行 DSL 校验。）")
+        self.assertIn("### 9.2 假设清单", chapter_9)
+        assumption_section = section_between(
+            chapter_9,
+            "### 9.2 假设清单",
+            "支持数据（ASM-001 / 调用方已先执行 DSL 校验。）",
+        )
         self.assertIn("| ID | 假设 | 依据 | 验证建议 | 置信度 |", assumption_section)
         self.assertIn("| ASM-001 | 调用方已先执行 DSL 校验。 | Renderer 只做防御性检查。 | 保留 validate_dsl.py。 | unknown |", assumption_section)
         self.assertIn("支持数据（ASM-001 / 调用方已先执行 DSL 校验。）", chapter_9)
@@ -1783,10 +1804,10 @@ class ChapterNineRenderingTests(unittest.TestCase):
         markdown = module.render_markdown(document)
         chapter_9 = markdown[markdown.index("## 9. 结构问题与改进建议") :]
 
-        self.assertIn("### 低置信度项", chapter_9)
+        self.assertIn("### 9.3 低置信度项目", chapter_9)
         self.assertIn("$.architecture_views.module_intro.rows[0]", chapter_9)
         self.assertNotIn("$.evidence[0]", chapter_9)
-        low_confidence = section_from(chapter_9, "### 低置信度项")
+        low_confidence = section_from(chapter_9, "### 9.3 低置信度项目")
         self.assertNotIn("RISK-UNKNOWN", low_confidence)
         self.assertNotIn("ASM-UNKNOWN", low_confidence)
         self.assertNotIn("MER-ARCH-MODULES", chapter_9)
@@ -1803,6 +1824,11 @@ def collect_non_empty_mermaid_sources(document):
         for diagram in diagrams or []:
             add_diagram(diagram)
 
+    def add_content_blocks(blocks):
+        for block in blocks or []:
+            if isinstance(block, dict) and block.get("block_type") == "diagram":
+                add_diagram(block.get("diagram"))
+
     architecture = document.get("architecture_views", {})
     add_diagram(architecture.get("module_relationship_diagram"))
     add_diagram_array(architecture.get("extra_diagrams"))
@@ -1812,6 +1838,9 @@ def collect_non_empty_mermaid_sources(document):
         public_interfaces = module_item.get("public_interfaces", {})
         for interface in public_interfaces.get("interfaces", []):
             add_diagram(interface.get("execution_flow_diagram"))
+        internal_mechanism = module_item.get("internal_mechanism", {})
+        for detail in internal_mechanism.get("mechanism_details", []):
+            add_content_blocks(detail.get("blocks", []))
 
     runtime = document.get("runtime_view", {})
     add_diagram(runtime.get("runtime_flow_diagram"))
@@ -1829,6 +1858,10 @@ def collect_non_empty_mermaid_sources(document):
     for flow in key_flows.get("flows", []):
         add_diagram(flow.get("diagram"))
     add_diagram_array(key_flows.get("extra_diagrams"))
+
+    structure_issues = document.get("structure_issues_and_suggestions", {})
+    if isinstance(structure_issues, dict):
+        add_content_blocks(structure_issues.get("blocks", []))
     return sources
 
 
@@ -1942,6 +1975,7 @@ class RendererIntegrationTests(unittest.TestCase):
             "architecture extra_diagrams": synthetic_flowchart_source("ARCHEXTRA"),
             "module public_interface render flow": synthetic_flowchart_source("IFACEFLOW"),
             "module public_interface validate flow": synthetic_flowchart_source("IFACEVALIDATE"),
+            "module mechanism content block": synthetic_flowchart_source("MECHANISMBLOCK"),
             "runtime_flow": synthetic_flowchart_source("RUNTIMEFLOW"),
             "runtime_sequence": "sequenceDiagram\n  participant SeqA\n  participant SeqB\n  SeqA->>SeqB: RuntimeSequence",
             "runtime extra": synthetic_flowchart_source("RUNTIMEEXTRA"),
@@ -1950,6 +1984,7 @@ class RendererIntegrationTests(unittest.TestCase):
             "collaboration extra": synthetic_flowchart_source("COLLABEXTRA"),
             "key flow diagram": synthetic_flowchart_source("KEYFLOW"),
             "key flow extra": synthetic_flowchart_source("KEYFLOWEXTRA"),
+            "chapter 9 structure issue content block": synthetic_flowchart_source("ISSUEBLOCK"),
         }
         document = valid_document()
         module_item = document["module_design"]["modules"][0]
@@ -1966,6 +2001,9 @@ class RendererIntegrationTests(unittest.TestCase):
         ]
         module_item["public_interfaces"]["interfaces"][2]["execution_flow_diagram"]["source"] = sources[
             "module public_interface validate flow"
+        ]
+        module_item["internal_mechanism"]["mechanism_details"][0]["blocks"][1]["diagram"]["source"] = sources[
+            "module mechanism content block"
         ]
         document["runtime_view"]["runtime_flow_diagram"]["source"] = sources["runtime_flow"]
         document["runtime_view"]["runtime_sequence_diagram"] = synthetic_diagram(
@@ -1990,9 +2028,12 @@ class RendererIntegrationTests(unittest.TestCase):
         document["key_flows"]["extra_diagrams"] = [
             synthetic_diagram("MER-SYN-KEY-FLOW-EXTRA", sources["key flow extra"])
         ]
+        document["structure_issues_and_suggestions"]["blocks"][1]["diagram"]["source"] = sources[
+            "chapter 9 structure issue content block"
+        ]
 
         expected_sources = list(sources.values())
-        self.assertEqual(12, len(expected_sources))
+        self.assertEqual(14, len(expected_sources))
         with tempfile.TemporaryDirectory() as tmpdir:
             dsl_path = write_json(tmpdir, "all-known-mermaid-paths.dsl.json", document)
             completed = subprocess.run(
@@ -2010,9 +2051,9 @@ class RendererIntegrationTests(unittest.TestCase):
             parsed_diagrams, extraction_report = validator_module.extract_diagrams_from_markdown(markdown)
             self.assertEqual([], extraction_report.errors)
             parsed_sources = [diagram.source for diagram in parsed_diagrams]
-            self.assertEqual(12, len(parsed_sources))
+            self.assertEqual(14, len(parsed_sources))
             self.assertCountEqual(expected_sources, parsed_sources)
-            self.assertEqual(12, markdown.count("```mermaid"))
+            self.assertEqual(14, markdown.count("```mermaid"))
 
             mermaid = subprocess.run(
                 [PYTHON, str(VALIDATOR), "--from-markdown", str(output_path), "--static"],

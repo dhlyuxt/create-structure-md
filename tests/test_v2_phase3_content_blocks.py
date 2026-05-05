@@ -92,7 +92,6 @@ class Phase3FixtureContractTests(unittest.TestCase):
     def test_chapter_4_renders_content_blocks_through_shared_visible_contract(self):
         renderer = load_renderer_module()
         document = valid_document()
-        document["structure_issues_and_suggestions"] = "Legacy Chapter 9 placeholder."
         markdown = renderer.render_markdown(document)
 
         self.assert_markdown_contains(markdown, "DSL 校验管线说明")
@@ -376,3 +375,86 @@ class Phase3SemanticValidationTests(unittest.TestCase):
         ]
         completed = validation_stderr_for(document)
         self.assertEqual(0, completed.returncode, completed.stderr)
+
+
+class Phase3RenderingTests(unittest.TestCase):
+    def markdown(self, document=None, evidence_mode="hidden"):
+        renderer = load_renderer_module()
+        return renderer.render_markdown(document or valid_document(), evidence_mode=evidence_mode)
+
+    def test_hidden_mode_suppresses_block_support_refs(self):
+        document = valid_document()
+        document["evidence"] = [
+            {
+                "id": "EV-BLOCK",
+                "kind": "source",
+                "title": "块证据",
+                "location": "tests/fixtures/valid-v2-foundation.dsl.json",
+                "description": "块级证据",
+                "confidence": "observed",
+            }
+        ]
+        document["structure_issues_and_suggestions"]["blocks"][0]["evidence_refs"] = ["EV-BLOCK"]
+        markdown = self.markdown(document, evidence_mode="hidden")
+        self.assertNotIn("支持数据", markdown)
+        self.assertNotIn("EV-BLOCK", markdown)
+
+    def test_inline_mode_renders_block_support_after_block(self):
+        document = valid_document()
+        document["evidence"] = [
+            {
+                "id": "EV-BLOCK",
+                "kind": "source",
+                "title": "块证据",
+                "location": "tests/fixtures/valid-v2-foundation.dsl.json",
+                "description": "块级证据",
+                "confidence": "observed",
+            }
+        ]
+        document["structure_issues_and_suggestions"]["blocks"][0]["evidence_refs"] = ["EV-BLOCK"]
+        markdown = self.markdown(document, evidence_mode="inline")
+        block_position = markdown.index("上游内容完整性")
+        support_position = markdown.index("支持数据（上游内容完整性）")
+        self.assertLess(block_position, support_position)
+        self.assertIn("依据：EV-BLOCK", markdown)
+
+    def test_table_block_heading_uses_block_title_not_table_title(self):
+        document = valid_document()
+        block = document["structure_issues_and_suggestions"]["blocks"][2]
+        block["title"] = "可见表标题"
+        block["table"]["title"] = "内部表元数据标题"
+        markdown = self.markdown(document)
+        self.assertIn("#### 可见表标题", markdown)
+        self.assertNotIn("#### 内部表元数据标题", markdown)
+
+    def test_chapter_9_diagram_block_renders_under_structure_issues(self):
+        markdown = self.markdown()
+        section = markdown[markdown.index("### 9.4 结构问题与改进建议") :]
+        self.assertIn("#### 结构问题关系图", section)
+        self.assertIn("```mermaid\nflowchart TD", section)
+
+    def test_chapter_4_diagram_block_uses_block_title_without_breaking_heading_hierarchy(self):
+        document = valid_document()
+        block = document["module_design"]["modules"][0]["internal_mechanism"]["mechanism_details"][0]["blocks"][1]
+        block["title"] = "可见图标题"
+        block["diagram"]["title"] = "内部图元数据标题"
+        markdown = self.markdown(document)
+        self.assertIn("**可见图标题**", markdown)
+        self.assertIn("内部图元数据标题", markdown)
+
+    def test_chapter_9_summary_renders_before_blocks(self):
+        markdown = self.markdown()
+        summary_position = markdown.index("结构问题概览")
+        block_position = markdown.index("上游内容完整性")
+        self.assertLess(summary_position, block_position)
+
+    def test_chapter_9_empty_structure_issues_reason_renders_under_9_4(self):
+        document = valid_document()
+        issues = document["structure_issues_and_suggestions"]
+        issues["summary"] = ""
+        issues["blocks"] = []
+        issues["not_applicable_reason"] = "未识别到结构问题。"
+        markdown = self.markdown(document)
+        section_position = markdown.index("### 9.4 结构问题与改进建议")
+        reason_position = markdown.index("未识别到结构问题。")
+        self.assertLess(section_position, reason_position)
