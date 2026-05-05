@@ -102,3 +102,70 @@ class Phase4RendererMetadataTests(unittest.TestCase):
 
         with self.assertRaisesRegex(module.RenderError, "Mermaid diagram.id must be a string"):
             module.render_mermaid_block(diagram)
+
+
+class Phase4ExpectedDiagramCollectorTests(unittest.TestCase):
+    def _diagram_at_json_path(self, document, path):
+        current = document
+        for part in path.removeprefix("$.").split("."):
+            if "[" in part:
+                field, index = part.rstrip("]").split("[")
+                current = current[field][int(index)]
+            else:
+                current = current[part]
+        return current
+
+    def test_expected_collector_includes_existing_and_v2_diagram_paths(self):
+        phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_collector_under_test")
+        document = valid_document()
+        diagrams = phase4.collect_expected_diagrams(document)
+        by_id = {diagram.diagram_id: diagram for diagram in diagrams if diagram.should_render}
+        expected_paths = {
+            "MER-ARCH-MODULES": "$.architecture_views.module_relationship_diagram",
+            "MER-IFACE-SKILL-RENDER-CLI": "$.module_design.modules[0].public_interfaces.interfaces[1].execution_flow_diagram",
+            "MER-IFACE-SKILL-VALIDATE-CLI": "$.module_design.modules[0].public_interfaces.interfaces[2].execution_flow_diagram",
+            "MER-BLOCK-MECHANISM-FLOW": "$.module_design.modules[0].internal_mechanism.mechanism_details[0].blocks[1].diagram",
+            "MER-RUNTIME-FLOW": "$.runtime_view.runtime_flow_diagram",
+            "MER-COLLABORATION-RELATIONSHIP": "$.cross_module_collaboration.collaboration_relationship_diagram",
+            "MER-FLOW-GENERATE": "$.key_flows.flows[0].diagram",
+            "MER-BLOCK-STRUCTURE-ISSUES": "$.structure_issues_and_suggestions.blocks[1].diagram",
+        }
+
+        self.assertEqual(set(expected_paths), set(by_id))
+        for diagram_id, path in expected_paths.items():
+            with self.subTest(diagram_id=diagram_id):
+                expected_diagram = self._diagram_at_json_path(document, path)
+                self.assertEqual(path, by_id[diagram_id].json_path)
+                self.assertEqual(expected_diagram["source"].strip(), by_id[diagram_id].source.strip())
+                self.assertEqual(expected_diagram["title"].strip(), by_id[diagram_id].title.strip())
+
+    def test_expected_collector_ignores_removed_v1_chapter_4_paths(self):
+        phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_collector_under_test")
+        document = valid_document()
+        module = document["module_design"]["modules"][0]
+        module["internal_structure"] = {
+            "diagram": {
+                "id": "MER-REMOVED-INTERNAL-STRUCTURE",
+                "title": "Removed V1 diagram",
+                "source": "flowchart TD\n  A --> B",
+            }
+        }
+
+        diagrams = phase4.collect_expected_diagrams(document)
+
+        self.assertNotIn("MER-REMOVED-INTERNAL-STRUCTURE", {diagram.diagram_id for diagram in diagrams})
+
+    def test_expected_collector_ignores_contract_interface_execution_flow_diagram(self):
+        phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_collector_under_test")
+        document = valid_document()
+        contract_interface = document["module_design"]["modules"][0]["public_interfaces"]["interfaces"][0]
+        self.assertEqual("schema_contract", contract_interface["interface_type"])
+        contract_interface["execution_flow_diagram"] = {
+            "id": "MER-CONTRACT-SHOULD-NOT-RENDER",
+            "title": "Contract interface should not render",
+            "source": "flowchart TD\n  A --> B",
+        }
+
+        diagrams = phase4.collect_expected_diagrams(document)
+
+        self.assertNotIn("MER-CONTRACT-SHOULD-NOT-RENDER", {diagram.diagram_id for diagram in diagrams})
