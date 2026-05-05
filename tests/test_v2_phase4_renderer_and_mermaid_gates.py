@@ -789,3 +789,46 @@ class Phase4VerificationWorkflowTests(unittest.TestCase):
                 str((tmpdir / "mermaid-work" / "pre-render").resolve()),
                 run_args[work_dir_index + 1],
             )
+
+    def test_resolve_cli_path_expands_user_without_requiring_existing_path(self):
+        workflow = load_script(
+            "scripts/verify_v2_mermaid_gates.py",
+            "phase4_verify_v2_mermaid_gates_expanduser_under_test",
+        )
+
+        resolved = workflow.resolve_cli_path("~/phase4-nonexistent-path-for-test")
+
+        self.assertEqual(
+            (Path.home() / "phase4-nonexistent-path-for-test").resolve(strict=False),
+            resolved,
+        )
+
+    def test_validator_start_failure_returns_gate_error_without_traceback(self):
+        workflow = load_script(
+            "scripts/verify_v2_mermaid_gates.py",
+            "phase4_verify_v2_mermaid_gates_oserror_under_test",
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            document = valid_document()
+            dsl_path = write_json(tmpdir, "structure.dsl.json", document)
+            artifact_path = self.write_complete_artifact(tmpdir, dsl_path, document)
+
+            with mock.patch.object(workflow.subprocess, "run", side_effect=OSError("boom")):
+                code, stdout, stderr = call_main(
+                    workflow,
+                    [
+                        str(dsl_path),
+                        "--mermaid-review-artifact",
+                        str(artifact_path),
+                        "--pre-render",
+                        "--work-dir",
+                        str(tmpdir / "mermaid-work"),
+                    ],
+                )
+
+            self.assertEqual(2, code)
+            self.assertEqual("", stdout)
+            self.assertIn("could not run Mermaid validator", stderr)
+            self.assertIn("boom", stderr)
+            self.assertNotIn("Traceback", stderr)

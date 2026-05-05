@@ -56,6 +56,10 @@ def load_text_file(path):
         raise Phase4GateError(f"could not read rendered Markdown {path}: {exc}") from exc
 
 
+def resolve_cli_path(value):
+    return Path(value).expanduser().resolve(strict=False)
+
+
 def print_errors(errors):
     for error in errors:
         print(f"ERROR: {error}", file=sys.stderr)
@@ -94,13 +98,17 @@ def validate_artifact_gate(document, dsl_file, artifact_path):
 
 
 def run_validate_mermaid(args):
-    completed = subprocess.run(
-        [sys.executable, str(ROOT / "scripts/validate_mermaid.py"), *args],
-        cwd=ROOT,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+    try:
+        completed = subprocess.run(
+            [sys.executable, str(ROOT / "scripts/validate_mermaid.py"), *args],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    except OSError as exc:
+        print(f"ERROR: could not run Mermaid validator: {exc}", file=sys.stderr)
+        return 2
     sys.stdout.write(completed.stdout)
     sys.stderr.write(completed.stderr)
     return completed.returncode
@@ -142,11 +150,11 @@ def main(argv=None):
     if args.post_render and not args.rendered_markdown:
         parser.error("--rendered-markdown is required with --post-render")
 
-    dsl_file = Path(args.dsl_file).resolve(strict=False)
-    artifact_path = Path(args.mermaid_review_artifact).resolve(strict=False)
-    work_dir = Path(args.work_dir).resolve(strict=False)
+    dsl_file = resolve_cli_path(args.dsl_file)
+    artifact_path = resolve_cli_path(args.mermaid_review_artifact)
+    work_dir = resolve_cli_path(args.work_dir)
     rendered_markdown = (
-        Path(args.rendered_markdown).resolve(strict=False)
+        resolve_cli_path(args.rendered_markdown)
         if args.rendered_markdown
         else None
     )
