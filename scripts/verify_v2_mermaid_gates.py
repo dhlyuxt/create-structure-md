@@ -142,9 +142,14 @@ def main(argv=None):
     if args.post_render and not args.rendered_markdown:
         parser.error("--rendered-markdown is required with --post-render")
 
-    dsl_file = Path(args.dsl_file)
-    artifact_path = Path(args.mermaid_review_artifact)
-    work_dir = Path(args.work_dir)
+    dsl_file = Path(args.dsl_file).resolve(strict=False)
+    artifact_path = Path(args.mermaid_review_artifact).resolve(strict=False)
+    work_dir = Path(args.work_dir).resolve(strict=False)
+    rendered_markdown = (
+        Path(args.rendered_markdown).resolve(strict=False)
+        if args.rendered_markdown
+        else None
+    )
 
     try:
         document = load_json_file(dsl_file, label="DSL input")
@@ -159,7 +164,7 @@ def main(argv=None):
 
         if args.pre_render:
             return pre_render_gate(dsl_file, work_dir)
-        return post_render_gate(document, Path(args.rendered_markdown), work_dir)
+        return post_render_gate(document, rendered_markdown, work_dir)
     except Phase4GateError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2

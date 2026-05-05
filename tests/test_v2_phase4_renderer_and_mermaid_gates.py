@@ -2,6 +2,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -730,3 +731,61 @@ class Phase4VerificationWorkflowTests(unittest.TestCase):
             self.assertIn(str(dsl_path), run_args)
             self.assertIn("--strict", run_args)
             self.assertIn(str(tmpdir / "mermaid-work" / "pre-render"), run_args)
+
+    def test_pre_render_resolves_relative_paths_before_child_validation(self):
+        workflow = load_script(
+            "scripts/verify_v2_mermaid_gates.py",
+            "phase4_verify_v2_mermaid_gates_relative_paths_under_test",
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            document = valid_document()
+            write_json(tmpdir, "structure.dsl.json", document)
+
+            phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_workflow_relative_artifact_under_test")
+            expected_ids = {
+                diagram.diagram_id
+                for diagram in phase4.collect_expected_diagrams(document)
+                if diagram.should_render
+            }
+            write_json(
+                tmpdir,
+                "mermaid-readability-review.json",
+                complete_review_artifact("structure.dsl.json", expected_ids),
+            )
+            completed = subprocess.CompletedProcess(
+                ["validate_mermaid.py"],
+                0,
+                stdout="Mermaid validation succeeded: 6 diagram(s) checked in strict mode.\n",
+                stderr="",
+            )
+            original_cwd = Path.cwd()
+
+            try:
+                os.chdir(tmpdir)
+                with mock.patch.object(workflow.subprocess, "run", return_value=completed) as run:
+                    code, stdout, stderr = call_main(
+                        workflow,
+                        [
+                            "structure.dsl.json",
+                            "--mermaid-review-artifact",
+                            "mermaid-readability-review.json",
+                            "--pre-render",
+                            "--work-dir",
+                            "mermaid-work",
+                        ],
+                    )
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertEqual(0, code)
+            self.assertIn("strict mode", stdout)
+            self.assertEqual("", stderr)
+            run_args = run.call_args.args[0]
+            from_dsl_index = run_args.index("--from-dsl")
+            work_dir_index = run_args.index("--work-dir")
+            self.assertEqual(str((tmpdir / "structure.dsl.json").resolve()), run_args[from_dsl_index + 1])
+            self.assertEqual(
+                str((tmpdir / "mermaid-work" / "pre-render").resolve()),
+                run_args[work_dir_index + 1],
+            )
