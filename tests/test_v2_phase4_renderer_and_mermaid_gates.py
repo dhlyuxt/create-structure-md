@@ -530,7 +530,7 @@ class Phase4ReadabilityArtifactTests(unittest.TestCase):
         self.assertIn(f"skipped_diagrams contains duplicate diagram IDs: {skipped_id}", errors)
 
 
-class Phase4VerificationWorkflowTests(unittest.TestCase):
+class Phase4VerificationWorkflowMixin:
     def write_complete_artifact(self, tmpdir, dsl_path, document):
         phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_workflow_artifact_under_test")
         expected_ids = {
@@ -540,6 +540,91 @@ class Phase4VerificationWorkflowTests(unittest.TestCase):
         }
         artifact = complete_review_artifact(dsl_path, expected_ids)
         return write_json(tmpdir, "mermaid-readability-review.json", artifact)
+
+
+class Phase4StrictRenderedMarkdownTests(unittest.TestCase):
+    def test_post_render_strict_validates_local_interface_and_content_block_diagrams(self):
+        workflow = load_script("scripts/verify_v2_mermaid_gates.py", "verify_v2_mermaid_gates_strict_under_test")
+        renderer = load_script("scripts/render_markdown.py", "render_markdown_strict_post_under_test")
+        document = valid_document()
+        markdown = renderer.render_markdown(document)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dsl_path = write_json(tmpdir, "structure.dsl.json", document)
+            phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_strict_artifact_under_test")
+            expected_ids = {diagram.diagram_id for diagram in phase4.collect_expected_diagrams(document) if diagram.should_render}
+            artifact_path = write_json(tmpdir, "mermaid-readability-review.json", complete_review_artifact(dsl_path, expected_ids))
+            markdown_path = write_text(tmpdir, "rendered.md", markdown)
+            with mock.patch.object(workflow.subprocess, "run") as run_validate:
+                run_validate.return_value = subprocess.CompletedProcess(
+                    ["validate_mermaid.py"],
+                    0,
+                    stdout="Mermaid validation succeeded: 8 diagram(s) checked in strict mode.\n",
+                    stderr="",
+                )
+                code, stdout, stderr = call_main(
+                    workflow,
+                    [
+                        str(dsl_path),
+                        "--mermaid-review-artifact",
+                        str(artifact_path),
+                        "--rendered-markdown",
+                        str(markdown_path),
+                        "--post-render",
+                        "--work-dir",
+                        str(Path(tmpdir) / "mermaid-work"),
+                    ],
+                )
+
+        self.assertEqual(0, code, stderr)
+        self.assertIn("strict mode", stdout)
+        self.assertEqual("", stderr)
+        self.assertEqual(1, run_validate.call_count)
+        argv = run_validate.call_args.args[0]
+        self.assertIn("--from-markdown", argv)
+        self.assertIn(str(Path(markdown_path).resolve(strict=False)), argv)
+        self.assertIn("--strict", argv)
+        self.assertIn("--work-dir", argv)
+        self.assertIn(str((Path(tmpdir) / "mermaid-work" / "post-render").resolve(strict=False)), argv)
+
+
+class Phase4RealStrictRenderedMarkdownTests(unittest.TestCase):
+    def test_rendered_markdown_passes_real_strict_validation_when_cli_available(self):
+        import shutil
+
+        if shutil.which("node") is None or shutil.which("mmdc") is None:
+            self.skipTest("node or mmdc unavailable")
+
+        renderer = load_script("scripts/render_markdown.py", "render_markdown_real_strict_under_test")
+        document = valid_document()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dsl_path = write_json(tmpdir, "structure.dsl.json", document)
+            phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_real_strict_artifact_under_test")
+            expected_ids = {diagram.diagram_id for diagram in phase4.collect_expected_diagrams(document) if diagram.should_render}
+            artifact_path = write_json(tmpdir, "mermaid-readability-review.json", complete_review_artifact(dsl_path, expected_ids))
+            markdown_path = write_text(tmpdir, document["document"]["output_file"], renderer.render_markdown(document))
+            completed = subprocess.run(
+                [
+                    PYTHON,
+                    str(ROOT / "scripts/verify_v2_mermaid_gates.py"),
+                    str(dsl_path),
+                    "--mermaid-review-artifact",
+                    str(artifact_path),
+                    "--rendered-markdown",
+                    str(markdown_path),
+                    "--post-render",
+                    "--work-dir",
+                    str(Path(tmpdir) / "mermaid-work"),
+                ],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        self.assertEqual(0, completed.returncode, completed.stderr)
+
+
+class Phase4VerificationWorkflowTests(Phase4VerificationWorkflowMixin, unittest.TestCase):
 
     def test_missing_review_artifact_fails_workflow(self):
         with tempfile.TemporaryDirectory() as tmpdir:
