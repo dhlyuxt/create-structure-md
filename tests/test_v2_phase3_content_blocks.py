@@ -129,3 +129,66 @@ class Phase3FixtureContractTests(unittest.TestCase):
                 self.assertNotEqual(-1, position, f"Missing Chapter 9 heading: {heading}")
                 positions.append(position)
         self.assertEqual(sorted(positions), positions)
+
+
+class Phase3SchemaShapeTests(unittest.TestCase):
+    def flatten_schema_error_messages(self, errors):
+        messages = []
+
+        def visit(error):
+            messages.append(f"{list(error.path)}: {error.message}")
+            for child in error.context:
+                visit(child)
+
+        for error in errors:
+            visit(error)
+        return "\n".join(messages)
+
+    def assert_schema_invalid(self, document, path_fragment):
+        errors = schema_errors(document)
+        self.assertTrue(errors, "Expected schema validation failure")
+        rendered = self.flatten_schema_error_messages(errors)
+        self.assertIn(path_fragment, rendered)
+
+    def test_schema_accepts_content_block_shapes(self):
+        document = valid_document()
+        self.assertEqual([], schema_errors(document))
+
+    def test_top_level_structure_issues_string_is_rejected(self):
+        document = valid_document()
+        document["structure_issues_and_suggestions"] = "旧版自由文本"
+        self.assert_schema_invalid(document, "structure_issues_and_suggestions")
+
+    def test_block_title_and_confidence_are_required(self):
+        for field_name in ["title", "confidence"]:
+            document = valid_document()
+            block = document["structure_issues_and_suggestions"]["blocks"][0]
+            block.pop(field_name)
+            with self.subTest(field=field_name):
+                self.assert_schema_invalid(document, field_name)
+
+    def test_text_block_requires_text(self):
+        document = valid_document()
+        block = document["structure_issues_and_suggestions"]["blocks"][0]
+        block.pop("text")
+        self.assert_schema_invalid(document, "text")
+
+    def test_diagram_block_requires_diagram_object(self):
+        document = valid_document()
+        block = document["module_design"]["modules"][0]["internal_mechanism"]["mechanism_details"][0]["blocks"][1]
+        block.pop("diagram")
+        self.assert_schema_invalid(document, "diagram")
+
+    def test_table_block_requires_table_object(self):
+        document = valid_document()
+        block = document["structure_issues_and_suggestions"]["blocks"][2]
+        block.pop("table")
+        self.assert_schema_invalid(document, "table")
+
+    def test_content_block_table_rows_reject_support_refs_at_schema_level(self):
+        for field_name in ["evidence_refs", "traceability_refs", "source_snippet_refs"]:
+            document = valid_document()
+            row = document["structure_issues_and_suggestions"]["blocks"][2]["table"]["rows"][0]
+            row[field_name] = []
+            with self.subTest(field=field_name):
+                self.assert_schema_invalid(document, field_name)

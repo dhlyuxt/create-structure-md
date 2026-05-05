@@ -47,7 +47,7 @@
       "$ref": "#/$defs/keyFlows"
     },
     "structure_issues_and_suggestions": {
-      "type": "string"
+      "$ref": "#/$defs/structureIssuesAndSuggestions"
     },
     "evidence": {
       "type": "array",
@@ -559,19 +559,134 @@
         "not_applicable_reason": { "type": "string" }
       }
     },
-    "mechanismTextBlock": {
+    "contentBlockBase": {
       "type": "object",
-      "required": ["block_id", "block_type", "title", "text", "confidence", "evidence_refs", "traceability_refs", "source_snippet_refs"],
-      "additionalProperties": false,
+      "required": ["block_id", "block_type", "title", "confidence"],
       "properties": {
         "block_id": { "$ref": "#/$defs/nonEmptyString" },
-        "block_type": { "const": "text" },
+        "block_type": { "type": "string", "enum": ["text", "diagram", "table"] },
         "title": { "$ref": "#/$defs/nonEmptyString" },
-        "text": { "$ref": "#/$defs/nonEmptyString" },
         "confidence": { "$ref": "#/$defs/confidence" },
         "evidence_refs": { "$ref": "#/$defs/referenceArray" },
         "traceability_refs": { "$ref": "#/$defs/referenceArray" },
         "source_snippet_refs": { "$ref": "#/$defs/referenceArray" }
+      }
+    },
+    "textContentBlock": {
+      "allOf": [
+        { "$ref": "#/$defs/contentBlockBase" },
+        {
+          "type": "object",
+          "required": ["block_type", "text"],
+          "additionalProperties": false,
+          "properties": {
+            "block_id": { "$ref": "#/$defs/nonEmptyString" },
+            "block_type": { "const": "text" },
+            "title": { "$ref": "#/$defs/nonEmptyString" },
+            "text": { "$ref": "#/$defs/nonEmptyString" },
+            "confidence": { "$ref": "#/$defs/confidence" },
+            "evidence_refs": { "$ref": "#/$defs/referenceArray" },
+            "traceability_refs": { "$ref": "#/$defs/referenceArray" },
+            "source_snippet_refs": { "$ref": "#/$defs/referenceArray" }
+          }
+        }
+      ]
+    },
+    "diagramContentBlock": {
+      "allOf": [
+        { "$ref": "#/$defs/contentBlockBase" },
+        {
+          "type": "object",
+          "required": ["block_type", "diagram"],
+          "additionalProperties": false,
+          "properties": {
+            "block_id": { "$ref": "#/$defs/nonEmptyString" },
+            "block_type": { "const": "diagram" },
+            "title": { "$ref": "#/$defs/nonEmptyString" },
+            "confidence": { "$ref": "#/$defs/confidence" },
+            "evidence_refs": { "$ref": "#/$defs/referenceArray" },
+            "traceability_refs": { "$ref": "#/$defs/referenceArray" },
+            "source_snippet_refs": { "$ref": "#/$defs/referenceArray" },
+            "diagram": { "$ref": "#/$defs/diagram" }
+          }
+        }
+      ]
+    },
+    "contentBlockTableColumn": {
+      "type": "object",
+      "required": ["key", "title"],
+      "additionalProperties": false,
+      "properties": {
+        "key": { "$ref": "#/$defs/nonEmptyString" },
+        "title": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "contentBlockTableRow": {
+      "type": "object",
+      "not": {
+        "anyOf": [
+          { "required": ["evidence_refs"] },
+          { "required": ["traceability_refs"] },
+          { "required": ["source_snippet_refs"] }
+        ]
+      },
+      "additionalProperties": true
+    },
+    "contentBlockTable": {
+      "type": "object",
+      "required": ["id", "title", "columns", "rows"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "columns": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contentBlockTableColumn" }
+        },
+        "rows": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contentBlockTableRow" }
+        }
+      }
+    },
+    "tableContentBlock": {
+      "allOf": [
+        { "$ref": "#/$defs/contentBlockBase" },
+        {
+          "type": "object",
+          "required": ["block_type", "table"],
+          "additionalProperties": false,
+          "properties": {
+            "block_id": { "$ref": "#/$defs/nonEmptyString" },
+            "block_type": { "const": "table" },
+            "title": { "$ref": "#/$defs/nonEmptyString" },
+            "confidence": { "$ref": "#/$defs/confidence" },
+            "evidence_refs": { "$ref": "#/$defs/referenceArray" },
+            "traceability_refs": { "$ref": "#/$defs/referenceArray" },
+            "source_snippet_refs": { "$ref": "#/$defs/referenceArray" },
+            "table": { "$ref": "#/$defs/contentBlockTable" }
+          }
+        }
+      ]
+    },
+    "contentBlock": {
+      "oneOf": [
+        { "$ref": "#/$defs/textContentBlock" },
+        { "$ref": "#/$defs/diagramContentBlock" },
+        { "$ref": "#/$defs/tableContentBlock" }
+      ]
+    },
+    "structureIssuesAndSuggestions": {
+      "type": "object",
+      "required": ["summary", "blocks", "not_applicable_reason"],
+      "additionalProperties": false,
+      "properties": {
+        "summary": { "type": "string" },
+        "blocks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contentBlock" }
+        },
+        "not_applicable_reason": { "type": "string" }
       }
     },
     "mechanismDetail": {
@@ -580,7 +695,10 @@
       "additionalProperties": false,
       "properties": {
         "mechanism_id": { "$ref": "#/$defs/nonEmptyString" },
-        "blocks": { "type": "array", "items": { "$ref": "#/$defs/mechanismTextBlock" } }
+        "blocks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contentBlock" }
+        }
       }
     },
     "internalMechanism": {
