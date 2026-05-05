@@ -39,6 +39,7 @@ GENERIC_OUTPUT_TOKENS = {
 
 CONTROL_CHARACTER_RE = re.compile(r"[\x00-\x1f\x7f-\x9f]")
 SAFE_FENCE_INFO_RE = re.compile(r"^[A-Za-z0-9_+.-]+$")
+SAFE_DIAGRAM_ID_COMMENT_RE = re.compile(r"^(?!.*--)[A-Za-z0-9_.:-]+$")
 
 RUNTIME_UNIT_COLUMNS = [
     ("unit_name", "运行单元"),
@@ -466,6 +467,15 @@ def render_extras(extra_tables, extra_diagrams, empty_text="无补充内容。",
     return "\n\n".join(parts)
 
 
+def render_diagram_id_comment(diagram):
+    diagram_id = stringify_markdown_value((diagram or {}).get("id", "")).strip()
+    if not diagram_id:
+        raise RenderError("Mermaid diagram.id is required for diagram-id metadata")
+    if not SAFE_DIAGRAM_ID_COMMENT_RE.fullmatch(diagram_id):
+        raise RenderError(f"unsafe Mermaid diagram.id for diagram-id metadata: {diagram_id!r}")
+    return f"<!-- diagram-id: {diagram_id} -->"
+
+
 def render_mermaid_block(diagram, empty_text=None):
     source = ""
     if diagram:
@@ -482,7 +492,7 @@ def render_mermaid_block(diagram, empty_text=None):
         parts.append(escape_plain_text(title))
     if description:
         parts.append(escape_plain_text(description))
-    parts.append(f"```mermaid\n{source}\n```")
+    parts.append(f"{render_diagram_id_comment(diagram)}\n```mermaid\n{source}\n```")
     return "\n\n".join(parts)
 
 
