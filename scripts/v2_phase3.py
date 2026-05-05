@@ -1,10 +1,11 @@
 try:
-    from v2_foundation import RuleViolation, has_reason
+    from v2_foundation import RuleViolation
 except ModuleNotFoundError:
-    from scripts.v2_foundation import RuleViolation, has_reason
+    from scripts.v2_foundation import RuleViolation
 
 
 SUPPORT_REF_FIELDS = ("evidence_refs", "traceability_refs", "source_snippet_refs")
+RESERVED_CONTENT_BLOCK_TABLE_COLUMN_KEYS = (*SUPPORT_REF_FIELDS, "confidence")
 
 
 def _non_empty(value):
@@ -41,7 +42,6 @@ def iter_content_block_sections(document):
                     "$.module_design.modules"
                     f"[{module_index}].internal_mechanism.mechanism_details[{detail_index}].blocks",
                     detail.get("blocks", []),
-                    None,
                 )
 
     structure_issues = document.get("structure_issues_and_suggestions")
@@ -49,7 +49,6 @@ def iter_content_block_sections(document):
         yield (
             "$.structure_issues_and_suggestions.blocks",
             structure_issues.get("blocks", []),
-            structure_issues.get("not_applicable_reason"),
         )
 
 
@@ -58,12 +57,10 @@ def phase3_content_block_violations(document):
     if not isinstance(document, dict):
         return violations
 
-    for section_path, blocks, not_applicable_reason in iter_content_block_sections(document):
+    for section_path, blocks in iter_content_block_sections(document):
         if not isinstance(blocks, list):
             continue
         if not blocks:
-            continue
-        if has_reason(not_applicable_reason):
             continue
         block_ids = [block.get("block_id") for block in blocks if isinstance(block, dict)]
         for duplicate in _duplicate_values(block_ids):
@@ -132,7 +129,7 @@ def _table_block_violations(block, base):
         violations.append(RuleViolation(f"{base}.table.rows", "table block must contain at least one row"))
     column_keys = [column.get("key") for column in columns if isinstance(column, dict)]
     for column_index, key in enumerate(column_keys):
-        if key in SUPPORT_REF_FIELDS:
+        if key in RESERVED_CONTENT_BLOCK_TABLE_COLUMN_KEYS:
             violations.append(
                 RuleViolation(
                     f"{base}.table.columns[{column_index}].key",

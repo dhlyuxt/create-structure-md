@@ -257,6 +257,13 @@ class Phase3SemanticValidationTests(unittest.TestCase):
         self.assertEqual(0, completed.returncode, completed.stderr)
         self.assert_invalid(mutate, "table block must contain at least one column")
 
+    def test_content_block_table_requires_rows(self):
+        def mutate(document):
+            table = document["structure_issues_and_suggestions"]["blocks"][2]["table"]
+            table["rows"] = []
+
+        self.assert_invalid(mutate, "table block must contain at least one row")
+
     def test_content_block_table_rows_must_use_declared_column_keys(self):
         def mutate(document):
             row = document["structure_issues_and_suggestions"]["blocks"][2]["table"]["rows"][0]
@@ -277,6 +284,13 @@ class Phase3SemanticValidationTests(unittest.TestCase):
             columns[0]["key"] = "evidence_refs"
 
         self.assert_invalid(mutate, "reserved support metadata key evidence_refs")
+
+    def test_content_block_table_column_keys_must_not_shadow_confidence(self):
+        def mutate(document):
+            columns = document["structure_issues_and_suggestions"]["blocks"][2]["table"]["columns"]
+            columns[0]["key"] = "confidence"
+
+        self.assert_invalid(mutate, "reserved support metadata key confidence")
 
     def test_content_block_table_rows_may_use_declared_reference_like_column_names(self):
         document = valid_document()
@@ -299,6 +313,14 @@ class Phase3SemanticValidationTests(unittest.TestCase):
             document["structure_issues_and_suggestions"]["not_applicable_reason"] = "不适用"
 
         self.assert_invalid(mutate, "cannot provide both content and not_applicable_reason")
+
+    def test_chapter_9_not_applicable_reason_does_not_skip_block_specific_checks(self):
+        def mutate(document):
+            issues = document["structure_issues_and_suggestions"]
+            issues["not_applicable_reason"] = "不适用"
+            issues["blocks"] = [issues["blocks"][2]]
+
+        self.assert_invalid(mutate, "content block section must include at least one non-empty text block")
 
     def test_chapter_9_requires_not_applicable_reason_when_summary_and_blocks_are_empty(self):
         def mutate(document):
