@@ -138,6 +138,7 @@ def _collect_module_design(records, document):
             continue
 
         public_interfaces = _object(module.get("public_interfaces"))
+        public_interfaces_path = json_path("module_design", "modules", module_index, "public_interfaces")
         interfaces_path = json_path("module_design", "modules", module_index, "public_interfaces", "interfaces")
         for interface_index, interface in enumerate(_list(public_interfaces.get("interfaces"))):
             if not isinstance(interface, dict):
@@ -149,11 +150,12 @@ def _collect_module_design(records, document):
                 records,
                 interface.get("execution_flow_diagram"),
                 f"{interface_path}.execution_flow_diagram",
-                interface_path,
-                owner_section=interface,
+                public_interfaces_path,
+                owner_section=public_interfaces,
             )
 
         internal_mechanism = _object(module.get("internal_mechanism"))
+        internal_mechanism_path = json_path("module_design", "modules", module_index, "internal_mechanism")
         details_path = json_path("module_design", "modules", module_index, "internal_mechanism", "mechanism_details")
         for detail_index, detail in enumerate(_list(internal_mechanism.get("mechanism_details"))):
             if not isinstance(detail, dict):
@@ -167,8 +169,8 @@ def _collect_module_design(records, document):
                     records,
                     block.get("diagram"),
                     f"{block_path}.diagram",
-                    block_path,
-                    owner_section=block,
+                    internal_mechanism_path,
+                    owner_section=internal_mechanism,
                 )
 
 
@@ -254,6 +256,7 @@ def _collect_key_flows(records, document):
 
 def _collect_structure_issues(records, document):
     section = _object(document.get("structure_issues_and_suggestions"))
+    owner_path = json_path("structure_issues_and_suggestions")
     blocks_path = json_path("structure_issues_and_suggestions", "blocks")
     for block_index, block in enumerate(_list(section.get("blocks"))):
         if not isinstance(block, dict) or block.get("block_type") != "diagram":
@@ -263,8 +266,8 @@ def _collect_structure_issues(records, document):
             records,
             block.get("diagram"),
             f"{block_path}.diagram",
-            block_path,
-            owner_section=block,
+            owner_path,
+            owner_section=section,
         )
 
 
