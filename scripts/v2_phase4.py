@@ -317,6 +317,16 @@ def collect_expected_diagrams(document):
     return records
 
 
+def _duplicate_values(values):
+    seen = set()
+    duplicates = set()
+    for value in values:
+        if value in seen:
+            duplicates.add(value)
+        seen.add(value)
+    return sorted(duplicates)
+
+
 def _require_string_list(artifact, key, errors):
     values = artifact.get(key)
     if not isinstance(values, list) or not all(
@@ -324,17 +334,40 @@ def _require_string_list(artifact, key, errors):
     ):
         errors.append(f"{key} must be a list of non-empty strings")
         return set()
-    return {value.strip() for value in values}
+
+    normalized_values = [value.strip() for value in values]
+    duplicate_ids = _duplicate_values(normalized_values)
+    if duplicate_ids:
+        errors.append(f"{key} contains duplicate diagram IDs: {', '.join(duplicate_ids)}")
+    return set(normalized_values)
 
 
-def _split_ids_are_derived_from_checked(split_ids, checked_ids):
+def _split_ids_are_derived_from_checked(split_ids, checked_ids, errors):
     unresolved_ids = set()
+    empty_suffix_ids = []
     for split_id in split_ids:
         if split_id in checked_ids:
             continue
-        if any(split_id.startswith(f"{checked_id}::") for checked_id in checked_ids):
+
+        derived_from_checked_id = False
+        for checked_id in checked_ids:
+            prefix = f"{checked_id}::"
+            if not split_id.startswith(prefix):
+                continue
+            derived_from_checked_id = True
+            if not split_id.removeprefix(prefix).strip():
+                empty_suffix_ids.append(split_id)
+            break
+
+        if derived_from_checked_id:
             continue
+
         unresolved_ids.add(split_id)
+    if empty_suffix_ids:
+        errors.append(
+            "split_diagram_ids must use a non-empty derived suffix: "
+            + ", ".join(sorted(empty_suffix_ids))
+        )
     return unresolved_ids
 
 
@@ -363,6 +396,11 @@ def validate_mermaid_review_artifact(document, source_dsl_path, artifact, artifa
         errors.append("source_dsl does not match the DSL input used for expected diagram collection")
 
     records = collect_expected_diagrams(document)
+    expected_diagram_ids = [record.diagram_id for record in records if record.diagram_id]
+    duplicate_expected_ids = _duplicate_values(expected_diagram_ids)
+    if duplicate_expected_ids:
+        errors.append("duplicate expected diagram IDs: " + ", ".join(duplicate_expected_ids))
+
     records_by_id = {record.diagram_id: record for record in records if record.diagram_id}
     all_expected_ids = set(records_by_id)
     rendered_ids = {
@@ -432,7 +470,7 @@ def validate_mermaid_review_artifact(document, source_dsl_path, artifact, artifa
         )
 
     unresolved_review_ids = (accepted_ids | revised_ids) - checked_ids
-    unresolved_review_ids |= _split_ids_are_derived_from_checked(split_ids, checked_ids)
+    unresolved_review_ids |= _split_ids_are_derived_from_checked(split_ids, checked_ids, errors)
     if unresolved_review_ids:
         errors.append(
             "accepted/revised/split IDs must refer to checked diagrams: "

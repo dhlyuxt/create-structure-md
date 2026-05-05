@@ -253,6 +253,45 @@ class Phase4ReadabilityArtifactTests(unittest.TestCase):
 
         self.assertEqual([], errors)
 
+    def test_duplicate_expected_diagram_ids_are_error(self):
+        phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_readability_artifact_duplicate_expected_under_test")
+        document = valid_document()
+        duplicate_id = document["architecture_views"]["module_relationship_diagram"]["id"]
+        document["runtime_view"]["runtime_flow_diagram"]["id"] = duplicate_id
+        deduplicated_ids = {
+            diagram.diagram_id
+            for diagram in phase4.collect_expected_diagrams(document)
+            if diagram.should_render
+        }
+        artifact = complete_review_artifact(FIXTURE, deduplicated_ids)
+
+        errors = phase4.validate_mermaid_review_artifact(document, FIXTURE, artifact)
+
+        self.assertTrue(
+            any("duplicate expected diagram IDs" in error and duplicate_id in error for error in errors),
+            errors,
+        )
+
+    def test_split_diagram_ids_require_non_empty_derived_suffix(self):
+        phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_readability_artifact_empty_split_under_test")
+        checked_id = sorted(self.expected_ids())[0]
+        artifact = complete_review_artifact(FIXTURE, self.expected_ids())
+        artifact["split_diagram_ids"] = [f"{checked_id}::"]
+
+        errors = phase4.validate_mermaid_review_artifact(valid_document(), FIXTURE, artifact)
+
+        self.assertIn(f"split_diagram_ids must use a non-empty derived suffix: {checked_id}::", errors)
+
+    def test_checked_diagram_ids_reject_duplicates(self):
+        phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_readability_artifact_duplicate_checked_under_test")
+        checked_id = sorted(self.expected_ids())[0]
+        artifact = complete_review_artifact(FIXTURE, self.expected_ids())
+        artifact["checked_diagram_ids"].append(checked_id)
+
+        errors = phase4.validate_mermaid_review_artifact(valid_document(), FIXTURE, artifact)
+
+        self.assertIn(f"checked_diagram_ids contains duplicate diagram IDs: {checked_id}", errors)
+
     def test_relative_source_dsl_resolves_against_artifact_directory(self):
         phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_readability_artifact_relative_under_test")
         with tempfile.TemporaryDirectory() as tmpdir:
