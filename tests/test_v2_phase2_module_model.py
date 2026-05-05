@@ -216,6 +216,22 @@ class Phase2SchemaShapeTests(unittest.TestCase):
             with self.subTest(field=field_name):
                 self.assert_schema_invalid(document, field_name)
 
+    def test_chapter_4_child_nodes_accept_optional_support_refs(self):
+        document = valid_document()
+        module = document["module_design"]["modules"][0]
+        child_nodes = [
+            module["configuration"]["parameters"]["rows"][0],
+            module["dependencies"]["rows"][0],
+            module["data_objects"]["rows"][0],
+            module["public_interfaces"]["interfaces"][0],
+            module["known_limitations"]["rows"][0],
+        ]
+        for node in child_nodes:
+            node["traceability_refs"] = []
+            node["source_snippet_refs"] = []
+
+        self.assertEqual([], schema_errors(document))
+
 
 class Phase2SemanticValidationTests(unittest.TestCase):
     def assert_invalid(self, mutate, expected):
@@ -340,6 +356,16 @@ class Phase2SemanticValidationTests(unittest.TestCase):
             document["module_design"]["modules"][0]["internal_mechanism"]["mechanism_details"] = []
 
         self.assert_invalid(mutate, "mechanism_index rows and mechanism_details must have matching mechanism_id sets")
+
+    def test_internal_mechanism_requires_rows_unless_not_applicable_reason(self):
+        def mutate(document):
+            mechanism = document["module_design"]["modules"][0]["internal_mechanism"]
+            mechanism["summary"] = "只保留摘要。"
+            mechanism["mechanism_index"]["rows"] = []
+            mechanism["mechanism_details"] = []
+            mechanism["not_applicable_reason"] = ""
+
+        self.assert_invalid(mutate, "internal_mechanism requires mechanism_index rows unless not_applicable_reason is set")
 
     def test_duplicate_mechanism_ids_fail_within_module(self):
         def mutate(document):

@@ -392,6 +392,13 @@ def _internal_mechanism_violations(module, base, anchor_targets):
     index_ids = [row.get("mechanism_id") for row in index_rows]
     detail_ids = [detail.get("mechanism_id") for detail in details if isinstance(detail, dict)]
 
+    if not index_rows and not details and not has_reason(mechanism.get("not_applicable_reason")):
+        violations.append(
+            RuleViolation(
+                f"{base}.internal_mechanism",
+                "internal_mechanism requires mechanism_index rows unless not_applicable_reason is set",
+            )
+        )
     for duplicate in _duplicate_values(index_ids):
         violations.append(RuleViolation(f"{base}.internal_mechanism.mechanism_index.rows", f"duplicate mechanism_id {duplicate}"))
     for duplicate in _duplicate_values(detail_ids):

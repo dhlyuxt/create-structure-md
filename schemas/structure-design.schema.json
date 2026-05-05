@@ -312,7 +312,9 @@
         "value_source": { "$ref": "#/$defs/valueSource" },
         "meaning": { "$ref": "#/$defs/nonEmptyString" },
         "confidence": { "$ref": "#/$defs/confidence" },
-        "evidence_refs": { "$ref": "#/$defs/referenceArray" }
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" },
+        "traceability_refs": { "$ref": "#/$defs/referenceArray" },
+        "source_snippet_refs": { "$ref": "#/$defs/referenceArray" }
       }
     },
     "moduleParameterTable": {
@@ -348,7 +350,9 @@
         "required_for": { "$ref": "#/$defs/nonEmptyString" },
         "failure_behavior": { "$ref": "#/$defs/nonEmptyString" },
         "confidence": { "$ref": "#/$defs/confidence" },
-        "evidence_refs": { "$ref": "#/$defs/referenceArray" }
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" },
+        "traceability_refs": { "$ref": "#/$defs/referenceArray" },
+        "source_snippet_refs": { "$ref": "#/$defs/referenceArray" }
       }
     },
     "moduleDependencies": {
@@ -374,7 +378,9 @@
         "consumer": { "$ref": "#/$defs/nonEmptyString" },
         "shape_or_contract": { "$ref": "#/$defs/nonEmptyString" },
         "confidence": { "$ref": "#/$defs/confidence" },
-        "evidence_refs": { "$ref": "#/$defs/referenceArray" }
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" },
+        "traceability_refs": { "$ref": "#/$defs/referenceArray" },
+        "source_snippet_refs": { "$ref": "#/$defs/referenceArray" }
       }
     },
     "moduleDataObjects": {
@@ -499,7 +505,9 @@
         "consumers": { "$ref": "#/$defs/stringArray" },
         "contract": { "$ref": "#/$defs/interfaceContract" },
         "confidence": { "$ref": "#/$defs/confidence" },
-        "evidence_refs": { "$ref": "#/$defs/referenceArray" }
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" },
+        "traceability_refs": { "$ref": "#/$defs/referenceArray" },
+        "source_snippet_refs": { "$ref": "#/$defs/referenceArray" }
       }
     },
     "publicInterfaces": {
@@ -596,7 +604,9 @@
         "impact": { "$ref": "#/$defs/nonEmptyString" },
         "mitigation_or_next_step": { "$ref": "#/$defs/nonEmptyString" },
         "confidence": { "$ref": "#/$defs/confidence" },
-        "evidence_refs": { "$ref": "#/$defs/referenceArray" }
+        "evidence_refs": { "$ref": "#/$defs/referenceArray" },
+        "traceability_refs": { "$ref": "#/$defs/referenceArray" },
+        "source_snippet_refs": { "$ref": "#/$defs/referenceArray" }
       }
     },
     "knownLimitations": {
