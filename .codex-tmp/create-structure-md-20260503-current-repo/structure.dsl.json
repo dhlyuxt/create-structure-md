@@ -636,7 +636,7 @@
         "summary": "该模块通过示例 DSL 和 unittest 测试保证技能契约可被真实脚本执行，覆盖各阶段的结构、语义、Mermaid、渲染、安装和端到端流程。",
         "responsibilities": [
           "提供 from-code 和 from-requirements 最小 DSL 示例",
-          "提供 valid-phase2 fixture 作为 schema 与渲染测试基础",
+          "提供 rejected-v1-phase2 fixture 作为旧版输入拒绝路径的测试基础",
           "测试 DSL schema 和语义校验行为",
           "测试 Mermaid 静态和严格校验边界",
           "测试 Markdown 渲染章节、转义和支持数据位置",
@@ -1909,8 +1909,8 @@
       "id": "EV-EXAMPLES",
       "kind": "source",
       "title": "最小 DSL 示例",
-      "location": "examples/minimal-from-code.dsl.json, examples/minimal-from-requirements.dsl.json, tests/fixtures/valid-phase2.dsl.json",
-      "description": "提供可用于校验和渲染测试的 DSL 示例与 fixture。",
+      "location": "examples/minimal-from-code.dsl.json, examples/minimal-from-requirements.dsl.json, tests/fixtures/rejected-v1-phase2.dsl.json",
+      "description": "提供可用于校验、渲染和旧版输入拒绝测试的 DSL 示例与 fixture。",
       "confidence": "observed"
     },
     {
