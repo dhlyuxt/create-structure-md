@@ -10,6 +10,8 @@ V2 accepts only `dsl_version: "0.2.0"`. Inputs with any other version fail befor
 
 V1 fixtures may remain in the repository only as rejected fixtures. They must not be used as renderer acceptance fixtures.
 
+Accepted examples are renderer acceptance inputs and must use `dsl_version: "0.2.0"`. V1 examples may remain only as rejected fixtures; they are used to prove fail-fast migration errors and must not appear in accepted example lists.
+
 ## Input Readiness Contract
 
 The Input Readiness Contract is the gate before any DSL JSON is written. Codex must already have prepared structure design content from an earlier project-understanding step, including module IDs, responsibilities, relationships, runtime units, configuration/data/dependency details when applicable, key flows, diagram intent, confidence levels, assumptions, risks, evidence, traceability targets, and safe source snippets. If required facts are missing, do not invent placeholders inside the DSL; stop and gather the missing design input outside this skill.
@@ -42,6 +44,10 @@ The required V2 module fields include `source_scope`, `configuration`, `dependen
 V1 fields `internal_structure`, `external_capability_details`, `extra_diagrams`, and `extra_tables` are invalid as alternate V2 module-design inputs.
 Section 5.2 no longer accepts `entrypoint_not_applicable_reason` or `external_environment_reason`.
 When a runtime unit has no concrete entrypoint, set `entrypoint` to exactly `不适用` and put the explanation in `notes`.
+
+## Chapter 9 Model
+
+Chapter 9 renders risks, assumptions, low-confidence items, and structure issues in that order. The structure issues section renders its summary before reusable content blocks.
 
 ## Common Metadata
 
@@ -96,6 +102,8 @@ Source snippets must be necessary, minimal, and safe to disclose. Do not include
 ## Support Data
 
 Support data supplies confidence, evidence, traceability, source snippets, risks, and assumptions for design items. Support data helps render stronger documentation but does not create standalone Markdown chapters.
+
+The evidence-mode choice is renderer policy outside DSL content. Hidden mode is the default and suppresses evidence, traceability, and source snippet notes in final Markdown while preserving normal structural facts. Inline mode renders those support notes near the content that references them.
 
 - Evidence refs remain DSL metadata by default; when rendered with `--evidence-mode inline`, evidence referenced by design nodes renders near those nodes as compact `依据：EV-...` notes.
 - Unreferenced evidence produces a validation warning, not a failure.

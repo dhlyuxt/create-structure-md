@@ -11,6 +11,8 @@ Create one module- or system-specific Markdown file from already-prepared struct
 
 This skill does not analyze repositories, infer requirements, generate multiple documents, produce Word/PDF files, or export images. Codex performs project or requirement understanding before invoking this skill. Do not run repository analysis tools as part of this skill.
 
+For V2, create-structure-md accepts only `dsl_version: "0.2.0"`. create-structure-md does not analyze repositories, does not infer missing requirements, and does not invent missing design content from source code; another actor must prepare the structure content before this skill runs.
+
 ## Input Readiness
 
 Before creating DSL JSON, Codex must already have enough information to populate required sections without fabrication:
@@ -48,6 +50,8 @@ If any required input is missing, stop and perform project or requirement unders
 9. Run `python scripts/verify_v2_mermaid_gates.py <temporary-work-directory>/structure.dsl.json --mermaid-review-artifact <temporary-work-directory>/mermaid-readability-review.json --rendered-markdown <output-file> --post-render --work-dir <temporary-work-directory>/mermaid`.
 10. Review with references/review-checklist.md.
 11. Report output path, temporary work directory, assumptions, low-confidence items, and Mermaid gate results. Mermaid gate results include the Mermaid readability artifact path, rendered diagram completeness status, and strict rendered Markdown validation status.
+
+Evidence support blocks are hidden by default through renderer policy, equivalent to `--evidence-mode hidden`. Use `--evidence-mode inline` only when the user explicitly wants inline evidence notes. Static-only Mermaid validation is not final acceptance: the final workflow requires a Mermaid readability review artifact, rendered diagram completeness, and strict rendered Markdown validation.
 
 Strict Mermaid validation is the default. The Mermaid readability artifact is workflow metadata. Do not store it inside DSL JSON and do not render it into final Markdown. The artifact `source_dsl` value must identify the same DSL path passed to `verify_v2_mermaid_gates.py`; prefer `<temporary-work-directory>/structure.dsl.json` or an absolute path. Every rendered Mermaid fence must have an adjacent `<!-- diagram-id: ... -->` comment immediately before the fence. Static-only Mermaid validation is not final acceptance for V2 Phase 4.
 

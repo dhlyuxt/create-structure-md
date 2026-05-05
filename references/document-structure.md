@@ -49,6 +49,8 @@ Fixed subchapter numbering is part of the rendered contract. Chapters 1, 2, and 
 
 Chapter 1 renders document metadata from `document`. Chapter 2 renders prepared system overview content. Chapter 3 renders architecture overview, module list, module relationship Mermaid, and supplemental architecture diagrams. Chapter 4 renders each module's V2 module model as seven fixed subsections: module positioning and source/output scope, configuration, dependencies, data objects, public interfaces, internal mechanism, and known limitations. Chapter 5 renders runtime overview, runtime units, runtime flow Mermaid, runtime sequence Mermaid, and supplemental runtime diagrams. Chapter 6 renders configuration items, structural data/artifacts, dependencies, and supplemental diagrams. Chapter 7 renders collaboration overview, collaboration rows, collaboration Mermaid, and supplemental diagrams. Chapter 8 renders flow overview, flow list, and per-flow details. Chapter 9 renders risks, assumptions, low-confidence summaries, and structure issues in a fixed order.
 
+Each Chapter 4 module renders exactly these subsections in order: `4.x.1 模块定位与源码/产物范围`, `4.x.2 配置`, `4.x.3 依赖`, `4.x.4 数据对象`, `4.x.5 对外接口`, `4.x.6 实现机制说明`, and `4.x.7 已知限制`.
+
 ## Fixed Table Visible Columns
 
 Fixed table visible columns are section-specific content columns only. IDs, confidence, evidence refs, traceability refs, source snippet refs, risk refs, and assumption refs are hidden from normal tables. They may appear only in chapter 9 review summaries when the purpose is review traceability.
@@ -57,6 +59,8 @@ Section 5.2 runtime units render these visible columns:
 
 | 运行单元 | 类型 | 入口 | 职责 | 关联模块 | 备注 |
 | --- | --- | --- | --- | --- | --- |
+
+Section 5.2 renders runtime units with the simplified visible columns `运行单元 | 类型 | 入口 | 职责 | 关联模块 | 备注`. It does not render V1 `入口不适用原因` or `外部环境原因` columns.
 
 ## Empty-State Sentences
 
@@ -81,6 +85,8 @@ Chapter 9 renders in this fixed order:
 
 Section 9.4 renders `structure_issues_and_suggestions.summary` before the shared content blocks.
 
+Chapter 9 renders `9.1 风险清单`, `9.2 假设清单`, `9.3 低置信度项目`, and `9.4 结构问题与改进建议` in that fixed order.
+
 ## Evidence Rendering Mode
 
 Evidence support blocks are hidden by default in final Markdown. Use `python scripts/render_markdown.py structure.dsl.json --evidence-mode inline` only when final Markdown should preserve inline support-data blocks such as `支持数据（...）`.
@@ -94,6 +100,8 @@ The renderer writes into the requested output directory and does not overwrite a
 ## Mermaid And Tables
 
 Every non-empty DSL Mermaid source is rendered in exactly one Mermaid code fence. Every rendered Mermaid fence is preceded immediately by `<!-- diagram-id: MER-... -->`. The comment is structural Markdown source metadata, not evidence support data, and it renders regardless of `--evidence-mode`. Rendered diagram completeness checks match expected DSL diagram IDs to these metadata comments. Title-only matches do not count. After rendering, run `python scripts/verify_v2_mermaid_gates.py <temporary-work-directory>/structure.dsl.json --mermaid-review-artifact <temporary-work-directory>/mermaid-readability-review.json --rendered-markdown <output-file> --post-render --work-dir <temporary-work-directory>/mermaid` to validate rendered diagram completeness and strict rendered Markdown validation. The strict post-render gate covers `validate_mermaid.py --from-markdown <output-file>`.
+
+Every rendered Mermaid fence is preceded by a `diagram-id` metadata comment so rendered diagram completeness can bind Markdown fences back to DSL diagram IDs.
 
 Tables use fixed visible table columns for each section. IDs, confidence, evidence refs, traceability refs, and source snippet refs are hidden from normal tables. They may appear only in chapter 9 risks, assumptions, and low-confidence summaries where review traceability is the purpose.
 

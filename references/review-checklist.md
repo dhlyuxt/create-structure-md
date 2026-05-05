@@ -61,6 +61,17 @@
 - Confirm public interface index rows and detail sections match and render in index order.
 - Confirm Section 5.2 simplified runtime unit table omits V1 reason columns.
 
+## Phase 5 Acceptance Checks
+
+- V2 examples validate, render, and pass rendered diagram completeness.
+- Accepted examples use `dsl_version: "0.2.0"` and rejected V1 fixtures are not renderer acceptance fixtures.
+- hidden evidence mode is the default and inline evidence mode is available only through renderer CLI policy.
+- Mermaid readability artifact exists before strict validation and covers expected diagrams.
+- rendered diagram completeness passes before strict rendered Markdown validation.
+- strict rendered Markdown validation is reported; Static-only Mermaid validation is not final acceptance.
+- `scripts/validate_mermaid.py` unchanged.
+- `references/mermaid-rules.md` unchanged.
+
 ## Mermaid Validation
 
 - Confirm Mermaid-only diagram output: every final diagram is a Markdown Mermaid code block.
