@@ -192,3 +192,137 @@ class Phase3SchemaShapeTests(unittest.TestCase):
             row[field_name] = []
             with self.subTest(field=field_name):
                 self.assert_schema_invalid(document, field_name)
+
+
+class Phase3SemanticValidationTests(unittest.TestCase):
+    def assert_invalid(self, mutate, expected):
+        document = valid_document()
+        mutate(document)
+        completed = validation_stderr_for(document)
+        self.assertEqual(1, completed.returncode, completed.stderr or completed.stdout)
+        self.assertIn(expected, completed.stderr)
+
+    def test_each_content_block_section_requires_at_least_one_text_block_when_blocks_present(self):
+        def mutate(document):
+            document["structure_issues_and_suggestions"]["blocks"] = [
+                document["structure_issues_and_suggestions"]["blocks"][2]
+            ]
+
+        self.assert_invalid(mutate, "content block section must include at least one non-empty text block")
+
+    def test_mechanism_detail_still_requires_at_least_one_text_block(self):
+        def mutate(document):
+            detail = document["module_design"]["modules"][0]["internal_mechanism"]["mechanism_details"][0]
+            detail["blocks"] = [detail["blocks"][1], detail["blocks"][2]]
+
+        self.assert_invalid(mutate, "content block section must include at least one non-empty text block")
+
+    def test_block_ids_are_unique_within_parent_section(self):
+        def mutate(document):
+            blocks = document["structure_issues_and_suggestions"]["blocks"]
+            blocks[1]["block_id"] = blocks[0]["block_id"]
+
+        self.assert_invalid(mutate, "duplicate block_id ISSUE-TEXT-001")
+
+    def test_same_block_id_can_recur_in_different_parent_sections(self):
+        document = valid_document()
+        mechanism_block = document["module_design"]["modules"][0]["internal_mechanism"]["mechanism_details"][0]["blocks"][0]
+        issue_block = document["structure_issues_and_suggestions"]["blocks"][0]
+        issue_block["block_id"] = mechanism_block["block_id"]
+        completed = validation_stderr_for(document)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+
+    def test_diagram_block_requires_non_empty_source(self):
+        def mutate(document):
+            block = document["module_design"]["modules"][0]["internal_mechanism"]["mechanism_details"][0]["blocks"][1]
+            block["diagram"]["source"] = ""
+
+        self.assert_invalid(mutate, "diagram.source must be non-empty")
+
+    def test_diagram_block_confidence_must_match_nested_diagram(self):
+        def mutate(document):
+            block = document["module_design"]["modules"][0]["internal_mechanism"]["mechanism_details"][0]["blocks"][1]
+            block["confidence"] = "observed"
+            block["diagram"]["confidence"] = "unknown"
+
+        self.assert_invalid(mutate, "diagram block confidence must match diagram.confidence")
+
+    def test_content_block_table_requires_columns_and_rows(self):
+        def mutate(document):
+            table = document["structure_issues_and_suggestions"]["blocks"][2]["table"]
+            table["columns"] = []
+            table["rows"] = []
+
+        completed = validation_stderr_for(valid_document())
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assert_invalid(mutate, "table block must contain at least one column")
+
+    def test_content_block_table_rows_must_use_declared_column_keys(self):
+        def mutate(document):
+            row = document["structure_issues_and_suggestions"]["blocks"][2]["table"]["rows"][0]
+            row["undeclared"] = "bad"
+
+        self.assert_invalid(mutate, "content block table row contains keys outside declared columns")
+
+    def test_content_block_table_column_keys_must_be_unique(self):
+        def mutate(document):
+            columns = document["structure_issues_and_suggestions"]["blocks"][2]["table"]["columns"]
+            columns[1]["key"] = columns[0]["key"]
+
+        self.assert_invalid(mutate, "duplicate content block table column key issue")
+
+    def test_content_block_table_column_keys_must_not_shadow_support_refs(self):
+        def mutate(document):
+            columns = document["structure_issues_and_suggestions"]["blocks"][2]["table"]["columns"]
+            columns[0]["key"] = "evidence_refs"
+
+        self.assert_invalid(mutate, "reserved support metadata key evidence_refs")
+
+    def test_content_block_table_rows_may_use_declared_reference_like_column_names(self):
+        document = valid_document()
+        table = document["structure_issues_and_suggestions"]["blocks"][2]["table"]
+        table["columns"] = [
+            {"key": "issue_id", "title": "问题 ID"},
+            {"key": "related_module_ids", "title": "关联模块"},
+        ]
+        table["rows"] = [
+            {
+                "issue_id": "ISSUE-001",
+                "related_module_ids": "MOD-SKILL",
+            }
+        ]
+        completed = validation_stderr_for(document)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+
+    def test_chapter_9_not_applicable_reason_is_mutually_exclusive_with_summary_and_blocks(self):
+        def mutate(document):
+            document["structure_issues_and_suggestions"]["not_applicable_reason"] = "不适用"
+
+        self.assert_invalid(mutate, "cannot provide both content and not_applicable_reason")
+
+    def test_chapter_9_requires_not_applicable_reason_when_summary_and_blocks_are_empty(self):
+        def mutate(document):
+            issues = document["structure_issues_and_suggestions"]
+            issues["summary"] = ""
+            issues["blocks"] = []
+            issues["not_applicable_reason"] = ""
+
+        self.assert_invalid(mutate, "must provide not_applicable_reason when content is absent")
+
+    def test_content_block_table_ids_participate_in_global_uniqueness(self):
+        def mutate(document):
+            document["structure_issues_and_suggestions"]["blocks"][2]["table"]["id"] = "TBL-BLOCK-MECHANISM-STAGES"
+
+        self.assert_invalid(mutate, "duplicate ID TBL-BLOCK-MECHANISM-STAGES")
+
+    def test_content_block_diagram_ids_participate_in_global_uniqueness(self):
+        def mutate(document):
+            document["structure_issues_and_suggestions"]["blocks"][1]["diagram"]["id"] = "MER-BLOCK-MECHANISM-FLOW"
+
+        self.assert_invalid(mutate, "duplicate ID MER-BLOCK-MECHANISM-FLOW")
+
+    def test_block_support_refs_are_resolved_by_global_support_ref_validation(self):
+        def mutate(document):
+            document["structure_issues_and_suggestions"]["blocks"][0]["evidence_refs"] = ["EV-MISSING"]
+
+        self.assert_invalid(mutate, "references unknown evidence ID EV-MISSING")

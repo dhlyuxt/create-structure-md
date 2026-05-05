@@ -27,6 +27,11 @@ try:
 except ModuleNotFoundError:
     from scripts.v2_phase2 import phase2_module_model_violations, phase2_module_model_warnings
 
+try:
+    from v2_phase3 import phase3_content_block_violations
+except ModuleNotFoundError:
+    from scripts.v2_phase3 import phase3_content_block_violations
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = ROOT / "schemas/structure-design.schema.json"
@@ -236,6 +241,7 @@ REGISTERED_REFERENCE_PATHS = [
     re.compile(r"^\$\.module_design\.modules\[\d+\]\.internal_mechanism\.mechanism_index\.rows\[\d+\]\.mechanism_id$"),
     re.compile(r"^\$\.module_design\.modules\[\d+\]\.internal_mechanism\.mechanism_details\[\d+\]\.mechanism_id$"),
     re.compile(r"^\$\.module_design\.modules\[\d+\]\.internal_mechanism\.mechanism_details\[\d+\]\.blocks\[\d+\]\.block_id$"),
+    re.compile(r"^\$\.structure_issues_and_suggestions\.blocks\[\d+\]\.block_id$"),
     re.compile(r"^\$\.module_design\.modules\[\d+\]\.known_limitations\.rows\[\d+\]\.limitation_id$"),
     re.compile(r"^\$\.runtime_view\.runtime_units\.rows\[\d+\]\.(unit_id|related_module_ids)$"),
     re.compile(r"^\$\.configuration_data_dependencies\.configuration_items\.rows\[\d+\]\.config_id$"),
@@ -249,6 +255,7 @@ REGISTERED_REFERENCE_PATHS = [
     # traceability.target_id resolution depends on target_type and is deferred to Task 6.
     re.compile(r"^\$\.traceability\[\d+\]\.(id|source_external_id|target_id)$"),
     re.compile(r"^\$\.(evidence|risks|assumptions|source_snippets)\[\d+\]\.id$"),
+    re.compile(r"^\$.*\.blocks\[\d+\]\.table\.id$"),
     re.compile(r"^\$.*\.(?:extra_tables\[\d+\]|extra_diagrams\[\d+\]|.*diagram)\.id$"),
 ]
 
@@ -318,6 +325,14 @@ def is_diagram_registration_path(path):
 
 def is_extra_table_registration_path(path):
     return ".extra_tables[" in path and ".rows[" not in path
+
+
+def is_content_block_table_registration_path(path):
+    return re.search(r"\.blocks\[\d+\]\.table$", path) is not None
+
+
+def is_content_block_table_row_path(path):
+    return re.search(r"\.blocks\[\d+\]\.table\.rows\[\d+\]$", path) is not None
 
 
 class ValidationContext:
@@ -402,7 +417,9 @@ class ValidationContext:
         for path, value in walk(doc):
             if is_diagram_object(value) and is_diagram_registration_path(path):
                 self.register("diagram", value["id"], f"{path}.id")
-            elif is_extra_table_object(value) and is_extra_table_registration_path(path):
+            elif is_extra_table_object(value) and (
+                is_extra_table_registration_path(path) or is_content_block_table_registration_path(path)
+            ):
                 self.register("extra_table", value["id"], f"{path}.id")
 
     def _check_registered_references(self):
@@ -431,6 +448,8 @@ class ValidationContext:
                 self._check_support_refs(child, f"{path}[{i}]")
 
     def _check_unregistered_id_fields(self, value, path="$"):
+        if is_content_block_table_row_path(path):
+            return
         if isinstance(value, dict):
             for key, child in value.items():
                 child_path = f"{path}.{key}"
@@ -890,14 +909,13 @@ def has_large_code_like_block(value):
 
 def check_chapter_9(document, context):
     value = document["structure_issues_and_suggestions"]
-    for pattern in MARKDOWN_UNSAFE_PATTERNS:
-        if pattern.search(value):
-            context.report.error(
-                "$.structure_issues_and_suggestions",
-                "unsafe Markdown structure is not allowed in chapter 9",
-                "Use paragraphs, simple lists, emphasis, and inline code only",
-            )
-            return
+    if isinstance(value, dict):
+        return
+    context.report.error(
+        "$.structure_issues_and_suggestions",
+        "structure_issues_and_suggestions must use the V2 Phase 3 object shape",
+        "Use summary, blocks, and not_applicable_reason",
+    )
 
 
 def is_mermaid_source_path(path):
@@ -918,10 +936,12 @@ def real_diagram_field_patterns(field_name):
     return [
         rf"^\$\.architecture_views\.module_relationship_diagram\.{escaped_field_name}$",
         rf"^\$\.module_design\.modules\[\d+\]\.public_interfaces\.interfaces\[\d+\]\.execution_flow_diagram\.{escaped_field_name}$",
+        rf"^\$\.module_design\.modules\[\d+\]\.internal_mechanism\.mechanism_details\[\d+\]\.blocks\[\d+\]\.diagram\.{escaped_field_name}$",
         rf"^\$\.runtime_view\.runtime_flow_diagram\.{escaped_field_name}$",
         rf"^\$\.runtime_view\.runtime_sequence_diagram\.{escaped_field_name}$",
         rf"^\$\.cross_module_collaboration\.collaboration_relationship_diagram\.{escaped_field_name}$",
         rf"^\$\.key_flows\.flows\[\d+\]\.diagram\.{escaped_field_name}$",
+        rf"^\$\.structure_issues_and_suggestions\.blocks\[\d+\]\.diagram\.{escaped_field_name}$",
         rf"^\$\.architecture_views\.extra_diagrams\[\d+\]\.{escaped_field_name}$",
         rf"^\$\.runtime_view\.extra_diagrams\[\d+\]\.{escaped_field_name}$",
         rf"^\$\.configuration_data_dependencies\.extra_diagrams\[\d+\]\.{escaped_field_name}$",
@@ -944,7 +964,7 @@ def check_markdown_safety(document, context):
             continue
         if is_diagram_type_path(path):
             continue
-        if path == "$.structure_issues_and_suggestions":
+        if path == "$.structure_issues_and_suggestions" and isinstance(value, str):
             continue
         for pattern in MARKDOWN_UNSAFE_PATTERNS:
             if pattern.search(value):
@@ -1001,9 +1021,15 @@ def check_v2_phase2_module_model(document, report):
         report.warn(warning.path, warning.message)
 
 
+def check_v2_phase3_content_blocks(document, report):
+    for violation in phase3_content_block_violations(document):
+        report.error(violation.path, violation.message)
+
+
 def run_semantic_checks(document, context, *, allow_long_snippets):
     check_v2_global_foundation_rules(document, context.report)
     check_v2_phase2_module_model(document, context.report)
+    check_v2_phase3_content_blocks(document, context.report)
     check_chapter_rules(document, context)
     check_extra_tables(document, context)
     check_traceability(document, context)
