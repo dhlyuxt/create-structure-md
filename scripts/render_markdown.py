@@ -188,7 +188,9 @@ LOW_CONFIDENCE_COLUMNS = [
 LOW_CONFIDENCE_LABEL_KEYS = [
     "module_name",
     "interface_name",
+    "mechanism_name",
     "name",
+    "prototype",
     "capability_name",
     "unit_name",
     "config_name",
@@ -196,6 +198,7 @@ LOW_CONFIDENCE_LABEL_KEYS = [
     "dependency_name",
     "scenario",
     "flow_name",
+    "title",
     "limitation",
     "description",
     "condition",
@@ -714,6 +717,20 @@ def render_not_applicable_table(section, columns, empty_text):
     return render_paragraph(reason, empty_text=empty_text)
 
 
+def render_not_applicable_table_with_support(section, columns, empty_text, support_context, *, id_key, label_key):
+    rows = section.get("rows", []) if section else []
+    if rows:
+        return render_fixed_table_with_support(
+            rows,
+            columns,
+            support_context,
+            id_key=id_key,
+            label_key=label_key,
+        )
+    reason = section.get("not_applicable_reason", "") if section else ""
+    return render_paragraph(reason, empty_text=empty_text)
+
+
 def render_source_scope(scope):
     parts = [
         render_paragraph(scope.get("summary", "")),
@@ -795,7 +812,7 @@ def render_contract_interface_detail(interface):
     return "\n\n".join(part for part in parts if part != "")
 
 
-def render_public_interfaces(public_interfaces, chapter_index):
+def render_public_interfaces(public_interfaces, chapter_index, support_context):
     index_rows = public_interfaces.get("interface_index", {}).get("rows", [])
     interfaces = public_interfaces.get("interfaces", [])
     if not index_rows and not interfaces:
@@ -817,10 +834,11 @@ def render_public_interfaces(public_interfaces, chapter_index):
             parts.append(render_executable_interface_detail(interface))
         else:
             parts.append(render_contract_interface_detail(interface))
+        parts.append(render_node_support(interface, support_context))
     return "\n\n".join(part for part in parts if part != "")
 
 
-def render_mechanism_text_block(block):
+def render_mechanism_text_block(block, support_context):
     parts = []
     title = render_paragraph(block.get("title", ""))
     if title:
@@ -828,10 +846,13 @@ def render_mechanism_text_block(block):
     text = render_paragraph(block.get("text", ""))
     if text:
         parts.append(text)
+    support = render_node_support(block, support_context)
+    if support:
+        parts.append(support)
     return "\n\n".join(parts)
 
 
-def render_internal_mechanism(internal_mechanism, chapter_index):
+def render_internal_mechanism(internal_mechanism, chapter_index, support_context):
     index_rows = internal_mechanism.get("mechanism_index", {}).get("rows", [])
     details = internal_mechanism.get("mechanism_details", [])
     if not index_rows and not details:
@@ -840,10 +861,13 @@ def render_internal_mechanism(internal_mechanism, chapter_index):
     detail_by_id = {detail.get("mechanism_id"): detail for detail in details}
     parts = [
         render_paragraph(internal_mechanism.get("summary", "")),
-        render_not_applicable_table(
+        render_not_applicable_table_with_support(
             internal_mechanism.get("mechanism_index", {}),
             MECHANISM_INDEX_COLUMNS,
             "无实现机制索引。",
+            support_context,
+            id_key="mechanism_id",
+            label_key="mechanism_name",
         ),
     ]
     for detail_index, row in enumerate(index_rows, start=1):
@@ -854,7 +878,7 @@ def render_internal_mechanism(internal_mechanism, chapter_index):
         parts.append(f"###### 4.{chapter_index}.6.{detail_index} {mechanism_name}")
         for block in detail.get("blocks", []):
             if block.get("block_type") == "text":
-                parts.append(render_mechanism_text_block(block))
+                parts.append(render_mechanism_text_block(block, support_context))
     return "\n\n".join(part for part in parts if part != "")
 
 
@@ -877,35 +901,47 @@ def render_module_design_section(module, index, support_context):
         module_support,
         nested_heading(4, index, 2, "配置"),
         render_paragraph(module.get("configuration", {}).get("summary", "")),
-        render_not_applicable_table(
+        render_not_applicable_table_with_support(
             module.get("configuration", {}).get("parameters", {}),
             MODULE_PARAMETER_COLUMNS,
             "无模块配置。",
+            support_context,
+            id_key="parameter_id",
+            label_key="prototype",
         ),
         nested_heading(4, index, 3, "依赖"),
         render_paragraph(module.get("dependencies", {}).get("summary", "")),
-        render_not_applicable_table(
+        render_not_applicable_table_with_support(
             module.get("dependencies", {}),
             MODULE_DEPENDENCY_COLUMNS,
             "无模块依赖。",
+            support_context,
+            id_key="dependency_id",
+            label_key="name",
         ),
         nested_heading(4, index, 4, "数据对象"),
         render_paragraph(module.get("data_objects", {}).get("summary", "")),
-        render_not_applicable_table(
+        render_not_applicable_table_with_support(
             module.get("data_objects", {}),
             MODULE_DATA_OBJECT_COLUMNS,
             "无数据对象。",
+            support_context,
+            id_key="data_id",
+            label_key="name",
         ),
         nested_heading(4, index, 5, "对外接口"),
-        render_public_interfaces(module.get("public_interfaces", {}), index),
+        render_public_interfaces(module.get("public_interfaces", {}), index, support_context),
         nested_heading(4, index, 6, "实现机制说明"),
-        render_internal_mechanism(module.get("internal_mechanism", {}), index),
+        render_internal_mechanism(module.get("internal_mechanism", {}), index, support_context),
         nested_heading(4, index, 7, "已知限制"),
         render_paragraph(module.get("known_limitations", {}).get("summary", "")),
-        render_not_applicable_table(
+        render_not_applicable_table_with_support(
             module.get("known_limitations", {}),
             KNOWN_LIMITATION_COLUMNS,
             "无已知限制。",
+            support_context,
+            id_key="limitation_id",
+            label_key="limitation",
         ),
     ]
     return "\n\n".join(part for part in parts if part != "")
@@ -1172,6 +1208,24 @@ def collect_low_confidence_items(document):
 
     for module_index, module in enumerate(document.get("module_design", {}).get("modules", [])):
         add_item(f"$.module_design.modules[{module_index}]", module)
+        for row_index, row in enumerate(module.get("configuration", {}).get("parameters", {}).get("rows", [])):
+            add_item(
+                "$.module_design.modules"
+                f"[{module_index}].configuration.parameters.rows[{row_index}]",
+                row,
+            )
+        for row_index, row in enumerate(module.get("dependencies", {}).get("rows", [])):
+            add_item(
+                "$.module_design.modules"
+                f"[{module_index}].dependencies.rows[{row_index}]",
+                row,
+            )
+        for row_index, row in enumerate(module.get("data_objects", {}).get("rows", [])):
+            add_item(
+                "$.module_design.modules"
+                f"[{module_index}].data_objects.rows[{row_index}]",
+                row,
+            )
         interfaces = module.get("public_interfaces", {}).get("interfaces", [])
         for interface_index, interface in enumerate(interfaces):
             add_item(
@@ -1179,6 +1233,20 @@ def collect_low_confidence_items(document):
                 f"[{module_index}].public_interfaces.interfaces[{interface_index}]",
                 interface,
             )
+        internal_mechanism = module.get("internal_mechanism", {})
+        for row_index, row in enumerate(internal_mechanism.get("mechanism_index", {}).get("rows", [])):
+            add_item(
+                "$.module_design.modules"
+                f"[{module_index}].internal_mechanism.mechanism_index.rows[{row_index}]",
+                row,
+            )
+        for detail_index, detail in enumerate(internal_mechanism.get("mechanism_details", [])):
+            for block_index, block in enumerate(detail.get("blocks", [])):
+                add_item(
+                    "$.module_design.modules"
+                    f"[{module_index}].internal_mechanism.mechanism_details[{detail_index}].blocks[{block_index}]",
+                    block,
+                )
         for row_index, row in enumerate(module.get("known_limitations", {}).get("rows", [])):
             add_item(
                 "$.module_design.modules"

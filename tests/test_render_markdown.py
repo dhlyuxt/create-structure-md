@@ -1136,6 +1136,41 @@ class NodeLevelSupportPlacementTests(unittest.TestCase):
         module_scope_section = section_between(module_section, "#### 4.1.1 模块定位与源码/产物范围", "#### 4.1.2 配置")
         self.assertNotIn("| REQ-MODULE |", module_scope_section)
 
+    def test_v2_chapter_4_child_support_renders_near_supported_nodes(self):
+        module = load_renderer_module()
+        document = valid_document()
+        module_item = document["module_design"]["modules"][0]
+        parameter = module_item["configuration"]["parameters"]["rows"][0]
+        interface = module_item["public_interfaces"]["interfaces"][0]
+        limitation = module_item["known_limitations"]["rows"][0]
+        parameter["evidence_refs"] = ["EV-PARAM"]
+        interface["evidence_refs"] = ["EV-IFACE"]
+        interface["source_snippet_refs"] = ["SNIP-IFACE"]
+        limitation["evidence_refs"] = ["EV-LIMIT"]
+        limitation["source_snippet_refs"] = ["SNIP-LIMIT"]
+        document["evidence"] = [
+            {"id": "EV-PARAM", "kind": "analysis", "title": "参数依据", "location": "cli docs", "description": "", "confidence": "observed"},
+            {"id": "EV-IFACE", "kind": "analysis", "title": "接口依据", "location": "schema docs", "description": "", "confidence": "observed"},
+            {"id": "EV-LIMIT", "kind": "analysis", "title": "限制依据", "location": "review", "description": "", "confidence": "observed"},
+        ]
+        document["source_snippets"] = [
+            {"id": "SNIP-IFACE", "path": "schemas/structure-design.schema.json", "line_start": 1, "line_end": 2, "language": "json", "purpose": "接口证据。", "content": "{\"type\": \"object\"}", "confidence": "observed"},
+            {"id": "SNIP-LIMIT", "path": "SKILL.md", "line_start": 5, "line_end": 6, "language": "markdown", "purpose": "限制证据。", "content": "No repo analysis.", "confidence": "observed"},
+        ]
+
+        markdown = module.render_markdown(document, evidence_mode="inline")
+        parameter_section = section_between(markdown, "#### 4.1.2 配置", "#### 4.1.3 依赖")
+        interface_section = section_between(markdown, "##### 4.1.5.3 structure-design.schema.json", "#### 4.1.6 实现机制说明")
+        limitation_section = section_from(markdown, "#### 4.1.7 已知限制")
+
+        self.assertIn("支持数据（MPARAM-SKILL-OUTPUT-DIR / --output-dir）", parameter_section)
+        self.assertIn("依据：EV-PARAM（参数依据，cli docs）", parameter_section)
+        self.assertIn("依据：EV-IFACE（接口依据，schema docs）", interface_section)
+        self.assertIn("Source: schemas/structure-design.schema.json:1-2", interface_section)
+        self.assertIn("支持数据（LIMIT-SKILL-NO-REPO-ANALYSIS / 不会从仓库源码自动推理缺失设计内容。）", limitation_section)
+        self.assertIn("依据：EV-LIMIT（限制依据，review）", limitation_section)
+        self.assertIn("Source: SKILL.md:5-6", limitation_section)
+
     def test_flow_detail_step_and_branch_support_render_near_flow_sections(self):
         module = load_renderer_module()
         document = valid_document()
@@ -1646,18 +1681,33 @@ class ChapterNineRenderingTests(unittest.TestCase):
         module = load_renderer_module()
         document = valid_document()
         document["architecture_views"]["module_intro"]["rows"][0]["confidence"] = "unknown"
+        document["module_design"]["modules"][0]["configuration"]["parameters"]["rows"][0]["confidence"] = "unknown"
+        document["module_design"]["modules"][0]["dependencies"]["rows"][0]["confidence"] = "unknown"
+        document["module_design"]["modules"][0]["data_objects"]["rows"][0]["confidence"] = "unknown"
         document["module_design"]["modules"][0]["public_interfaces"]["interfaces"][0]["confidence"] = "unknown"
+        document["module_design"]["modules"][0]["internal_mechanism"]["mechanism_index"]["rows"][0]["confidence"] = "unknown"
+        document["module_design"]["modules"][0]["internal_mechanism"]["mechanism_details"][0]["blocks"][0]["confidence"] = "unknown"
         document["module_design"]["modules"][0]["known_limitations"]["rows"][0]["confidence"] = "unknown"
         document["key_flows"]["flows"][0]["steps"][0]["confidence"] = "unknown"
         markdown = module.render_markdown(document)
         section = markdown[markdown.index("## 9. 结构问题与改进建议") :]
         self.assertIn("### 低置信度项", section)
         self.assertIn("$.architecture_views.module_intro.rows[0]", section)
+        self.assertIn("$.module_design.modules[0].configuration.parameters.rows[0]", section)
+        self.assertIn("$.module_design.modules[0].dependencies.rows[0]", section)
+        self.assertIn("$.module_design.modules[0].data_objects.rows[0]", section)
         self.assertIn("$.module_design.modules[0].public_interfaces.interfaces[0]", section)
+        self.assertIn("$.module_design.modules[0].internal_mechanism.mechanism_index.rows[0]", section)
+        self.assertIn("$.module_design.modules[0].internal_mechanism.mechanism_details[0].blocks[0]", section)
         self.assertIn("$.module_design.modules[0].known_limitations.rows[0]", section)
         self.assertIn("$.key_flows.flows[0].steps[0]", section)
         self.assertIn("技能文档生成模块", section)
+        self.assertIn("--output-dir", section)
+        self.assertIn("jsonschema", section)
+        self.assertIn("结构设计 DSL", section)
         self.assertIn("structure-design.schema.json", section)
+        self.assertIn("DSL 校验管线", section)
+        self.assertIn("DSL 校验管线说明", section)
         self.assertIn("不会从仓库源码自动推理缺失设计内容。", section)
         self.assertIn("准备结构化 DSL JSON。", section)
         self.assertNotIn("未识别到明确的结构问题与改进建议。", section)
