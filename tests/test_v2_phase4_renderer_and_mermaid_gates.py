@@ -255,20 +255,21 @@ class Phase4ReadabilityArtifactTests(unittest.TestCase):
 
     def test_relative_source_dsl_resolves_against_artifact_directory(self):
         phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_readability_artifact_relative_under_test")
-        tmpdir = Path(tempfile.mkdtemp(prefix="phase4-artifact-"))
-        dsl_path = write_json(tmpdir, "structure.dsl.json", valid_document())
-        artifact_path = tmpdir / "mermaid-readability-review.json"
-        artifact = complete_review_artifact(dsl_path, self.expected_ids())
-        artifact["source_dsl"] = "structure.dsl.json"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            dsl_path = write_json(tmpdir, "structure.dsl.json", valid_document())
+            artifact_path = tmpdir / "mermaid-readability-review.json"
+            artifact = complete_review_artifact(dsl_path, self.expected_ids())
+            artifact["source_dsl"] = "structure.dsl.json"
 
-        errors = phase4.validate_mermaid_review_artifact(
-            valid_document(),
-            dsl_path,
-            artifact,
-            artifact_base_dir=artifact_path.parent,
-        )
+            errors = phase4.validate_mermaid_review_artifact(
+                valid_document(),
+                dsl_path,
+                artifact,
+                artifact_base_dir=artifact_path.parent,
+            )
 
-        self.assertEqual([], errors)
+            self.assertEqual([], errors)
 
     def test_missing_artifact_is_error(self):
         phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_readability_artifact_missing_under_test")
