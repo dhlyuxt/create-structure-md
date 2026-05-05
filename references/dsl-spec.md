@@ -53,8 +53,9 @@ V2 Phase 3 content block sections use `blocks[]` with `block_type` values `text`
 Each non-empty content-block section must include at least one text block. Block-level `evidence_refs`,
 `traceability_refs`, and `source_snippet_refs` are valid metadata and are hidden by default in rendered Markdown.
 
-Content-block tables attach support data to the block as a whole. Their rows must use declared column keys only and
-must not include `evidence_refs`, `traceability_refs`, or `source_snippet_refs`.
+Content-block tables attach support data to the block as a whole. Their column keys must not use support metadata
+names such as `evidence_refs`, `traceability_refs`, `source_snippet_refs`, or `confidence`; rows must use declared
+column keys only.
 
 ## ID Prefix Conventions
 
