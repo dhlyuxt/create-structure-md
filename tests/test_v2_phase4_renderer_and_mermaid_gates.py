@@ -527,3 +527,206 @@ class Phase4ReadabilityArtifactTests(unittest.TestCase):
         errors = phase4.validate_mermaid_review_artifact(valid_document(), FIXTURE, artifact)
 
         self.assertIn(f"skipped_diagrams contains duplicate diagram IDs: {skipped_id}", errors)
+
+
+class Phase4VerificationWorkflowTests(unittest.TestCase):
+    def write_complete_artifact(self, tmpdir, dsl_path, document):
+        phase4 = load_script("scripts/v2_phase4.py", "v2_phase4_workflow_artifact_under_test")
+        expected_ids = {
+            diagram.diagram_id
+            for diagram in phase4.collect_expected_diagrams(document)
+            if diagram.should_render
+        }
+        artifact = complete_review_artifact(dsl_path, expected_ids)
+        return write_json(tmpdir, "mermaid-readability-review.json", artifact)
+
+    def test_missing_review_artifact_fails_workflow(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            document = valid_document()
+            dsl_path = write_json(tmpdir, "structure.dsl.json", document)
+            rendered_path = write_text(tmpdir, "rendered.md", "")
+
+            completed = subprocess.run(
+                [
+                    PYTHON,
+                    str(ROOT / "scripts/verify_v2_mermaid_gates.py"),
+                    str(dsl_path),
+                    "--mermaid-review-artifact",
+                    str(tmpdir / "missing.json"),
+                    "--rendered-markdown",
+                    str(rendered_path),
+                    "--post-render",
+                    "--work-dir",
+                    str(tmpdir / "mermaid-work"),
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(2, completed.returncode)
+            self.assertIn("readability review artifact is missing", completed.stderr)
+
+    def test_incomplete_review_artifact_fails_workflow_before_mermaid_cli(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            document = valid_document()
+            dsl_path = write_json(tmpdir, "structure.dsl.json", document)
+            artifact_path = write_json(
+                tmpdir,
+                "mermaid-readability-review.json",
+                complete_review_artifact(dsl_path, set()),
+            )
+            rendered_path = write_text(tmpdir, "rendered.md", "No Mermaid yet.\n")
+
+            completed = subprocess.run(
+                [
+                    PYTHON,
+                    str(ROOT / "scripts/verify_v2_mermaid_gates.py"),
+                    str(dsl_path),
+                    "--mermaid-review-artifact",
+                    str(artifact_path),
+                    "--rendered-markdown",
+                    str(rendered_path),
+                    "--post-render",
+                    "--work-dir",
+                    str(tmpdir / "mermaid-work"),
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(1, completed.returncode)
+            self.assertIn("does not cover expected diagrams", completed.stderr)
+
+    def test_rendered_completeness_failure_blocks_post_render_strict_validation(self):
+        renderer = load_script("scripts/render_markdown.py", "phase4_workflow_renderer_under_test")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            document = valid_document()
+            dsl_path = write_json(tmpdir, "structure.dsl.json", document)
+            artifact_path = self.write_complete_artifact(tmpdir, dsl_path, document)
+            rendered_markdown = renderer.render_markdown(document).replace(
+                "<!-- diagram-id: MER-FLOW-GENERATE -->\n",
+                "",
+                1,
+            )
+            rendered_path = write_text(tmpdir, "rendered.md", rendered_markdown)
+
+            completed = subprocess.run(
+                [
+                    PYTHON,
+                    str(ROOT / "scripts/verify_v2_mermaid_gates.py"),
+                    str(dsl_path),
+                    "--mermaid-review-artifact",
+                    str(artifact_path),
+                    "--rendered-markdown",
+                    str(rendered_path),
+                    "--post-render",
+                    "--work-dir",
+                    str(tmpdir / "mermaid-work"),
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(1, completed.returncode)
+            self.assertIn("MER-FLOW-GENERATE", completed.stderr)
+
+    def test_v1_dsl_rejected_before_artifact_gate(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            document = valid_document()
+            document["dsl_version"] = "0.1.0"
+            dsl_path = write_json(tmpdir, "structure.dsl.json", document)
+
+            completed = subprocess.run(
+                [
+                    PYTHON,
+                    str(ROOT / "scripts/verify_v2_mermaid_gates.py"),
+                    str(dsl_path),
+                    "--mermaid-review-artifact",
+                    str(tmpdir / "missing.json"),
+                    "--pre-render",
+                    "--work-dir",
+                    str(tmpdir / "mermaid-work"),
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(2, completed.returncode)
+            self.assertIn("V1 DSL is not supported", completed.stderr)
+            self.assertNotIn("readability review artifact is missing", completed.stderr)
+
+    def test_not_applicable_contradiction_rejected_before_artifact_gate(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            artifact_document = valid_document()
+            document = valid_document()
+            document["structure_issues_and_suggestions"]["not_applicable_reason"] = "Not applicable."
+            dsl_path = write_json(tmpdir, "structure.dsl.json", document)
+            artifact_path = self.write_complete_artifact(tmpdir, dsl_path, artifact_document)
+
+            completed = subprocess.run(
+                [
+                    PYTHON,
+                    str(ROOT / "scripts/verify_v2_mermaid_gates.py"),
+                    str(dsl_path),
+                    "--mermaid-review-artifact",
+                    str(artifact_path),
+                    "--pre-render",
+                    "--work-dir",
+                    str(tmpdir / "mermaid-work"),
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(1, completed.returncode)
+            self.assertIn("cannot provide both content and not_applicable_reason", completed.stderr)
+            self.assertNotIn("strict mode", completed.stdout)
+
+    def test_pre_render_invokes_existing_dsl_strict_validator_after_artifact_gate(self):
+        workflow = load_script(
+            "scripts/verify_v2_mermaid_gates.py",
+            "phase4_verify_v2_mermaid_gates_workflow_under_test",
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            document = valid_document()
+            dsl_path = write_json(tmpdir, "structure.dsl.json", document)
+            artifact_path = self.write_complete_artifact(tmpdir, dsl_path, document)
+            completed = subprocess.CompletedProcess(
+                ["validate_mermaid.py"],
+                0,
+                stdout="Mermaid validation succeeded: 6 diagram(s) checked in strict mode.\n",
+                stderr="",
+            )
+
+            with mock.patch.object(workflow.subprocess, "run", return_value=completed) as run:
+                code, stdout, stderr = call_main(
+                    workflow,
+                    [
+                        str(dsl_path),
+                        "--mermaid-review-artifact",
+                        str(artifact_path),
+                        "--pre-render",
+                        "--work-dir",
+                        str(tmpdir / "mermaid-work"),
+                    ],
+                )
+
+            self.assertEqual(0, code)
+            self.assertIn("strict mode", stdout)
+            self.assertEqual("", stderr)
+            run_args = run.call_args.args[0]
+            self.assertIn("--from-dsl", run_args)
+            self.assertIn(str(dsl_path), run_args)
+            self.assertIn("--strict", run_args)
+            self.assertIn(str(tmpdir / "mermaid-work" / "pre-render"), run_args)
