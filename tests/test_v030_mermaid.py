@@ -282,6 +282,8 @@ class V030MermaidTests(unittest.TestCase):
         self.assertIn("`participant 存储接口`", rules)
         self.assertIn("unlabeled flowchart node IDs", rules)
         self.assertIn("`---|失败路径|`", rules)
+        self.assertIn("simple flowchart subgraph titles", rules)
+        self.assertIn("`subgraph 存储核心`", rules)
         self.assertIn("state diagrams are supported by schema but non-strict", rules)
 
 
