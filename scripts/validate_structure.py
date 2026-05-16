@@ -7,6 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.v030_package import load_manifest_package, manifest_shape_errors
+from scripts.v030_schema import schema_validation_result
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -35,15 +36,20 @@ def main(argv=None) -> int:
     if isinstance(manifest, dict) and "dsl_version" in manifest:
         print("ERROR: $.dsl_version: structure.manifest.json must not contain dsl_version", file=sys.stderr)
         return 2
-    errors = manifest_shape_errors(manifest)
-    if errors:
-        for issue in errors:
+    shape_errors = manifest_shape_errors(manifest)
+    if shape_errors:
+        for issue in shape_errors:
             print(issue.format(), file=sys.stderr)
         return 2
     try:
-        load_manifest_package(manifest_path)
+        package = load_manifest_package(manifest_path)
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
+        return 2
+    schema_result = schema_validation_result(package)
+    if schema_result.errors:
+        for issue in schema_result.errors:
+            print(issue.format(), file=sys.stderr)
         return 2
     print("Validation succeeded")
     return 0

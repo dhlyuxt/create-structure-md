@@ -1,0 +1,1908 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://create-structure-md.local/schemas/v0.3.0/chapter.schema.json",
+  "$defs": {
+    "Confidence": {
+      "type": "string",
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "ChapterKey": {
+      "type": "string",
+      "enum": [
+        "document",
+        "repository_overview",
+        "directory_map",
+        "module_layers",
+        "repository_mainline",
+        "key_mechanisms",
+        "integration_boundaries",
+        "risks_validation"
+      ]
+    },
+    "Id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]*$"
+    },
+    "Path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$))(?!.*//).+$"
+    },
+    "SourceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/Path"
+        },
+        "symbol": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "Diagram": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "diagram_type",
+        "description",
+        "source"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "diagram_type": {
+          "type": "string",
+          "enum": [
+            "flowchart",
+            "sequenceDiagram",
+            "stateDiagram-v2"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "FlowchartDiagram": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "diagram_type",
+        "description",
+        "source"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "diagram_type": {
+          "const": "flowchart"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "MainlineDetailDiagram": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "diagram_type",
+        "description",
+        "source"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "diagram_type": {
+          "type": "string",
+          "enum": [
+            "flowchart",
+            "sequenceDiagram"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "DocumentInfo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "version",
+        "status",
+        "language",
+        "generated_at",
+        "output_file"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "reviewed",
+            "final"
+          ]
+        },
+        "language": {
+          "const": "zh-CN"
+        },
+        "generated_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "output_file": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "RepositoryInfo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "root_display_path",
+        "kind",
+        "primary_languages"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "root_display_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "c_library",
+            "c_application",
+            "firmware",
+            "mixed",
+            "other"
+          ]
+        },
+        "primary_languages": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "ScopeIncluded": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "area",
+        "description"
+      ],
+      "properties": {
+        "area": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "ScopeExcluded": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "area",
+        "reason"
+      ],
+      "properties": {
+        "area": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "Scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "included",
+        "excluded"
+      ],
+      "properties": {
+        "included": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ScopeIncluded"
+          }
+        },
+        "excluded": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ScopeExcluded"
+          }
+        }
+      }
+    },
+    "ConfidenceSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "level",
+        "summary",
+        "validation_gaps"
+      ],
+      "properties": {
+        "level": {
+          "$ref": "#/$defs/Confidence"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "validation_gaps": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "RepositoryOverview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "summary",
+        "problem_domain",
+        "repository_purpose",
+        "target_readers"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "problem_domain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repository_purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_readers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "RecommendedFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "reason"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/Path"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "ReadingStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "order",
+        "title",
+        "why_read_this",
+        "recommended_files",
+        "expected_takeaway"
+      ],
+      "properties": {
+        "order": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "why_read_this": {
+          "type": "string",
+          "minLength": 1
+        },
+        "recommended_files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RecommendedFile"
+          }
+        },
+        "expected_takeaway": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "ReaderOrientation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "read_first",
+        "read_later",
+        "can_skip_initially"
+      ],
+      "properties": {
+        "read_first": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "read_later": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "can_skip_initially": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "CoreCapability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "description",
+        "entry_points",
+        "notes"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entry_points": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SourceRef"
+          }
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "DirectoryGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "role",
+        "paths",
+        "responsibility",
+        "read_when",
+        "notes"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "main_source",
+            "public_headers",
+            "platform_port",
+            "plugin",
+            "demo",
+            "docs",
+            "tests",
+            "third_party",
+            "build",
+            "generated",
+            "other"
+          ]
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Path"
+          },
+          "minItems": 1
+        },
+        "responsibility": {
+          "type": "string",
+          "minLength": 1
+        },
+        "read_when": {
+          "type": "string",
+          "minLength": 1
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "ImportantFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "why_it_matters",
+        "related_chapters"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/Path"
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "why_it_matters": {
+          "type": "string",
+          "minLength": 1
+        },
+        "related_chapters": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ChapterKey"
+          }
+        }
+      }
+    },
+    "RelationshipDiagram": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "summary"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "diagram": {
+          "$ref": "#/$defs/Diagram"
+        }
+      }
+    },
+    "AreaBoundaryNote": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "area",
+        "note"
+      ],
+      "properties": {
+        "area": {
+          "type": "string",
+          "minLength": 1
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "TopicBoundaryNote": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topic",
+        "note"
+      ],
+      "properties": {
+        "topic": {
+          "type": "string",
+          "minLength": 1
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "Layer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "layer_id",
+        "name",
+        "role",
+        "responsibilities",
+        "paths",
+        "notes"
+      ],
+      "properties": {
+        "layer_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "responsibilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Path"
+          },
+          "minItems": 1
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "ModuleCollaboration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "module_ref",
+        "relationship"
+      ],
+      "properties": {
+        "module_ref": {
+          "$ref": "#/$defs/Id"
+        },
+        "relationship": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "Module": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "module_id",
+        "name",
+        "layer_id",
+        "purpose",
+        "source_paths",
+        "owns",
+        "consumes",
+        "produces",
+        "does_not_own",
+        "collaborates_with",
+        "read_when",
+        "notes"
+      ],
+      "properties": {
+        "module_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "layer_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_paths": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Path"
+          },
+          "minItems": 1
+        },
+        "owns": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "consumes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "produces": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "does_not_own": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "collaborates_with": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModuleCollaboration"
+          }
+        },
+        "read_when": {
+          "type": "string",
+          "minLength": 1
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "MainlineEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "name",
+        "description"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "api",
+            "command",
+            "build_target",
+            "startup",
+            "user_action",
+            "external_event",
+            "other"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_ref": {
+          "$ref": "#/$defs/SourceRef"
+        }
+      }
+    },
+    "MainlineStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "order",
+        "step",
+        "source_refs",
+        "effect"
+      ],
+      "properties": {
+        "order": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "step": {
+          "type": "string",
+          "minLength": 1
+        },
+        "module_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          }
+        },
+        "source_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SourceRef"
+          }
+        },
+        "effect": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "Mainline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mainline_id",
+        "name",
+        "purpose",
+        "entry",
+        "steps",
+        "result",
+        "notes"
+      ],
+      "properties": {
+        "mainline_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entry": {
+          "$ref": "#/$defs/MainlineEntry"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MainlineStep"
+          },
+          "minItems": 1
+        },
+        "result": {
+          "type": "string",
+          "minLength": 1
+        },
+        "detail_diagram": {
+          "$ref": "#/$defs/MainlineDetailDiagram"
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "MechanismSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "SourceFocus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_ref",
+        "reason"
+      ],
+      "properties": {
+        "source_ref": {
+          "$ref": "#/$defs/SourceRef"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "MechanismStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "order",
+        "step",
+        "source_refs",
+        "state_or_data",
+        "notes"
+      ],
+      "properties": {
+        "order": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "step": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SourceRef"
+          }
+        },
+        "state_or_data": {
+          "type": "string",
+          "minLength": 1
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "StateOrData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "kind",
+        "description",
+        "source_refs"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "state",
+            "struct",
+            "enum",
+            "macro",
+            "storage_layout",
+            "runtime_value",
+            "artifact",
+            "other"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SourceRef"
+          }
+        }
+      }
+    },
+    "CommonMisunderstanding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "misunderstanding",
+        "correction"
+      ],
+      "properties": {
+        "misunderstanding": {
+          "type": "string",
+          "minLength": 1
+        },
+        "correction": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "ConfigurationLocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "description"
+      ],
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_ref": {
+          "$ref": "#/$defs/SourceRef"
+        },
+        "external_name": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "RequiredConfiguration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "kind",
+        "location",
+        "purpose",
+        "required_when",
+        "notes"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "macro",
+            "config_file",
+            "build_option",
+            "environment",
+            "runtime_setting",
+            "other"
+          ]
+        },
+        "location": {
+          "$ref": "#/$defs/ConfigurationLocation"
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required_when": {
+          "type": "string",
+          "minLength": 1
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "AdaptationLocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "description"
+      ],
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_ref": {
+          "$ref": "#/$defs/SourceRef"
+        },
+        "external_name": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "RequiredAdaptation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "kind",
+        "location",
+        "responsibility",
+        "caller_or_consumer",
+        "failure_if_missing"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "port_function",
+            "platform_hook",
+            "driver_binding",
+            "memory_hook",
+            "logging_hook",
+            "other"
+          ]
+        },
+        "location": {
+          "$ref": "#/$defs/AdaptationLocation"
+        },
+        "responsibility": {
+          "type": "string",
+          "minLength": 1
+        },
+        "caller_or_consumer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "failure_if_missing": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "IntegrationEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "description"
+      ],
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_ref": {
+          "$ref": "#/$defs/SourceRef"
+        },
+        "external_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "IntegrationPath": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "scenario",
+        "recommended_entry",
+        "steps",
+        "reference_examples",
+        "notes"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scenario": {
+          "type": "string",
+          "minLength": 1
+        },
+        "recommended_entry": {
+          "$ref": "#/$defs/IntegrationEntry"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "reference_examples": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Path"
+          }
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "ExternalDependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "kind",
+        "used_by",
+        "integration_role",
+        "notes"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "library",
+            "hardware",
+            "toolchain",
+            "os",
+            "protocol",
+            "service",
+            "other"
+          ]
+        },
+        "used_by": {
+          "type": "string",
+          "minLength": 1
+        },
+        "integration_role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "OutOfScopeResponsibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topic",
+        "owner",
+        "reason"
+      ],
+      "properties": {
+        "topic": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner": {
+          "type": "string",
+          "enum": [
+            "caller",
+            "platform",
+            "application",
+            "build_system",
+            "deployment",
+            "unknown"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "Risk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "risk_id",
+        "description",
+        "impact",
+        "mitigation",
+        "related_modules",
+        "related_mechanisms",
+        "confidence"
+      ],
+      "properties": {
+        "risk_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "impact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mitigation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "related_modules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          }
+        },
+        "related_mechanisms": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          }
+        },
+        "confidence": {
+          "$ref": "#/$defs/Confidence"
+        }
+      }
+    },
+    "Assumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assumption_id",
+        "description",
+        "rationale",
+        "validation_suggestion",
+        "confidence"
+      ],
+      "properties": {
+        "assumption_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "validation_suggestion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "confidence": {
+          "$ref": "#/$defs/Confidence"
+        }
+      }
+    },
+    "ValidationGap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gap_id",
+        "gap_type",
+        "description",
+        "why_it_matters",
+        "suggested_validation",
+        "related_chapters",
+        "confidence"
+      ],
+      "properties": {
+        "gap_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "gap_type": {
+          "type": "string",
+          "enum": [
+            "analysis_gap",
+            "missing_build_validation",
+            "missing_runtime_validation",
+            "uncertain_behavior",
+            "no_key_mechanisms_selected",
+            "other"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "why_it_matters": {
+          "type": "string",
+          "minLength": 1
+        },
+        "suggested_validation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "related_chapters": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ChapterKey"
+          }
+        },
+        "confidence": {
+          "$ref": "#/$defs/Confidence"
+        }
+      }
+    },
+    "LowConfidenceLocation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "chapter"
+          ],
+          "properties": {
+            "kind": {
+              "const": "chapter"
+            },
+            "chapter": {
+              "$ref": "#/$defs/ChapterKey"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "path"
+          ],
+          "properties": {
+            "kind": {
+              "const": "manifest_path"
+            },
+            "path": {
+              "$ref": "#/$defs/Path"
+            }
+          }
+        }
+      ]
+    },
+    "LowConfidenceItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item_id",
+        "location",
+        "description",
+        "reason",
+        "needed_evidence"
+      ],
+      "properties": {
+        "item_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "location": {
+          "$ref": "#/$defs/LowConfidenceLocation"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "needed_evidence": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "DocumentChapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chapter",
+        "document",
+        "repository",
+        "scope",
+        "confidence"
+      ],
+      "properties": {
+        "chapter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "title"
+          ],
+          "properties": {
+            "key": {
+              "const": "document"
+            },
+            "title": {
+              "const": "文档说明"
+            }
+          }
+        },
+        "document": {
+          "$ref": "#/$defs/DocumentInfo"
+        },
+        "repository": {
+          "$ref": "#/$defs/RepositoryInfo"
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope"
+        },
+        "confidence": {
+          "$ref": "#/$defs/ConfidenceSummary"
+        }
+      }
+    },
+    "RepositoryOverviewChapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chapter",
+        "overview",
+        "core_capabilities",
+        "reading_route",
+        "reader_orientation"
+      ],
+      "properties": {
+        "chapter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "title"
+          ],
+          "properties": {
+            "key": {
+              "const": "repository_overview"
+            },
+            "title": {
+              "const": "仓库概述与阅读路线"
+            }
+          }
+        },
+        "overview": {
+          "$ref": "#/$defs/RepositoryOverview"
+        },
+        "core_capabilities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CoreCapability"
+          },
+          "minItems": 1
+        },
+        "reading_route": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "summary",
+            "steps"
+          ],
+          "properties": {
+            "summary": {
+              "type": "string",
+              "minLength": 1
+            },
+            "steps": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ReadingStep"
+              },
+              "minItems": 1
+            }
+          }
+        },
+        "reader_orientation": {
+          "$ref": "#/$defs/ReaderOrientation"
+        }
+      }
+    },
+    "DirectoryMapChapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chapter",
+        "summary",
+        "directory_groups",
+        "important_files",
+        "directory_relationships",
+        "boundary_notes"
+      ],
+      "properties": {
+        "chapter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "title"
+          ],
+          "properties": {
+            "key": {
+              "const": "directory_map"
+            },
+            "title": {
+              "const": "目录地图"
+            }
+          }
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "directory_groups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DirectoryGroup"
+          },
+          "minItems": 1
+        },
+        "important_files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ImportantFile"
+          }
+        },
+        "directory_relationships": {
+          "$ref": "#/$defs/RelationshipDiagram"
+        },
+        "boundary_notes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AreaBoundaryNote"
+          }
+        }
+      }
+    },
+    "ModuleLayersChapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chapter",
+        "summary",
+        "layers",
+        "modules",
+        "boundary_notes"
+      ],
+      "properties": {
+        "chapter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "title"
+          ],
+          "properties": {
+            "key": {
+              "const": "module_layers"
+            },
+            "title": {
+              "const": "系统分层与模块职责"
+            }
+          }
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "layers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Layer"
+          },
+          "minItems": 1
+        },
+        "modules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Module"
+          },
+          "minItems": 1
+        },
+        "boundary_notes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TopicBoundaryNote"
+          }
+        },
+        "layer_diagram": {
+          "$ref": "#/$defs/Diagram"
+        }
+      }
+    },
+    "RepositoryMainlineChapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chapter",
+        "summary",
+        "mainline_overview_diagram",
+        "mainlines",
+        "cross_mainline_notes"
+      ],
+      "properties": {
+        "chapter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "title"
+          ],
+          "properties": {
+            "key": {
+              "const": "repository_mainline"
+            },
+            "title": {
+              "const": "仓库主线"
+            }
+          }
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mainline_overview_diagram": {
+          "$ref": "#/$defs/FlowchartDiagram"
+        },
+        "mainlines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Mainline"
+          },
+          "minItems": 1,
+          "maxItems": 3
+        },
+        "cross_mainline_notes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TopicBoundaryNote"
+          }
+        }
+      }
+    },
+    "MechanismChapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "section",
+        "why_it_matters",
+        "reader_prerequisites",
+        "related_modules",
+        "source_focus",
+        "mechanism_overview",
+        "flow",
+        "key_states_or_data",
+        "common_misunderstandings",
+        "validation_gaps",
+        "confidence"
+      ],
+      "properties": {
+        "section": {
+          "$ref": "#/$defs/MechanismSection"
+        },
+        "why_it_matters": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reader_prerequisites": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "related_modules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          }
+        },
+        "source_focus": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SourceFocus"
+          },
+          "minItems": 1
+        },
+        "mechanism_overview": {
+          "type": "string",
+          "minLength": 1
+        },
+        "flow": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MechanismStep"
+          },
+          "minItems": 1
+        },
+        "key_states_or_data": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/StateOrData"
+          }
+        },
+        "common_misunderstandings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CommonMisunderstanding"
+          }
+        },
+        "validation_gaps": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "confidence": {
+          "$ref": "#/$defs/Confidence"
+        },
+        "diagram": {
+          "$ref": "#/$defs/Diagram"
+        }
+      }
+    },
+    "IntegrationBoundariesChapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chapter",
+        "summary",
+        "required_configuration",
+        "required_adaptations",
+        "integration_paths",
+        "external_dependencies",
+        "out_of_scope_responsibilities"
+      ],
+      "properties": {
+        "chapter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "title"
+          ],
+          "properties": {
+            "key": {
+              "const": "integration_boundaries"
+            },
+            "title": {
+              "const": "配置、移植与集成边界"
+            }
+          }
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required_configuration": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RequiredConfiguration"
+          }
+        },
+        "required_adaptations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RequiredAdaptation"
+          }
+        },
+        "integration_paths": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntegrationPath"
+          }
+        },
+        "external_dependencies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ExternalDependency"
+          }
+        },
+        "out_of_scope_responsibilities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/OutOfScopeResponsibility"
+          }
+        }
+      }
+    },
+    "RisksValidationChapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chapter",
+        "summary",
+        "risks",
+        "assumptions",
+        "validation_gaps",
+        "low_confidence_items"
+      ],
+      "properties": {
+        "chapter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "title"
+          ],
+          "properties": {
+            "key": {
+              "const": "risks_validation"
+            },
+            "title": {
+              "const": "风险、假设与验证缺口"
+            }
+          }
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "risks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Risk"
+          }
+        },
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Assumption"
+          }
+        },
+        "validation_gaps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ValidationGap"
+          }
+        },
+        "low_confidence_items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/LowConfidenceItem"
+          }
+        }
+      }
+    }
+  }
+}
