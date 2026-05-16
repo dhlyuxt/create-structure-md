@@ -34,7 +34,7 @@ SEQUENCE_MESSAGE_RE = re.compile(
 )
 SEQUENCE_UNSUPPORTED_VISIBLE_LINE_RE = re.compile(r"^\s*(?:Note|loop|alt|opt|par|and|rect|critical|break|box)\b")
 UNSUPPORTED_FLOWCHART_LABEL_LINE_RE = re.compile(
-    r"(?:--|==|-\.)\s+[^|\n]+?\s+(?:-{2,}(?:>|x|o)?|={2,}(?:>|x|o)?|\.-(?:>|x|o)?)"
+    r"(?<![-.=])(?:--|==|-\.)\s+[^|\n]+?\s+(?:-{2,}(?:>|x|o)?|={2,}(?:>|x|o)?|\.-(?:>|x|o)?)"
 )
 UNSUPPORTED_FLOWCHART_NODE_SHAPE_RE = re.compile(r"(?<![A-Za-z0-9_.:-])[A-Za-z0-9_][A-Za-z0-9_.:-]*\s*>\s*[^]\n]+\]")
 

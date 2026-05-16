@@ -238,6 +238,22 @@ class V030MermaidTests(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertTrue(any("visible Mermaid label leaks internal ID: MOD-CORE" in issue.message for issue in result.errors))
 
+    def test_supported_flowchart_edge_chains_do_not_warn(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = "flowchart TD\n  a --- b --> c"
+            result = mermaid_validation_result(package)
+        self.assertTrue(result.ok, [issue.format() for issue in result.errors])
+        self.assertFalse(result.warnings, [issue.format() for issue in result.warnings])
+
+    def test_textual_flowchart_line_label_still_warns_after_operator_boundary_fix(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = "flowchart TD\n  a -- label --- b"
+            result = mermaid_validation_result(package)
+        self.assertTrue(result.ok, [issue.format() for issue in result.errors])
+        self.assertTrue(any("Unsupported visible-label syntax" in issue.message for issue in result.warnings))
+
     def test_flowchart_textual_edge_syntax_warns_when_not_fully_inspected(self):
         sources = [
             ("dotted", "flowchart TD\n  a[应用] -. 失败路径 .-> b[核心]"),
@@ -421,6 +437,25 @@ class V030MermaidTests(unittest.TestCase):
             )
         self.assertEqual(2, completed.returncode)
         self.assertIn("strict mode treats validation warnings as errors", completed.stderr)
+
+    def test_strict_cli_allows_supported_flowchart_edge_chains(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest = write_valid_package(tmpdir)
+            package = load_manifest_package(manifest)
+            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = "flowchart TD\n  a --- b --> c"
+            package.chapter_files["repository_mainline"].write_text(
+                json.dumps(package.chapters["repository_mainline"], ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            completed = subprocess.run(
+                [PYTHON, str(ROOT / "scripts/validate_structure.py"), str(manifest), "--strict"],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertIn("Validation succeeded", completed.stdout)
 
     def test_mermaid_rules_document_checked_label_forms(self):
         rules = (ROOT / "references/mermaid-rules.md").read_text(encoding="utf-8")
