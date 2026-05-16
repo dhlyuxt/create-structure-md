@@ -10,7 +10,7 @@ Mermaid diagrams exist to help a reader build a mental model. They are not ID ma
 - `sequenceDiagram`
 - `stateDiagram-v2`
 
-The first non-empty Mermaid source line must start with the same token as `diagram_type`. Legacy `graph` declarations are rejected.
+The first non-empty, non-comment Mermaid source line must start with the same token as `diagram_type`. Legacy `graph` declarations are rejected.
 
 ## Visible Label Gate
 
@@ -18,11 +18,12 @@ The validator inspects these visible-label forms:
 
 - flowchart bracket labels such as `node[存储核心]`, `node(平台适配)`, and `node{是否已初始化}`
 - flowchart edge labels using `-->|失败路径|`, such as `api -->|失败路径| fallback`
+- unlabeled flowchart node IDs such as `storage_core` in `storage_core --> platform_port`
 - sequence aliases such as `participant api as 存储接口`
 - unaliased sequence participant and actor names such as `participant 存储接口` and `actor 用户`
 - sequence message labels such as `api->>core: 写入成功`
 
-Visible labels must not expose legacy internal IDs such as `MOD-*`, `RUN-*`, `FLOW-*`, or `MER-*`. Technical node identifiers are allowed when the rendered labels are human-readable.
+Visible labels must not expose legacy internal IDs such as `MOD-*`, `RUN-*`, `FLOW-*`, or `MER-*`. Technical node identifiers are allowed when explicit rendered labels are human-readable.
 
 Mermaid comment lines that start with `%%` are ignored by the visible-label gate.
 

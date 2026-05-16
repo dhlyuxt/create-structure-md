@@ -6,6 +6,12 @@ from scripts.v030_types import ValidationResult
 
 OLD_INTERNAL_ID_RE = re.compile(r"\b(?:MOD|RUN|FLOW|MER|STEP|CAP|CFG|DATA|COL|RISK|ASM)-[A-Za-z0-9_-]+\b")
 FLOWCHART_NODE_LABEL_RE = re.compile(r"(?<![\w])[\w.:-]+\s*(?:\[([^\]\n]+)\]|\(([^\)\n]+)\)|\{([^}\n]+)\})")
+FLOWCHART_EDGE_ENDPOINT_RE = re.compile(
+    r"(?P<left>[A-Za-z0-9_.:-]+(?:\[[^\]\n]*\]|\([^\)\n]*\)|\{[^}\n]*\})?)"
+    r"\s*(?:[-.=]+(?:>|x|o)|[-.=]+)\s*(?:\|[^|\n]+\|\s*)?"
+    r"(?P<right>[A-Za-z0-9_.:-]+(?:\[[^\]\n]*\]|\([^\)\n]*\)|\{[^}\n]*\})?)"
+)
+FLOWCHART_STANDALONE_NODE_RE = re.compile(r"^\s*([A-Za-z0-9_.:-]+)\s*;?\s*$")
 FLOWCHART_EDGE_LABEL_RE = re.compile(r"-->\|([^|]+)\|")
 SEQUENCE_ALIAS_RE = re.compile(r"^\s*(?:create\s+)?(?:participant|actor)\s+\S+\s+as\s+(.+?)\s*$")
 SEQUENCE_DECLARATION_RE = re.compile(r"^\s*(?:create\s+)?(?:participant|actor)\s+(.+?)\s*$")
@@ -21,11 +27,37 @@ def content_lines(source: str):
 
 
 def first_mermaid_token(source: str) -> str:
-    for line in source.splitlines():
+    for line in content_lines(source):
         stripped = line.strip()
         if stripped:
             return stripped.split()[0]
     return ""
+
+
+def unlabeled_flowchart_node_id(token: str) -> str:
+    token = token.strip().rstrip(";").strip('"')
+    if not token or any(marker in token for marker in "[({"):
+        return ""
+    if ":::" in token:
+        token = token.split(":::", 1)[0]
+    return token
+
+
+def visible_unlabeled_flowchart_node_ids(lines):
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith(("flowchart", "subgraph")) or stripped == "end":
+            continue
+        for match in FLOWCHART_EDGE_ENDPOINT_RE.finditer(line):
+            for group in ("left", "right"):
+                node_id = unlabeled_flowchart_node_id(match.group(group))
+                if node_id:
+                    yield node_id
+        match = FLOWCHART_STANDALONE_NODE_RE.match(line)
+        if match:
+            node_id = unlabeled_flowchart_node_id(match.group(1))
+            if node_id:
+                yield node_id
 
 
 def visible_labels(diagram_type: str, source: str):
@@ -40,6 +72,7 @@ def visible_labels(diagram_type: str, source: str):
             label = match.group(1).strip().strip('"')
             if label:
                 yield label
+        yield from visible_unlabeled_flowchart_node_ids(lines)
     if diagram_type != "sequenceDiagram":
         return
     for line in lines:

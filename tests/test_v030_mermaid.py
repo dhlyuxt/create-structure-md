@@ -24,6 +24,14 @@ class V030MermaidTests(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertTrue(any("diagram_type does not match Mermaid declaration" in issue.message for issue in result.errors))
 
+    def test_leading_mermaid_comments_do_not_affect_declaration_token(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = "%% comment\nflowchart TD\n  a[应用] --> b[核心]"
+            result = mermaid_validation_result(package)
+        self.assertTrue(result.ok, [issue.format() for issue in result.errors])
+        self.assertFalse(result.warnings, [issue.format() for issue in result.warnings])
+
     def test_legacy_graph_declaration_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             package = load_manifest_package(write_valid_package(tmpdir))
@@ -107,6 +115,23 @@ class V030MermaidTests(unittest.TestCase):
         self.assertTrue(result.ok, [issue.format() for issue in result.errors])
         self.assertFalse(result.warnings, [issue.format() for issue in result.warnings])
 
+    def test_unlabeled_flowchart_node_ids_are_visible_labels(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = "flowchart TD\n  MOD-CORE --> RUN-LOAD"
+            result = mermaid_validation_result(package)
+        self.assertFalse(result.ok)
+        self.assertTrue(any("visible Mermaid label leaks internal ID: MOD-CORE" in issue.message for issue in result.errors))
+        self.assertTrue(any("visible Mermaid label leaks internal ID: RUN-LOAD" in issue.message for issue in result.errors))
+
+    def test_explicitly_labeled_flowchart_technical_ids_are_allowed(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = "flowchart TD\n  mod_core[存储核心] --> run_load[加载流程]"
+            result = mermaid_validation_result(package)
+        self.assertTrue(result.ok, [issue.format() for issue in result.errors])
+        self.assertFalse(result.warnings, [issue.format() for issue in result.warnings])
+
     def test_state_diagram_warns_when_visible_label_syntax_is_not_covered(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             package = load_manifest_package(write_valid_package(tmpdir))
@@ -159,6 +184,7 @@ class V030MermaidTests(unittest.TestCase):
         self.assertIn("`api->>core: 写入成功`", rules)
         self.assertIn("unaliased sequence participant and actor names", rules)
         self.assertIn("`participant 存储接口`", rules)
+        self.assertIn("unlabeled flowchart node IDs", rules)
 
 
 if __name__ == "__main__":
