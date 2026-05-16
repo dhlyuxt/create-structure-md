@@ -31,6 +31,6 @@ Mermaid comment lines that start with `%%` are ignored by the visible-label gate
 
 ## Warning Policy
 
-If a diagram uses syntax whose visible labels are not inspected, validation emits a warning. This includes unsupported node shapes and sequence boxes. Normal validation allows warnings. Strict validation promotes warnings to errors.
+If a diagram uses syntax whose visible labels are not inspected, validation emits a warning. This includes unsupported node shapes such as asymmetric flowchart nodes, textual flowchart edge labels, and sequence boxes. Normal validation allows warnings. Strict validation promotes warnings to errors.
 
 `stateDiagram-v2` state diagrams are supported by schema but non-strict due to partial label coverage until state label inspection is implemented.

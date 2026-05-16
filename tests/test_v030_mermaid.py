@@ -218,6 +218,7 @@ class V030MermaidTests(unittest.TestCase):
             ("dotted", "flowchart TD\n  a[应用] -. 失败路径 .-> b[核心]"),
             ("thick", "flowchart TD\n  a[应用] == 失败路径 ==> b[核心]"),
             ("hyphenated", "flowchart TD\n  a[应用] -- 失败-路径 --> b[核心]"),
+            ("plain_line", "flowchart TD\n  a[应用] -- 失败路径 --- b[核心]"),
         ]
         for name, source in sources:
             with self.subTest(name=name):
@@ -232,6 +233,14 @@ class V030MermaidTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             package = load_manifest_package(write_valid_package(tmpdir))
             package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = "flowchart TD\n  a[应用]\n  b>MOD-CORE]"
+            result = mermaid_validation_result(package)
+        self.assertTrue(result.ok, [issue.format() for issue in result.errors])
+        self.assertTrue(any("Unsupported visible-label syntax" in issue.message for issue in result.warnings))
+
+    def test_inline_unsupported_flowchart_node_shape_warns_when_not_fully_inspected(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = "flowchart TD\n  a>MOD-CORE] --> b[核心]"
             result = mermaid_validation_result(package)
         self.assertTrue(result.ok, [issue.format() for issue in result.errors])
         self.assertTrue(any("Unsupported visible-label syntax" in issue.message for issue in result.warnings))
@@ -294,7 +303,7 @@ class V030MermaidTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest = write_valid_package(tmpdir)
             package = load_manifest_package(manifest)
-            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = "flowchart TD\n  a[应用]\n  b>MOD-CORE]"
+            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = "flowchart TD\n  a[应用] -- 失败路径 --- b[核心]"
             package.chapter_files["repository_mainline"].write_text(
                 json.dumps(package.chapters["repository_mainline"], ensure_ascii=False, indent=2),
                 encoding="utf-8",
@@ -322,6 +331,8 @@ class V030MermaidTests(unittest.TestCase):
         self.assertIn("simple flowchart subgraph titles", rules)
         self.assertIn("`subgraph 存储核心`", rules)
         self.assertIn("unsupported node shapes", rules)
+        self.assertIn("asymmetric flowchart nodes", rules)
+        self.assertIn("textual flowchart edge labels", rules)
         self.assertIn("sequence boxes", rules)
         self.assertIn("state diagrams are supported by schema but non-strict", rules)
 
