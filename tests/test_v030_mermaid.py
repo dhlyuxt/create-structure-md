@@ -47,6 +47,46 @@ class V030MermaidTests(unittest.TestCase):
             result = mermaid_validation_result(package)
         self.assertTrue(result.ok, [issue.format() for issue in result.errors])
 
+    def test_sequence_message_labels_must_not_leak_old_internal_ids(self):
+        sources = [
+            (
+                "with_aliases",
+                "sequenceDiagram\n  participant api as 存储接口\n  participant core as 存储核心\n  api->>core: MOD-CORE",
+            ),
+            ("without_aliases", "sequenceDiagram\n  api->>core: MOD-CORE"),
+        ]
+        for name, source in sources:
+            with self.subTest(name=name):
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    package = load_manifest_package(write_valid_package(tmpdir))
+                    diagram = package.chapters["repository_mainline"]["mainline_overview_diagram"]
+                    diagram["diagram_type"] = "sequenceDiagram"
+                    diagram["source"] = source
+                    result = mermaid_validation_result(package)
+                self.assertFalse(result.ok)
+                self.assertTrue(any("visible Mermaid label leaks internal ID: MOD-CORE" in issue.message for issue in result.errors))
+
+    def test_flowchart_labels_with_parentheses_must_not_hide_old_internal_ids(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = "flowchart TD\n  a[MOD-CORE (legacy)] --> b[结束]"
+            result = mermaid_validation_result(package)
+        self.assertFalse(result.ok)
+        self.assertTrue(any("visible Mermaid label leaks internal ID: MOD-CORE" in issue.message for issue in result.errors))
+
+    def test_mermaid_comments_are_ignored_by_visible_label_checks(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = (
+                "flowchart TD\n"
+                "  %% hidden[MOD-CORE]\n"
+                "  %% a -- hidden old route --> b\n"
+                "  a[应用] --> b[核心]"
+            )
+            result = mermaid_validation_result(package)
+        self.assertTrue(result.ok, [issue.format() for issue in result.errors])
+        self.assertFalse(result.warnings, [issue.format() for issue in result.warnings])
+
     def test_state_diagram_warns_when_visible_label_syntax_is_not_covered(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             package = load_manifest_package(write_valid_package(tmpdir))
@@ -90,6 +130,13 @@ class V030MermaidTests(unittest.TestCase):
             )
         self.assertEqual(2, completed.returncode)
         self.assertIn("strict mode treats validation warnings as errors", completed.stderr)
+
+    def test_mermaid_rules_document_checked_label_forms(self):
+        rules = (ROOT / "references/mermaid-rules.md").read_text(encoding="utf-8")
+        self.assertIn("flowchart edge labels", rules)
+        self.assertIn("`-->|失败路径|`", rules)
+        self.assertIn("sequence message labels", rules)
+        self.assertIn("`api->>core: 写入成功`", rules)
 
 
 if __name__ == "__main__":
