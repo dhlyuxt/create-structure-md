@@ -23,8 +23,9 @@ SEQUENCE_DECLARATION_RE = re.compile(r"^\s*(?:create\s+)?(?:participant|actor)\s
 SEQUENCE_MESSAGE_RE = re.compile(
     r"^\s*(?P<from>\S+)\s*(?:-{1,2}(?:>>?|x|\))|={1,2}(?:>>?|x|\)))[+-]?\s*(?P<to>\S+)\s*:\s*(?P<label>.+?)\s*$"
 )
-SEQUENCE_UNSUPPORTED_VISIBLE_LINE_RE = re.compile(r"^\s*(?:Note|loop|alt|opt|par|and|rect|critical|break)\b")
+SEQUENCE_UNSUPPORTED_VISIBLE_LINE_RE = re.compile(r"^\s*(?:Note|loop|alt|opt|par|and|rect|critical|break|box)\b")
 UNSUPPORTED_FLOWCHART_LABEL_LINE_RE = re.compile(r"(?:--|==|-\.)\s+[^|\n]+?\s+(?:-->|==>|\.->)")
+UNSUPPORTED_FLOWCHART_NODE_SHAPE_RE = re.compile(r"^\s*[A-Za-z0-9_.:-]+\s*>\s*[^]\n]+\]\s*$")
 
 
 def content_lines(source: str):
@@ -143,7 +144,10 @@ def has_unsupported_visible_label_syntax(diagram_type: str, source: str) -> bool
     if diagram_type == "stateDiagram-v2":
         return True
     if diagram_type == "flowchart":
-        return any(UNSUPPORTED_FLOWCHART_LABEL_LINE_RE.search(line) for line in content_lines(source))
+        return any(
+            UNSUPPORTED_FLOWCHART_LABEL_LINE_RE.search(line) or UNSUPPORTED_FLOWCHART_NODE_SHAPE_RE.search(line)
+            for line in content_lines(source)
+        )
     if diagram_type == "sequenceDiagram":
         return any(SEQUENCE_UNSUPPORTED_VISIBLE_LINE_RE.search(line) for line in content_lines(source))
     return False

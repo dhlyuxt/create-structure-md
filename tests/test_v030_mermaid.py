@@ -228,6 +228,24 @@ class V030MermaidTests(unittest.TestCase):
                 self.assertTrue(result.ok, [issue.format() for issue in result.errors])
                 self.assertTrue(any("Unsupported visible-label syntax" in issue.message for issue in result.warnings))
 
+    def test_unsupported_flowchart_node_shape_warns_when_not_fully_inspected(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = "flowchart TD\n  a[应用]\n  b>MOD-CORE]"
+            result = mermaid_validation_result(package)
+        self.assertTrue(result.ok, [issue.format() for issue in result.errors])
+        self.assertTrue(any("Unsupported visible-label syntax" in issue.message for issue in result.warnings))
+
+    def test_unsupported_sequence_box_warns_when_not_fully_inspected(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            diagram = package.chapters["repository_mainline"]["mainline_overview_diagram"]
+            diagram["diagram_type"] = "sequenceDiagram"
+            diagram["source"] = "sequenceDiagram\n  participant 应用\n  box MOD-CORE"
+            result = mermaid_validation_result(package)
+        self.assertTrue(result.ok, [issue.format() for issue in result.errors])
+        self.assertTrue(any("Unsupported visible-label syntax" in issue.message for issue in result.warnings))
+
     def test_state_diagram_warns_when_visible_label_syntax_is_not_covered(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             package = load_manifest_package(write_valid_package(tmpdir))
@@ -272,6 +290,25 @@ class V030MermaidTests(unittest.TestCase):
         self.assertEqual(2, completed.returncode)
         self.assertIn("strict mode treats validation warnings as errors", completed.stderr)
 
+    def test_strict_cli_promotes_unsupported_mermaid_syntax_warnings_to_errors(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest = write_valid_package(tmpdir)
+            package = load_manifest_package(manifest)
+            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = "flowchart TD\n  a[应用]\n  b>MOD-CORE]"
+            package.chapter_files["repository_mainline"].write_text(
+                json.dumps(package.chapters["repository_mainline"], ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            completed = subprocess.run(
+                [PYTHON, str(ROOT / "scripts/validate_structure.py"), str(manifest), "--strict"],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        self.assertEqual(2, completed.returncode)
+        self.assertIn("strict mode treats validation warnings as errors", completed.stderr)
+
     def test_mermaid_rules_document_checked_label_forms(self):
         rules = (ROOT / "references/mermaid-rules.md").read_text(encoding="utf-8")
         self.assertIn("flowchart edge labels", rules)
@@ -284,6 +321,8 @@ class V030MermaidTests(unittest.TestCase):
         self.assertIn("`---|失败路径|`", rules)
         self.assertIn("simple flowchart subgraph titles", rules)
         self.assertIn("`subgraph 存储核心`", rules)
+        self.assertIn("unsupported node shapes", rules)
+        self.assertIn("sequence boxes", rules)
         self.assertIn("state diagrams are supported by schema but non-strict", rules)
 
 
