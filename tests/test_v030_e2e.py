@@ -4,6 +4,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from scripts.v030_mermaid import _locate_mermaid_module, _locate_node
+
 
 ROOT = Path(__file__).resolve().parents[1]
 PYTHON = sys.executable
@@ -14,6 +16,16 @@ EXAMPLES = [
 
 
 class V030EndToEndAcceptanceTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        missing = []
+        if _locate_node() is None:
+            missing.append("Node executable")
+        if _locate_mermaid_module() is None:
+            missing.append("Mermaid ESM package")
+        if missing:
+            raise unittest.SkipTest(f"Mermaid tooling not available: {', '.join(missing)}")
+
     def test_examples_validate_in_strict_mode(self):
         for manifest in EXAMPLES:
             with self.subTest(manifest=manifest):

@@ -82,7 +82,7 @@
       ],
       "collaborates_with": [],
       "read_when": "理解主线行为时。",
-      "notes": "机制细节放在第六章。"
+      "notes": "本示例不展开机制章节，仅读取职责边界。"
     }
   ],
   "boundary_notes": [
