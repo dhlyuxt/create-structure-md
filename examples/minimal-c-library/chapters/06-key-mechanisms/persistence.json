@@ -1,0 +1,59 @@
+{
+  "section": {
+    "title": "持久化写入机制"
+  },
+  "why_it_matters": "这是理解仓库行为的核心机制。",
+  "reader_prerequisites": [
+    "先读仓库主线。"
+  ],
+  "related_modules": [
+    "storage_core"
+  ],
+  "source_focus": [
+    {
+      "source_ref": {
+        "path": "src/storage.c",
+        "symbol": "storage_write"
+      },
+      "reason": "写入流程入口。"
+    }
+  ],
+  "mechanism_overview": "核心层接收写入请求并交给平台适配完成。",
+  "flow": [
+    {
+      "order": 1,
+      "step": "检查写入请求。",
+      "source_refs": [
+        {
+          "path": "src/storage.c",
+          "symbol": "storage_write"
+        }
+      ],
+      "state_or_data": "写入缓冲区。",
+      "notes": "这里只讲机制，不列 API 表。"
+    }
+  ],
+  "key_states_or_data": [
+    {
+      "name": "写入缓冲区",
+      "kind": "runtime_value",
+      "description": "调用方传入的数据。",
+      "source_refs": [
+        {
+          "path": "src/storage.c",
+          "symbol": "storage_write"
+        }
+      ]
+    }
+  ],
+  "common_misunderstandings": [
+    {
+      "misunderstanding": "核心层直接访问硬件。",
+      "correction": "硬件访问属于平台适配。"
+    }
+  ],
+  "validation_gaps": [
+    "未在真实硬件上验证写入时序。"
+  ],
+  "confidence": "medium"
+}

@@ -1,0 +1,94 @@
+{
+  "chapter": {
+    "key": "module_layers",
+    "title": "系统分层与模块职责"
+  },
+  "summary": "系统分为接口层和核心层。",
+  "layers": [
+    {
+      "layer_id": "api",
+      "name": "接口层",
+      "role": "接收应用调用。",
+      "responsibilities": [
+        "稳定入口"
+      ],
+      "paths": [
+        "include"
+      ],
+      "notes": "不拥有存储细节。"
+    },
+    {
+      "layer_id": "core",
+      "name": "核心层",
+      "role": "实现持久化流程。",
+      "responsibilities": [
+        "调度读写"
+      ],
+      "paths": [
+        "src"
+      ],
+      "notes": "依赖平台适配。"
+    }
+  ],
+  "modules": [
+    {
+      "module_id": "storage_api",
+      "name": "存储接口",
+      "layer_id": "api",
+      "purpose": "提供应用入口。",
+      "source_paths": [
+        "include/storage.h"
+      ],
+      "owns": [
+        "接口契约"
+      ],
+      "consumes": [
+        "应用请求"
+      ],
+      "produces": [
+        "核心调用"
+      ],
+      "does_not_own": [
+        "平台驱动"
+      ],
+      "collaborates_with": [
+        {
+          "module_ref": "storage_core",
+          "relationship": "调用核心实现。"
+        }
+      ],
+      "read_when": "理解集成入口时。",
+      "notes": "只描述职责，不列函数原型。"
+    },
+    {
+      "module_id": "storage_core",
+      "name": "存储核心",
+      "layer_id": "core",
+      "purpose": "组织持久化读写。",
+      "source_paths": [
+        "src/storage.c"
+      ],
+      "owns": [
+        "读写流程"
+      ],
+      "consumes": [
+        "接口层调用"
+      ],
+      "produces": [
+        "平台适配调用"
+      ],
+      "does_not_own": [
+        "具体硬件"
+      ],
+      "collaborates_with": [],
+      "read_when": "理解主线行为时。",
+      "notes": "机制细节放在第六章。"
+    }
+  ],
+  "boundary_notes": [
+    {
+      "topic": "API 细节",
+      "note": "不在本章展开参数和返回值。"
+    }
+  ]
+}

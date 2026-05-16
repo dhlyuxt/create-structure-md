@@ -1,0 +1,43 @@
+{
+  "chapter": {
+    "key": "document",
+    "title": "文档说明"
+  },
+  "document": {
+    "title": "minimal-c-library 结构说明",
+    "version": "0.1",
+    "status": "draft",
+    "language": "zh-CN",
+    "generated_at": "2026-05-16T00:00:00+08:00",
+    "output_file": "MinimalCLibrary_STRUCTURE_DESIGN.md"
+  },
+  "repository": {
+    "name": "minimal-c-library",
+    "root_display_path": "minimal-c-library",
+    "kind": "c_library",
+    "primary_languages": [
+      "C"
+    ]
+  },
+  "scope": {
+    "included": [
+      {
+        "area": "library",
+        "description": "核心库代码。"
+      }
+    ],
+    "excluded": [
+      {
+        "area": "hardware",
+        "reason": "未连接目标硬件。"
+      }
+    ]
+  },
+  "confidence": {
+    "level": "medium",
+    "summary": "基于静态阅读。",
+    "validation_gaps": [
+      "未执行目标板验证。"
+    ]
+  }
+}

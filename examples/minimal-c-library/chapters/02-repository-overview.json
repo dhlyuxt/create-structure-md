@@ -1,0 +1,55 @@
+{
+  "chapter": {
+    "key": "repository_overview",
+    "title": "仓库概述与阅读路线"
+  },
+  "overview": {
+    "summary": "这是一个 C 库示例。",
+    "problem_domain": "嵌入式持久化。",
+    "repository_purpose": "提供可移植的存储能力。",
+    "target_readers": [
+      "首次阅读仓库的工程师"
+    ]
+  },
+  "core_capabilities": [
+    {
+      "name": "持久化读写",
+      "description": "封装底层存储访问。",
+      "entry_points": [
+        {
+          "path": "src/storage.c",
+          "symbol": "storage_init"
+        }
+      ],
+      "notes": "入口由应用调用。"
+    }
+  ],
+  "reading_route": {
+    "summary": "先读公共头文件，再读核心实现。",
+    "steps": [
+      {
+        "order": 1,
+        "title": "公共接口",
+        "why_read_this": "先理解调用面。",
+        "recommended_files": [
+          {
+            "path": "include/storage.h",
+            "reason": "声明主要接口。"
+          }
+        ],
+        "expected_takeaway": "知道应用如何进入库。"
+      }
+    ]
+  },
+  "reader_orientation": {
+    "read_first": [
+      "include/storage.h"
+    ],
+    "read_later": [
+      "src/storage.c"
+    ],
+    "can_skip_initially": [
+      "docs/"
+    ]
+  }
+}

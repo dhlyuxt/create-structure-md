@@ -1,0 +1,68 @@
+{
+  "chapter": {
+    "key": "repository_mainline",
+    "title": "仓库主线"
+  },
+  "summary": "主线展示应用初始化到存储就绪的路径。",
+  "mainline_overview_diagram": {
+    "id": "mainline_overview",
+    "title": "初始化主线",
+    "diagram_type": "flowchart",
+    "description": "应用进入库并完成核心初始化。",
+    "source": "flowchart TD\n  app[应用] --> api[存储接口]\n  api --> core[存储核心]"
+  },
+  "mainlines": [
+    {
+      "mainline_id": "init",
+      "name": "初始化",
+      "purpose": "让存储能力可用。",
+      "entry": {
+        "kind": "api",
+        "name": "storage_init",
+        "description": "应用初始化入口。",
+        "source_ref": {
+          "path": "include/storage.h",
+          "symbol": "storage_init"
+        }
+      },
+      "steps": [
+        {
+          "order": 1,
+          "step": "应用调用公共入口。",
+          "module_refs": [
+            "storage_api"
+          ],
+          "source_refs": [
+            {
+              "path": "include/storage.h",
+              "symbol": "storage_init"
+            }
+          ],
+          "effect": "进入库边界。"
+        },
+        {
+          "order": 2,
+          "step": "核心层准备运行状态。",
+          "module_refs": [
+            "storage_core"
+          ],
+          "source_refs": [
+            {
+              "path": "src/storage.c",
+              "symbol": "storage_init"
+            }
+          ],
+          "effect": "存储核心可处理请求。"
+        }
+      ],
+      "result": "初始化完成。",
+      "notes": "这是阅读主线，不是调用序列参考。"
+    }
+  ],
+  "cross_mainline_notes": [
+    {
+      "topic": "移植",
+      "note": "平台驱动由第七章说明。"
+    }
+  ]
+}

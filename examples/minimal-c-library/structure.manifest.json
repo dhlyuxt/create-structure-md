@@ -1,0 +1,12 @@
+{
+  "document": "chapters/01-document.json",
+  "repository_overview": "chapters/02-repository-overview.json",
+  "directory_map": "chapters/03-directory-map.json",
+  "module_layers": "chapters/04-module-layers.json",
+  "repository_mainline": "chapters/05-repository-mainline.json",
+  "key_mechanisms": [
+    "chapters/06-key-mechanisms/persistence.json"
+  ],
+  "integration_boundaries": "chapters/07-integration-boundaries.json",
+  "risks_validation": "chapters/08-risks-validation.json"
+}

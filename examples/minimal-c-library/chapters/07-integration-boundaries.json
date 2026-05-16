@@ -1,0 +1,76 @@
+{
+  "chapter": {
+    "key": "integration_boundaries",
+    "title": "配置、移植与集成边界"
+  },
+  "summary": "集成者需要提供平台驱动。",
+  "required_configuration": [
+    {
+      "name": "存储大小",
+      "kind": "macro",
+      "location": {
+        "description": "配置头文件",
+        "source_ref": {
+          "path": "include/storage_cfg.h"
+        }
+      },
+      "purpose": "定义可用存储空间。",
+      "required_when": "启用库时。",
+      "notes": "示例值不代表生产配置。"
+    }
+  ],
+  "required_adaptations": [
+    {
+      "name": "底层写入",
+      "kind": "port_function",
+      "location": {
+        "description": "平台适配文件",
+        "source_ref": {
+          "path": "port/storage_port.c",
+          "symbol": "storage_port_write"
+        }
+      },
+      "responsibility": "把数据写入硬件。",
+      "caller_or_consumer": "存储核心。",
+      "failure_if_missing": "写入请求无法完成。"
+    }
+  ],
+  "integration_paths": [
+    {
+      "name": "应用集成",
+      "scenario": "应用初始化存储库。",
+      "recommended_entry": {
+        "description": "调用公共初始化接口。",
+        "source_ref": {
+          "path": "include/storage.h",
+          "symbol": "storage_init"
+        }
+      },
+      "steps": [
+        "配置宏",
+        "实现平台函数",
+        "调用初始化入口"
+      ],
+      "reference_examples": [
+        "examples/basic"
+      ],
+      "notes": "示例路径可不存在于最小测试仓库。"
+    }
+  ],
+  "external_dependencies": [
+    {
+      "name": "Flash 驱动",
+      "kind": "hardware",
+      "used_by": "平台适配",
+      "integration_role": "提供擦写能力。",
+      "notes": "由平台工程提供。"
+    }
+  ],
+  "out_of_scope_responsibilities": [
+    {
+      "topic": "硬件寿命评估",
+      "owner": "application",
+      "reason": "依赖产品场景。"
+    }
+  ]
+}

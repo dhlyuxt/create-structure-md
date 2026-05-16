@@ -1,0 +1,65 @@
+{
+  "chapter": {
+    "key": "risks_validation",
+    "title": "风险、假设与验证缺口"
+  },
+  "summary": "主要缺口来自静态分析。",
+  "risks": [
+    {
+      "risk_id": "static_only",
+      "description": "未执行目标硬件验证。",
+      "impact": "时序问题可能遗漏。",
+      "mitigation": "在目标板运行集成测试。",
+      "related_modules": [
+        "storage_core"
+      ],
+      "related_mechanisms": [],
+      "confidence": "medium"
+    }
+  ],
+  "assumptions": [
+    {
+      "assumption_id": "caller_initializes_once",
+      "description": "应用按预期只初始化一次。",
+      "rationale": "静态阅读未发现重复初始化保护。",
+      "validation_suggestion": "补充重复初始化测试。",
+      "confidence": "low"
+    }
+  ],
+  "validation_gaps": [
+    {
+      "gap_id": "target_board",
+      "gap_type": "missing_runtime_validation",
+      "description": "未运行目标板测试。",
+      "why_it_matters": "硬件行为影响持久化可靠性。",
+      "suggested_validation": "在目标板执行写入回读。",
+      "related_chapters": [
+        "key_mechanisms"
+      ],
+      "confidence": "medium"
+    },
+    {
+      "gap_id": "no_mechanisms",
+      "gap_type": "no_key_mechanisms_selected",
+      "description": "本次分析未选择关键机制。",
+      "why_it_matters": "第六章为空需要显式说明。",
+      "suggested_validation": "重新评估候选机制。",
+      "related_chapters": [
+        "key_mechanisms"
+      ],
+      "confidence": "medium"
+    }
+  ],
+  "low_confidence_items": [
+    {
+      "item_id": "port_behavior",
+      "location": {
+        "kind": "chapter",
+        "chapter": "integration_boundaries"
+      },
+      "description": "平台适配行为来自接口推断。",
+      "reason": "没有目标平台实现。",
+      "needed_evidence": "具体平台代码。"
+    }
+  ]
+}

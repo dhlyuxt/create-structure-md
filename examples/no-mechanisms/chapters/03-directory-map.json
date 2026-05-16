@@ -1,0 +1,39 @@
+{
+  "chapter": {
+    "key": "directory_map",
+    "title": "目录地图"
+  },
+  "summary": "目录按公共接口、核心实现、示例分组。",
+  "directory_groups": [
+    {
+      "name": "公共头文件",
+      "role": "public_headers",
+      "paths": [
+        "include"
+      ],
+      "responsibility": "暴露应用集成接口。",
+      "read_when": "开始集成前。",
+      "notes": "保持小而稳定。"
+    }
+  ],
+  "important_files": [
+    {
+      "path": "include/storage.h",
+      "role": "公共接口",
+      "why_it_matters": "定义应用调用面。",
+      "related_chapters": [
+        "repository_overview",
+        "module_layers"
+      ]
+    }
+  ],
+  "directory_relationships": {
+    "summary": "应用通过公共头文件进入核心实现。"
+  },
+  "boundary_notes": [
+    {
+      "area": "demo",
+      "note": "示例代码不是库的一部分。"
+    }
+  ]
+}
