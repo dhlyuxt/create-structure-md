@@ -14,6 +14,10 @@ FLOWCHART_EDGE_ENDPOINT_RE = re.compile(
     r"\s*(?:[-.=]+(?:>|x|o)|[-.=]+)\s*(?:\|[^|\n]+\|\s*)?"
     r"(?P<right>[A-Za-z0-9_.:-]+(?:\[[^\]\n]*\]|\([^\)\n]*\)|\{[^}\n]*\})?)"
 )
+FLOWCHART_CHAIN_RIGHT_ENDPOINT_RE = re.compile(
+    r"(?:[-.=]+(?:>|x|o)|[-.=]+)\s*(?:\|[^|\n]+\|\s*)?"
+    r"(?P<right>[A-Za-z0-9_.:-]+(?:\[[^\]\n]*\]|\([^\)\n]*\)|\{[^}\n]*\})?)"
+)
 FLOWCHART_TEXTUAL_EDGE_RE = re.compile(
     r"(?P<left>[A-Za-z0-9_.:-]+(?:\[[^\]\n]*\]|\([^\)\n]*\)|\{[^}\n]*\})?)"
     r"\s*(?:--|==|-\.)\s+[^|\n]+?\s+(?:-{2,}(?:>|x|o)?|={2,}(?:>|x|o)?|\.-(?:>|x|o)?)\s*"
@@ -67,6 +71,17 @@ def explicit_flowchart_labels(content: str):
             yield node_id, label
 
 
+def normalized_flowchart_endpoint_statement(statement: str) -> str:
+    parts = []
+    start = 0
+    for match in FLOWCHART_TEXTUAL_EDGE_RE.finditer(statement):
+        parts.append(statement[start:match.start()])
+        parts.append(f"{match.group('left')} --> {match.group('right')}")
+        start = match.end()
+    parts.append(statement[start:])
+    return "".join(parts)
+
+
 def visible_unlabeled_flowchart_node_ids(lines, labeled_node_ids: set[str]):
     for line in lines:
         stripped = line.strip()
@@ -76,23 +91,24 @@ def visible_unlabeled_flowchart_node_ids(lines, labeled_node_ids: set[str]):
             statement = statement.strip()
             if not statement:
                 continue
-            textual_edge_matches = list(FLOWCHART_TEXTUAL_EDGE_RE.finditer(statement))
-            if textual_edge_matches:
-                for match in textual_edge_matches:
-                    for group in ("left", "right"):
-                        node_id = unlabeled_flowchart_node_id(match.group(group))
-                        if node_id and node_id not in labeled_node_ids:
-                            yield node_id
-                continue
+            statement = normalized_flowchart_endpoint_statement(statement)
+            yielded_node_ids = set()
             for match in FLOWCHART_EDGE_ENDPOINT_RE.finditer(statement):
                 for group in ("left", "right"):
                     node_id = unlabeled_flowchart_node_id(match.group(group))
-                    if node_id and node_id not in labeled_node_ids:
+                    if node_id and node_id not in labeled_node_ids and node_id not in yielded_node_ids:
+                        yielded_node_ids.add(node_id)
                         yield node_id
+            for match in FLOWCHART_CHAIN_RIGHT_ENDPOINT_RE.finditer(statement):
+                node_id = unlabeled_flowchart_node_id(match.group("right"))
+                if node_id and node_id not in labeled_node_ids and node_id not in yielded_node_ids:
+                    yielded_node_ids.add(node_id)
+                    yield node_id
             match = FLOWCHART_STANDALONE_NODE_RE.match(statement)
             if match:
                 node_id = unlabeled_flowchart_node_id(match.group(1))
-                if node_id and node_id not in labeled_node_ids:
+                if node_id and node_id not in labeled_node_ids and node_id not in yielded_node_ids:
+                    yielded_node_ids.add(node_id)
                     yield node_id
 
 
