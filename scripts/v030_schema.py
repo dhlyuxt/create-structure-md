@@ -48,11 +48,13 @@ def schema_validation_result(package: ManifestPackage) -> ValidationResult:
     for key in SINGLE_CHAPTER_KEYS:
         data = package.chapters[key]
         append_schema_errors(result, CHAPTER_DEF_BY_KEY[key], data, f"$.{key}")
+        if not isinstance(data, dict):
+            continue
         chapter = data.get("chapter", {})
         if chapter.get("key") != key:
             result.error("chapter.key", f"$.{key}.chapter.key", "chapter.key must match manifest property")
     for index, mechanism in enumerate(package.mechanisms):
         append_schema_errors(result, "MechanismChapter", mechanism.data, f"$.key_mechanisms[{index}]")
-        if "chapter" in mechanism.data:
+        if isinstance(mechanism.data, dict) and "chapter" in mechanism.data:
             result.error("mechanism.chapter", f"$.key_mechanisms[{index}].chapter", "Mechanism JSON files must not contain chapter")
     return result

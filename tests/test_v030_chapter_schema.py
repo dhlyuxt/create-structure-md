@@ -108,6 +108,38 @@ class V030ChapterSchemaTests(unittest.TestCase):
         self.assertIn("modules", completed.stderr)
         self.assertNotIn("Traceback", completed.stderr)
 
+    def test_cli_non_object_chapter_root_reports_schema_error_without_traceback(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest_path = write_valid_package(tmpdir)
+            document = Path(tmpdir) / "chapters/01-document.json"
+            document.write_text("[]", encoding="utf-8")
+            completed = subprocess.run(
+                [PYTHON, str(ROOT / "scripts/validate_structure.py"), str(manifest_path)],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        self.assertEqual(2, completed.returncode)
+        self.assertIn("object", completed.stderr)
+        self.assertNotIn("Traceback", completed.stderr)
+
+    def test_cli_non_object_mechanism_root_reports_schema_error_without_traceback(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest_path = write_valid_package(tmpdir)
+            mechanism = Path(tmpdir) / "chapters/06-key-mechanisms/persistence.json"
+            mechanism.write_text("1", encoding="utf-8")
+            completed = subprocess.run(
+                [PYTHON, str(ROOT / "scripts/validate_structure.py"), str(manifest_path)],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        self.assertEqual(2, completed.returncode)
+        self.assertIn("object", completed.stderr)
+        self.assertNotIn("Traceback", completed.stderr)
+
     def test_mainline_detail_diagram_rejects_state_diagram(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest_path = write_valid_package(tmpdir)
