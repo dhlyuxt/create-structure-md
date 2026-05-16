@@ -90,6 +90,27 @@ class V030MermaidTests(unittest.TestCase):
                 self.assertFalse(result.ok)
                 self.assertTrue(any("visible Mermaid label leaks internal ID: MOD-CORE" in issue.message for issue in result.errors))
 
+    def test_implicit_sequence_participants_must_not_leak_old_internal_ids(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            diagram = package.chapters["repository_mainline"]["mainline_overview_diagram"]
+            diagram["diagram_type"] = "sequenceDiagram"
+            diagram["source"] = "sequenceDiagram\n  MOD-CORE->>RUN-LOAD: 写入成功"
+            result = mermaid_validation_result(package)
+        self.assertFalse(result.ok)
+        self.assertTrue(any("visible Mermaid label leaks internal ID: MOD-CORE" in issue.message for issue in result.errors))
+        self.assertTrue(any("visible Mermaid label leaks internal ID: RUN-LOAD" in issue.message for issue in result.errors))
+
+    def test_human_readable_implicit_sequence_participants_are_allowed(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            diagram = package.chapters["repository_mainline"]["mainline_overview_diagram"]
+            diagram["diagram_type"] = "sequenceDiagram"
+            diagram["source"] = "sequenceDiagram\n  应用->>核心: 写入成功"
+            result = mermaid_validation_result(package)
+        self.assertTrue(result.ok, [issue.format() for issue in result.errors])
+        self.assertFalse(result.warnings, [issue.format() for issue in result.warnings])
+
     def test_unaliased_sequence_participants_must_not_leak_old_internal_ids(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             package = load_manifest_package(write_valid_package(tmpdir))
@@ -184,6 +205,29 @@ class V030MermaidTests(unittest.TestCase):
         self.assertTrue(result.ok, [issue.format() for issue in result.errors])
         self.assertFalse(result.warnings, [issue.format() for issue in result.warnings])
 
+    def test_subgraph_title_must_not_leak_old_internal_ids(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = "flowchart TD\n  subgraph MOD-CORE\n    a[应用]\n  end"
+            result = mermaid_validation_result(package)
+        self.assertFalse(result.ok)
+        self.assertTrue(any("visible Mermaid label leaks internal ID: MOD-CORE" in issue.message for issue in result.errors))
+
+    def test_flowchart_textual_edge_syntax_warns_when_not_fully_inspected(self):
+        sources = [
+            ("dotted", "flowchart TD\n  a[应用] -. 失败路径 .-> b[核心]"),
+            ("thick", "flowchart TD\n  a[应用] == 失败路径 ==> b[核心]"),
+            ("hyphenated", "flowchart TD\n  a[应用] -- 失败-路径 --> b[核心]"),
+        ]
+        for name, source in sources:
+            with self.subTest(name=name):
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    package = load_manifest_package(write_valid_package(tmpdir))
+                    package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = source
+                    result = mermaid_validation_result(package)
+                self.assertTrue(result.ok, [issue.format() for issue in result.errors])
+                self.assertTrue(any("Unsupported visible-label syntax" in issue.message for issue in result.warnings))
+
     def test_state_diagram_warns_when_visible_label_syntax_is_not_covered(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             package = load_manifest_package(write_valid_package(tmpdir))
@@ -238,6 +282,7 @@ class V030MermaidTests(unittest.TestCase):
         self.assertIn("`participant 存储接口`", rules)
         self.assertIn("unlabeled flowchart node IDs", rules)
         self.assertIn("`---|失败路径|`", rules)
+        self.assertIn("state diagrams are supported by schema but non-strict", rules)
 
 
 if __name__ == "__main__":

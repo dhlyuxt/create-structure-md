@@ -16,11 +16,15 @@ FLOWCHART_EDGE_ENDPOINT_RE = re.compile(
 )
 FLOWCHART_STANDALONE_NODE_RE = re.compile(r"^\s*([A-Za-z0-9_.:-]+)\s*;?\s*$")
 FLOWCHART_EDGE_LABEL_RE = re.compile(r"[-.=]+(?:>|x|o)?\s*\|([^|\n]+)\|")
-SEQUENCE_ALIAS_RE = re.compile(r"^\s*(?:create\s+)?(?:participant|actor)\s+\S+\s+as\s+(.+?)\s*$")
-SEQUENCE_DECLARATION_RE = re.compile(r"^\s*(?:create\s+)?(?:participant|actor)\s+(.+?)\s*$")
-SEQUENCE_MESSAGE_RE = re.compile(r"^\s*\S+\s*(?:-{1,2}(?:>>?|x|\))|={1,2}(?:>>?|x|\)))[+-]?\s*\S+\s*:\s*(.+?)\s*$")
+FLOWCHART_SUBGRAPH_RE = re.compile(r"^\s*subgraph\s+(.+?)\s*$")
+FLOWCHART_SUBGRAPH_LABEL_RE = re.compile(r"^[A-Za-z0-9_.:-]+\s*\[([^\]\n]+)\]\s*$")
+SEQUENCE_ALIAS_RE = re.compile(r"^\s*(?:create\s+)?(?:participant|actor)\s+(?P<id>\S+)\s+as\s+(?P<label>.+?)\s*$")
+SEQUENCE_DECLARATION_RE = re.compile(r"^\s*(?:create\s+)?(?:participant|actor)\s+(?P<label>.+?)\s*$")
+SEQUENCE_MESSAGE_RE = re.compile(
+    r"^\s*(?P<from>\S+)\s*(?:-{1,2}(?:>>?|x|\))|={1,2}(?:>>?|x|\)))[+-]?\s*(?P<to>\S+)\s*:\s*(?P<label>.+?)\s*$"
+)
 SEQUENCE_UNSUPPORTED_VISIBLE_LINE_RE = re.compile(r"^\s*(?:Note|loop|alt|opt|par|and|rect|critical|break)\b")
-UNSUPPORTED_FLOWCHART_LABEL_LINE_RE = re.compile(r"--\s+[^-|>][^-|>]+?\s+-->")
+UNSUPPORTED_FLOWCHART_LABEL_LINE_RE = re.compile(r"(?:--|==|-\.)\s+[^|\n]+?\s+(?:-->|==>|\.->)")
 
 
 def content_lines(source: str):
@@ -72,6 +76,23 @@ def visible_unlabeled_flowchart_node_ids(lines, labeled_node_ids: set[str]):
                 yield node_id
 
 
+def visible_flowchart_subgraph_labels(lines):
+    for line in lines:
+        match = FLOWCHART_SUBGRAPH_RE.match(line)
+        if not match:
+            continue
+        title = match.group(1).strip().strip('"')
+        label_match = FLOWCHART_SUBGRAPH_LABEL_RE.match(title)
+        if label_match:
+            title = label_match.group(1).strip().strip('"')
+        if title:
+            yield title
+
+
+def clean_sequence_participant(value: str) -> str:
+    return value.strip().lstrip("+-").strip('"')
+
+
 def visible_labels(diagram_type: str, source: str):
     lines = list(content_lines(source))
     content = "\n".join(lines)
@@ -84,28 +105,38 @@ def visible_labels(diagram_type: str, source: str):
             label = match.group(1).strip().strip('"')
             if label:
                 yield label
+        yield from visible_flowchart_subgraph_labels(lines)
         yield from visible_unlabeled_flowchart_node_ids(lines, labeled_node_ids)
     if diagram_type != "sequenceDiagram":
         return
+    declared_participant_ids = set()
     for line in lines:
         match = SEQUENCE_ALIAS_RE.match(line)
         if match:
-            label = match.group(1).strip().strip('"')
+            participant_id = clean_sequence_participant(match.group("id"))
+            label = match.group("label").strip().strip('"')
+            if participant_id:
+                declared_participant_ids.add(participant_id)
             if label:
                 yield label
             continue
         match = SEQUENCE_DECLARATION_RE.match(line)
         if match:
-            label = match.group(1).strip().strip('"')
+            label = clean_sequence_participant(match.group("label"))
+            if label:
+                declared_participant_ids.add(label)
+                yield label
+    for line in lines:
+        match = SEQUENCE_MESSAGE_RE.match(line)
+        if match:
+            sender = clean_sequence_participant(match.group("from"))
+            receiver = clean_sequence_participant(match.group("to"))
+            label = match.group("label").strip().strip('"')
+            for participant in (sender, receiver):
+                if participant and participant not in declared_participant_ids:
+                    yield participant
             if label:
                 yield label
-            continue
-        match = SEQUENCE_MESSAGE_RE.match(line)
-        if not match:
-            continue
-        label = match.group(1).strip().strip('"')
-        if label:
-            yield label
 
 
 def has_unsupported_visible_label_syntax(diagram_type: str, source: str) -> bool:
