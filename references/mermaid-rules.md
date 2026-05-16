@@ -2,36 +2,33 @@
 
 ## Purpose
 
-Mermaid diagrams exist to help a reader build a mental model. They are not ID maps.
+Mermaid diagrams exist to help readers build a mental model. The project validator must not implement a second Mermaid.
 
-## Supported Diagram Types
+## Hard Boundary
+
+Do not add a self-authored Mermaid syntax parser, grammar recognizer, source-level node parser, edge parser, participant parser, or visible-label parser.
+
+Syntax validation is delegated to Mermaid official tooling, such as `mermaid.parse`, `mmdc`, or another official Mermaid package or CLI entry point.
+
+## Supported DSL Types
 
 - `flowchart`
 - `sequenceDiagram`
 - `stateDiagram-v2`
 
-The first non-empty, non-comment Mermaid source line must start with the same token as `diagram_type`. Legacy `graph` declarations are rejected.
+The validator maps Mermaid tool result names to DSL names before comparison. For example, `flowchart-v2` and `flowchart` both normalize to `flowchart`, and `sequence` normalizes to `sequenceDiagram`.
 
-## Visible Label Gate
+## Project Policy Checks
 
-The validator inspects these visible-label forms:
+The validator keeps only narrow project policy checks outside Mermaid tooling:
 
-- flowchart bracket labels such as `node[存储核心]`, `node(平台适配)`, and `node{是否已初始化}`
-- flowchart edge labels, including pipe forms such as `-->|失败路径|`, `---|失败路径|`, `-.->|失败路径|`, and `==>|失败路径|`
-- flowchart attribute labels with simple quoted label values such as `@{ label: "存储核心" }`
-- unlabeled flowchart node IDs such as `storage_core` in `storage_core --> platform_port`; IDs with explicit rendered labels elsewhere in the diagram are not treated as visible labels
-- simple flowchart subgraph titles such as `subgraph 存储核心`
-- sequence aliases such as `participant api as 存储接口`
-- unaliased sequence participant and actor names such as `participant 存储接口` and `actor 用户`
-- implicit sequence participant names in messages such as `应用->>核心: 写入成功`
-- sequence message labels such as `api->>core: 写入成功`
+- legacy `graph` declarations are rejected; authors must use `flowchart`
+- the DSL `diagram_type` must match the Mermaid tool-reported diagram type after normalization
 
-Visible labels must not expose legacy internal IDs such as `MOD-*`, `RUN-*`, `FLOW-*`, or `MER-*`, including when they are embedded in surrounding text. Technical node identifiers are allowed when explicit rendered labels are human-readable.
+These checks are not a Mermaid grammar implementation.
 
-Mermaid comment lines that start with `%%` are ignored by the visible-label gate.
+## Visible Labels
 
-## Warning Policy
+Visible labels must be human-readable and must not expose internal IDs. In 0.3.0, the validator does not implement a source-level visible-label parser.
 
-If a diagram uses syntax whose visible labels are not inspected, validation emits a warning. This includes unsupported node shapes such as asymmetric flowchart nodes, textual flowchart edge labels such as `-. 失败路径 .-`, and sequence boxes. Normal validation allows warnings. Strict validation promotes warnings to errors.
-
-`stateDiagram-v2` state diagrams are supported by schema but non-strict due to partial label coverage until state label inspection is implemented.
+Future automated label gates must inspect Mermaid tooling output, such as rendered SVG text, rather than parsing Mermaid source locally.
