@@ -4,11 +4,13 @@ from scripts.v030_semantics import collect_diagrams
 from scripts.v030_types import ValidationResult
 
 
-OLD_INTERNAL_ID_RE = re.compile(r"(?:MOD|RUN|FLOW|MER|STEP|CAP|CFG|DATA|COL|RISK|ASM)-[A-Za-z0-9_-]+")
+OLD_INTERNAL_ID_RE = re.compile(r"(?:MOD|RUN|FLOW|MER|STEP|CAP|CFG|DATA|COL|RISK|ASM)-(?=[A-Za-z0-9_-]*[A-Z0-9])[A-Za-z0-9_-]+")
 FLOWCHART_NODE_LABEL_RE = re.compile(
     r"(?<![\w])(?P<id>[A-Za-z0-9_.:-]+)\s*"
     r"(?:\[(?P<bracket>[^\]\n]+)\]|\((?P<paren>[^\)\n]+)\)|\{(?P<brace>[^}\n]+)\})"
 )
+FLOWCHART_ATTRIBUTE_RE = re.compile(r"(?<![A-Za-z0-9_.:-])(?P<id>[A-Za-z0-9_.:-]+)\s*@\{(?P<body>[^}\n]*)\}")
+FLOWCHART_ATTRIBUTE_LABEL_VALUE_RE = re.compile(r"(?:^|[\s,])label\s*:\s*(?P<quote>[\"'])(?P<label>.*?)(?P=quote)")
 FLOWCHART_EDGE_ENDPOINT_RE = re.compile(
     r"(?P<left>[A-Za-z0-9_.:-]+(?:\[[^\]\n]*\]|\([^\)\n]*\)|\{[^}\n]*\})?)"
     r"\s*(?:[-.=]+(?:>|x|o)|[-.=]+)\s*(?:\|[^|\n]+\|\s*)?"
@@ -62,11 +64,23 @@ def unlabeled_flowchart_node_id(token: str) -> str:
     return token
 
 
+def attribute_label_value(body: str) -> str:
+    match = FLOWCHART_ATTRIBUTE_LABEL_VALUE_RE.search(body)
+    if not match:
+        return ""
+    return match.group("label").strip()
+
+
 def explicit_flowchart_labels(content: str):
     for match in FLOWCHART_NODE_LABEL_RE.finditer(content):
         node_id = match.group("id").strip().strip('"')
         label = next(match.group(name) for name in ("bracket", "paren", "brace") if match.group(name) is not None)
         label = label.strip().strip('"')
+        if node_id and label:
+            yield node_id, label
+    for match in FLOWCHART_ATTRIBUTE_RE.finditer(content):
+        node_id = match.group("id").strip().strip('"')
+        label = attribute_label_value(match.group("body"))
         if node_id and label:
             yield node_id, label
 
@@ -135,6 +149,17 @@ def visible_flowchart_subgraph_labels(lines):
             yield title
 
 
+def has_uninspected_flowchart_attribute_syntax(line: str) -> bool:
+    for match in FLOWCHART_ATTRIBUTE_RE.finditer(line):
+        if not attribute_label_value(match.group("body")):
+            return True
+    return False
+
+
+def mask_supported_flowchart_label_contents(line: str) -> str:
+    return re.sub(r"\[[^\]\n]*\]|\([^\)\n]*\)|\{[^}\n]*\}", "", line)
+
+
 def clean_sequence_participant(value: str) -> str:
     return value.strip().lstrip("+-").strip('"')
 
@@ -190,7 +215,9 @@ def has_unsupported_visible_label_syntax(diagram_type: str, source: str) -> bool
         return True
     if diagram_type == "flowchart":
         return any(
-            UNSUPPORTED_FLOWCHART_LABEL_LINE_RE.search(line) or UNSUPPORTED_FLOWCHART_NODE_SHAPE_RE.search(line)
+            UNSUPPORTED_FLOWCHART_LABEL_LINE_RE.search(mask_supported_flowchart_label_contents(line))
+            or UNSUPPORTED_FLOWCHART_NODE_SHAPE_RE.search(line)
+            or has_uninspected_flowchart_attribute_syntax(line)
             for line in content_lines(source)
         )
     if diagram_type == "sequenceDiagram":

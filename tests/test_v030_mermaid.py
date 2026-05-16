@@ -72,6 +72,21 @@ class V030MermaidTests(unittest.TestCase):
         self.assertTrue(result.ok, [issue.format() for issue in result.errors])
         self.assertFalse(result.warnings, [issue.format() for issue in result.warnings])
 
+    def test_natural_english_hyphenated_labels_do_not_match_old_internal_ids(self):
+        sources = [
+            ("data", "flowchart TD\n  a[DATA-driven flow] --> b[结果]"),
+            ("risk", "flowchart TD\n  a[RISK-free path] --> b[结果]"),
+            ("step", "flowchart TD\n  a[STEP-by-step guide] --> b[结果]"),
+        ]
+        for name, source in sources:
+            with self.subTest(name=name):
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    package = load_manifest_package(write_valid_package(tmpdir))
+                    package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = source
+                    result = mermaid_validation_result(package)
+                self.assertTrue(result.ok, [issue.format() for issue in result.errors])
+                self.assertFalse(result.warnings, [issue.format() for issue in result.warnings])
+
     def test_internal_node_ids_are_allowed_when_labels_are_human_readable(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             package = load_manifest_package(write_valid_package(tmpdir))
@@ -146,6 +161,32 @@ class V030MermaidTests(unittest.TestCase):
             result = mermaid_validation_result(package)
         self.assertFalse(result.ok)
         self.assertTrue(any("visible Mermaid label leaks internal ID: MOD-CORE" in issue.message for issue in result.errors))
+
+    def test_flowchart_attribute_labels_must_not_leak_old_internal_ids(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = 'flowchart TD\n  b@{ label: "MOD-CORE" }'
+            result = mermaid_validation_result(package)
+        self.assertFalse(result.ok)
+        self.assertTrue(any("visible Mermaid label leaks internal ID: MOD-CORE" in issue.message for issue in result.errors))
+
+    def test_human_readable_flowchart_attribute_labels_are_allowed(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = 'flowchart TD\n  b@{ label: "存储核心" }'
+            result = mermaid_validation_result(package)
+        self.assertTrue(result.ok, [issue.format() for issue in result.errors])
+        self.assertFalse(result.warnings, [issue.format() for issue in result.warnings])
+
+    def test_arrow_like_text_inside_explicit_flowchart_labels_does_not_warn(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = (
+                "flowchart TD\n  a[request -- sync --> response] --> b[核心]"
+            )
+            result = mermaid_validation_result(package)
+        self.assertTrue(result.ok, [issue.format() for issue in result.errors])
+        self.assertFalse(result.warnings, [issue.format() for issue in result.warnings])
 
     def test_mermaid_comments_are_ignored_by_visible_label_checks(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -485,6 +526,8 @@ class V030MermaidTests(unittest.TestCase):
         self.assertIn("`---|失败路径|`", rules)
         self.assertIn("simple flowchart subgraph titles", rules)
         self.assertIn("`subgraph 存储核心`", rules)
+        self.assertIn("flowchart attribute labels", rules)
+        self.assertIn('`@{ label: "存储核心" }`', rules)
         self.assertIn("unsupported node shapes", rules)
         self.assertIn("asymmetric flowchart nodes", rules)
         self.assertIn("textual flowchart edge labels", rules)

@@ -18,6 +18,7 @@ The validator inspects these visible-label forms:
 
 - flowchart bracket labels such as `node[存储核心]`, `node(平台适配)`, and `node{是否已初始化}`
 - flowchart edge labels, including pipe forms such as `-->|失败路径|`, `---|失败路径|`, `-.->|失败路径|`, and `==>|失败路径|`
+- flowchart attribute labels with simple quoted label values such as `@{ label: "存储核心" }`
 - unlabeled flowchart node IDs such as `storage_core` in `storage_core --> platform_port`; IDs with explicit rendered labels elsewhere in the diagram are not treated as visible labels
 - simple flowchart subgraph titles such as `subgraph 存储核心`
 - sequence aliases such as `participant api as 存储接口`
