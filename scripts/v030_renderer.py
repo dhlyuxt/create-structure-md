@@ -12,6 +12,12 @@ def _join(values) -> str:
     return "、".join(str(value) for value in values if value)
 
 
+def _sentence(text: str) -> str:
+    if text.endswith(("。", "！", "？", ".", "!", "?")):
+        return text
+    return f"{text}。"
+
+
 def _source_ref(source_ref: dict) -> str:
     if not source_ref:
         return ""
@@ -22,6 +28,11 @@ def _source_ref(source_ref: dict) -> str:
 
 def _source_refs(source_refs: list[dict]) -> str:
     return _join(_source_ref(source_ref) for source_ref in source_refs)
+
+
+def _with_parenthesized_source(text: str, source_ref: dict | None) -> str:
+    source = _source_ref(source_ref or {})
+    return f"{text}（{source}）" if source else text
 
 
 def _bullet(lines: list[str], text: str) -> None:
@@ -179,7 +190,8 @@ def _chapter5(lines: list[str], chapter: dict, module_names: dict[str, str]) -> 
         _line(lines, mainline["purpose"])
         _line(lines)
         entry = mainline["entry"]
-        _bullet(lines, f"入口：{entry['name']}，{entry['description']}（{_source_ref(entry.get('source_ref', {}))}）")
+        entry_text = _with_parenthesized_source(f"入口：{entry['name']}，{entry['description']}", entry.get("source_ref"))
+        _bullet(lines, entry_text)
         for step in mainline["steps"]:
             modules = _module_names(step.get("module_refs", []), module_names)
             sources = _source_refs(step.get("source_refs", []))
@@ -222,11 +234,14 @@ def _chapter6(lines: list[str], package: ManifestPackage, module_names: dict[str
         _line(lines, "#### 流程")
         for step in data["flow"]:
             sources = _source_refs(step.get("source_refs", []))
-            _numbered(lines, step["order"], f"{step['step']} 数据/状态：{step['state_or_data']}。参考：{sources}。{step.get('notes', '')}")
+            source_text = f"参考：{sources}。" if sources else ""
+            _numbered(lines, step["order"], f"{step['step']} 数据/状态：{_sentence(step['state_or_data'])}{source_text}{step.get('notes', '')}")
         _line(lines)
         _line(lines, "#### 关键状态与数据")
         for item in data["key_states_or_data"]:
-            _bullet(lines, f"{item['name']}：{item['description']}（{item['kind']}，{_source_refs(item.get('source_refs', []))}）")
+            sources = _source_refs(item.get("source_refs", []))
+            detail = f"{item['kind']}，{sources}" if sources else item["kind"]
+            _bullet(lines, f"{item['name']}：{item['description']}（{detail}）")
         _line(lines)
         _line(lines, "#### 常见误解")
         for item in data["common_misunderstandings"]:
@@ -245,17 +260,20 @@ def _chapter7(lines: list[str], chapter: dict) -> None:
     _line(lines, "### 必需配置")
     for item in chapter["required_configuration"]:
         location = item["location"]
-        _bullet(lines, f"{item['name']}：{item['purpose']}。位置：{location['description']}（{_source_ref(location.get('source_ref', {}))}）。要求：{item['required_when']} {item.get('notes', '')}")
+        location_text = _with_parenthesized_source(location["description"], location.get("source_ref"))
+        _bullet(lines, f"{item['name']}：{item['purpose']}。位置：{location_text}。要求：{item['required_when']} {item.get('notes', '')}")
     _line(lines)
     _line(lines, "### 必需适配")
     for item in chapter["required_adaptations"]:
         location = item["location"]
-        _bullet(lines, f"{item['name']}：{item['responsibility']}。消费者：{item['caller_or_consumer']}。位置：{location['description']}（{_source_ref(location.get('source_ref', {}))}）。缺失影响：{item['failure_if_missing']}")
+        location_text = _with_parenthesized_source(location["description"], location.get("source_ref"))
+        _bullet(lines, f"{item['name']}：{item['responsibility']}。消费者：{item['caller_or_consumer']}。位置：{location_text}。缺失影响：{item['failure_if_missing']}")
     _line(lines)
     _line(lines, "### 集成路径")
     for path in chapter["integration_paths"]:
         entry = path["recommended_entry"]
-        _bullet(lines, f"{path['name']}：{path['scenario']} 推荐入口：{entry['description']}（{_source_ref(entry.get('source_ref', {}))}）。步骤：{_join(path['steps'])}。示例：{_join(path['reference_examples'])}。{path.get('notes', '')}")
+        entry_text = _with_parenthesized_source(entry["description"], entry.get("source_ref"))
+        _bullet(lines, f"{path['name']}：{path['scenario']} 推荐入口：{entry_text}。步骤：{_join(path['steps'])}。示例：{_join(path['reference_examples'])}。{path.get('notes', '')}")
     _line(lines)
     _line(lines, "### 外部依赖与边界")
     for item in chapter["external_dependencies"]:

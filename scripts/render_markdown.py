@@ -77,6 +77,22 @@ def _validate_package(manifest_path: Path, *, strict: bool, repo_root: Path | No
     return package, 0
 
 
+def _default_output_path(package) -> Path | None:
+    root = package.root_dir.resolve()
+    output_file = package.chapters["document"]["document"]["output_file"]
+    output_path = Path(output_file)
+    if output_path.is_absolute() or ".." in output_path.parts:
+        print("ERROR: $.document.document.output_file: document.output_file must stay within the package root", file=sys.stderr)
+        return None
+    candidate = package.root_dir / output_path
+    try:
+        candidate.resolve().relative_to(root)
+    except ValueError:
+        print("ERROR: $.document.document.output_file: document.output_file must stay within the package root", file=sys.stderr)
+        return None
+    return candidate
+
+
 def main(argv=None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -88,7 +104,12 @@ def main(argv=None) -> int:
     )
     if code:
         return code
-    output_path = Path(args.output) if args.output else package.root_dir / package.chapters["document"]["document"]["output_file"]
+    if args.output:
+        output_path = Path(args.output)
+    else:
+        output_path = _default_output_path(package)
+        if output_path is None:
+            return 2
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(render_markdown(package), encoding="utf-8")
     print(f"Document written: {output_path}")

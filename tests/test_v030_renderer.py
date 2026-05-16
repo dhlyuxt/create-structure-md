@@ -132,6 +132,31 @@ class V030RendererTests(unittest.TestCase):
         self.assertIn("#### 持久化写入流程图", markdown)
         self.assertIn("```mermaid\nflowchart TD\n  core[存储核心] --> port[平台适配]\n```", markdown)
 
+    def test_optional_source_ref_absence_does_not_render_empty_parentheses(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            package.chapters["repository_mainline"]["mainlines"][0]["entry"].pop("source_ref")
+            package.chapters["integration_boundaries"]["required_configuration"][0]["location"].pop("source_ref")
+            package.chapters["integration_boundaries"]["required_adaptations"][0]["location"].pop("source_ref")
+            package.chapters["integration_boundaries"]["integration_paths"][0]["recommended_entry"].pop("source_ref")
+            markdown = render_markdown(package)
+        self.assertNotIn("（）", markdown)
+        self.assertIn("- 入口：storage_init，应用初始化入口。", markdown)
+        self.assertIn("位置：配置头文件。", markdown)
+        self.assertIn("位置：平台适配文件。", markdown)
+        self.assertIn("推荐入口：调用公共初始化接口。", markdown)
+
+    def test_empty_source_refs_do_not_render_empty_reference_punctuation(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            package.mechanisms[0].data["flow"][0]["source_refs"] = []
+            package.mechanisms[0].data["key_states_or_data"][0]["source_refs"] = []
+            markdown = render_markdown(package)
+        self.assertNotIn("参考：。", markdown)
+        self.assertNotIn("，）", markdown)
+        self.assertIn("1. 检查写入请求。 数据/状态：写入缓冲区。这里只讲机制，不列 API 表。", markdown)
+        self.assertIn("- 写入缓冲区：调用方传入的数据。（runtime_value）", markdown)
+
     def test_render_cli_writes_default_output_file_and_prints_path(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest = write_valid_package(tmpdir)
@@ -146,6 +171,38 @@ class V030RendererTests(unittest.TestCase):
             self.assertEqual(0, code)
             self.assertTrue(expected_output.exists())
             self.assertIn(f"Document written: {expected_output}", stdout.getvalue())
+
+    def test_render_cli_rejects_default_absolute_output_file(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            outside = root / "outside.md"
+            manifest = write_valid_package(str(root / "dsl"), output_file=str(outside))
+            stderr = io.StringIO()
+            with mock.patch("scripts.render_markdown.mermaid_validation_result") as mermaid:
+                mermaid.return_value.ok = True
+                mermaid.return_value.errors = []
+                mermaid.return_value.warnings = []
+                with contextlib.redirect_stderr(stderr):
+                    code = render_cli.main([str(manifest)])
+            self.assertEqual(2, code)
+            self.assertFalse(outside.exists())
+            self.assertIn("document.output_file must stay within the package root", stderr.getvalue())
+
+    def test_render_cli_rejects_default_dotdot_output_file(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            manifest = write_valid_package(str(root / "dsl" / "inner"), output_file="../../out.md")
+            outside = (manifest.parent / "../../out.md").resolve()
+            stderr = io.StringIO()
+            with mock.patch("scripts.render_markdown.mermaid_validation_result") as mermaid:
+                mermaid.return_value.ok = True
+                mermaid.return_value.errors = []
+                mermaid.return_value.warnings = []
+                with contextlib.redirect_stderr(stderr):
+                    code = render_cli.main([str(manifest)])
+            self.assertEqual(2, code)
+            self.assertFalse(outside.exists())
+            self.assertIn("document.output_file must stay within the package root", stderr.getvalue())
 
 
 if __name__ == "__main__":
