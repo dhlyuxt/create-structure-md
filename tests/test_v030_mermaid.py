@@ -273,6 +273,24 @@ class V030MermaidTests(unittest.TestCase):
                     [issue.format() for issue in result.errors],
                 )
 
+    def test_later_same_line_unlabeled_edges_are_checked_after_textual_edge_labels(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = (
+                "flowchart TD\n  a -- label --> b; MOD-CORE --> RUN-LOAD"
+            )
+            result = mermaid_validation_result(package)
+        self.assertFalse(result.ok)
+        self.assertTrue(any("Unsupported visible-label syntax" in issue.message for issue in result.warnings))
+        self.assertTrue(
+            any(
+                issue.code == "mermaid.visible_id"
+                and ("MOD-CORE" in issue.message or "RUN-LOAD" in issue.message)
+                for issue in result.errors
+            ),
+            [issue.format() for issue in result.errors],
+        )
+
     def test_unsupported_flowchart_node_shape_warns_when_not_fully_inspected(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             package = load_manifest_package(write_valid_package(tmpdir))
