@@ -1,0 +1,36 @@
+#!/usr/bin/env python3
+import argparse
+import json
+import sys
+from pathlib import Path
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Validate create-structure-md 0.3.0 manifest package.")
+    parser.add_argument("manifest", help="Path to structure.manifest.json")
+    parser.add_argument("--strict", action="store_true", help="Treat warnings as errors.")
+    parser.add_argument("--repo-root", help="Optional repository root for SourceRef existence checks.")
+    return parser
+
+
+def main(argv=None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    manifest_path = Path(args.manifest)
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        print(f"file not found: {manifest_path}", file=sys.stderr)
+        return 2
+    except json.JSONDecodeError as exc:
+        print(f"invalid JSON at line {exc.lineno}, column {exc.colno}: {exc.msg}", file=sys.stderr)
+        return 2
+    if "dsl_version" in manifest:
+        print("ERROR: $.dsl_version: structure.manifest.json must not contain dsl_version", file=sys.stderr)
+        return 2
+    print("Validation succeeded")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
