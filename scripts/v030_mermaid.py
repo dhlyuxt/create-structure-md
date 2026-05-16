@@ -14,6 +14,11 @@ FLOWCHART_EDGE_ENDPOINT_RE = re.compile(
     r"\s*(?:[-.=]+(?:>|x|o)|[-.=]+)\s*(?:\|[^|\n]+\|\s*)?"
     r"(?P<right>[A-Za-z0-9_.:-]+(?:\[[^\]\n]*\]|\([^\)\n]*\)|\{[^}\n]*\})?)"
 )
+FLOWCHART_TEXTUAL_EDGE_RE = re.compile(
+    r"(?P<left>[A-Za-z0-9_.:-]+(?:\[[^\]\n]*\]|\([^\)\n]*\)|\{[^}\n]*\})?)"
+    r"\s*(?:--|==|-\.)\s+[^|\n]+?\s+(?:-{2,}(?:>|x|o)?|={2,}(?:>|x|o)?|\.-(?:>|x|o)?)\s*"
+    r"(?P<right>[A-Za-z0-9_.:-]+(?:\[[^\]\n]*\]|\([^\)\n]*\)|\{[^}\n]*\})?)"
+)
 FLOWCHART_STANDALONE_NODE_RE = re.compile(r"^\s*([A-Za-z0-9_.:-]+)\s*;?\s*$")
 FLOWCHART_EDGE_LABEL_RE = re.compile(r"[-.=]+(?:>|x|o)?\s*\|([^|\n]+)\|")
 FLOWCHART_SUBGRAPH_RE = re.compile(r"^\s*subgraph\s+(.+?)\s*$")
@@ -66,6 +71,14 @@ def visible_unlabeled_flowchart_node_ids(lines, labeled_node_ids: set[str]):
     for line in lines:
         stripped = line.strip()
         if not stripped or stripped.startswith(("flowchart", "subgraph")) or stripped == "end":
+            continue
+        textual_edge_matches = list(FLOWCHART_TEXTUAL_EDGE_RE.finditer(line))
+        if textual_edge_matches:
+            for match in textual_edge_matches:
+                for group in ("left", "right"):
+                    node_id = unlabeled_flowchart_node_id(match.group(group))
+                    if node_id and node_id not in labeled_node_ids:
+                        yield node_id
             continue
         for match in FLOWCHART_EDGE_ENDPOINT_RE.finditer(line):
             for group in ("left", "right"):
