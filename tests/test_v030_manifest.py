@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests.helpers_v030 import FIXED_MANIFEST, write_manifest_only_package
+from tests.helpers_v030 import FIXED_MANIFEST, write_json, write_manifest_only_package
 
 from jsonschema import Draft202012Validator
 
@@ -50,6 +50,29 @@ class V030ManifestTests(unittest.TestCase):
             )
         self.assertEqual(2, completed.returncode)
         self.assertIn("manifest root must be an object", completed.stderr)
+        self.assertNotIn("Traceback", completed.stderr)
+
+    def test_manifest_cli_reports_child_directory_without_traceback(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            manifest = dict(FIXED_MANIFEST)
+            write_json(root / "structure.manifest.json", manifest)
+            for key, value in manifest.items():
+                paths = value if isinstance(value, list) else [value]
+                for child in paths:
+                    child_path = root / child
+                    if key == "document":
+                        child_path.mkdir(parents=True, exist_ok=True)
+                    else:
+                        write_json(child_path, {})
+            completed = subprocess.run(
+                [PYTHON, str(ROOT / "scripts/validate_structure.py"), str(root / "structure.manifest.json")],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        self.assertEqual(2, completed.returncode)
         self.assertNotIn("Traceback", completed.stderr)
 
     def test_manifest_rejects_aggregate_key_mechanisms_file(self):

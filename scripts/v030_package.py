@@ -154,9 +154,13 @@ def manifest_shape_errors(manifest) -> list[ValidationIssue]:
 
 def load_json(path: Path) -> dict:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        text = path.read_text(encoding="utf-8")
     except FileNotFoundError as exc:
         raise ValueError(f"file not found: {path}") from exc
+    except OSError as exc:
+        raise ValueError(f"unable to read JSON file {path}: {exc.strerror or exc}") from exc
+    try:
+        return json.loads(text)
     except json.JSONDecodeError as exc:
         raise ValueError(f"invalid JSON at {path}:{exc.lineno}:{exc.colno}: {exc.msg}") from exc
 
