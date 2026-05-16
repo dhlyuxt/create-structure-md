@@ -6,7 +6,7 @@ from scripts.v030_types import ValidationResult
 
 OLD_INTERNAL_ID_RE = re.compile(r"(?:MOD|RUN|FLOW|MER|STEP|CAP|CFG|DATA|COL|RISK|ASM)-(?=[A-Za-z0-9_-]*[A-Z0-9])[A-Za-z0-9_-]+")
 FLOWCHART_NODE_LABEL_RE = re.compile(
-    r"(?<![\w])(?P<id>[A-Za-z0-9_.:-]+)\s*"
+    r"(?<![A-Za-z0-9_.:-])(?P<id>[A-Za-z0-9_][A-Za-z0-9_.:-]*)\s*"
     r"(?:\[(?P<bracket>[^\]\n]+)\]|\((?P<paren>[^\)\n]+)\)|\{(?P<brace>[^}\n]+)\})"
 )
 FLOWCHART_ATTRIBUTE_RE = re.compile(r"(?<![A-Za-z0-9_.:-])(?P<id>[A-Za-z0-9_.:-]+)\s*@\{(?P<body>[^}\n]*)\}")
@@ -157,7 +157,17 @@ def has_uninspected_flowchart_attribute_syntax(line: str) -> bool:
 
 
 def mask_supported_flowchart_label_contents(line: str) -> str:
-    return re.sub(r"\[[^\]\n]*\]|\([^\)\n]*\)|\{[^}\n]*\}", "", line)
+    characters = list(line)
+    for match in FLOWCHART_NODE_LABEL_RE.finditer(line):
+        for name in ("bracket", "paren", "brace"):
+            if match.group(name) is not None:
+                start, end = match.span(name)
+                characters[start:end] = " " * (end - start)
+                break
+    for match in FLOWCHART_ATTRIBUTE_RE.finditer(line):
+        start, end = match.span("body")
+        characters[start:end] = " " * (end - start)
+    return "".join(characters)
 
 
 def clean_sequence_participant(value: str) -> str:
