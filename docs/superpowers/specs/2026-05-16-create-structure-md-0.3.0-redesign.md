@@ -78,17 +78,17 @@ Chapter 4 must not become an API reference. Function prototypes, parameter table
 
 ## Diagram Rules
 
-Mermaid diagrams and visible prose must be human-first.
+Mermaid diagrams and visible prose must be human-first. Mermaid validation is a tooling gate, not a local Mermaid implementation.
 
-- Visible Mermaid labels must use human-readable names such as "初始化流程", "持久化存储", or "平台适配".
-- Visible Mermaid labels must not show internal IDs such as `MOD-*`, `RUN-*`, `FLOW-*`, or `MER-*`.
+- Syntax validation must be delegated to Mermaid official tooling such as `mermaid.parse`, `mmdc`, or an equivalent official Mermaid package or CLI entry point.
+- Do not write a self-authored Mermaid syntax parser, grammar recognizer, regex syntax checker, edge parser, node parser, bracket-label parser, sequence alias parser, or source-level visible-label parser.
+- The only project policy checks outside official Mermaid tooling are rejecting legacy `graph` declarations and comparing DSL `diagram_type` with the Mermaid tool-reported diagram type after normalization.
+- Visible Mermaid labels must use human-readable names such as "初始化流程", "持久化存储", or "平台适配", and must not show internal IDs such as `MOD-*`, `RUN-*`, `FLOW-*`, or `MER-*`.
 - Internal IDs may remain in child JSON reference fields and validation metadata.
-- Mermaid source may use technical node identifiers when the visible node labels remain human-readable.
-- The readability gate checks rendered/visible labels, not every raw Mermaid source token.
+- Any future automated visible-label gate must inspect Mermaid tooling output, such as rendered SVG text, not Mermaid source.
 - `diagram-id` metadata may remain in Markdown source if gate tooling needs it, but the rendered diagram and surrounding prose must not depend on it for meaning.
 - Diagrams are included only when they help readers build a mental model.
 - Chapter 6 does not require every mechanism to have a diagram.
-- A readability gate should reject visible diagram labels that leak internal IDs.
 
 ## DSL Version And Compatibility
 
@@ -643,15 +643,11 @@ Schema rules:
 
 Semantic validator rules:
 
-- To match `diagram_type`, take the first non-empty line of `source`, trim it, split it on ASCII whitespace, and compare the first token.
-- `diagram_type = "flowchart"` requires first token `flowchart`.
-- `diagram_type = "sequenceDiagram"` requires first token `sequenceDiagram`.
-- `diagram_type = "stateDiagram-v2"` requires first token `stateDiagram-v2`.
-- Legacy `graph` declarations are not supported in 0.3.0; use `flowchart` instead.
-- Visible labels in `source` must be human-readable.
-- Internal node IDs in `source` are allowed only when rendered labels do not expose them.
-- The 0.3.0 readability gate must document the Mermaid label syntax it can inspect.
-- Unsupported visible-label syntax must produce a validation warning instead of being silently treated as checked.
+- Mermaid syntax must be validated through official Mermaid tooling such as `mermaid.parse`, `mmdc`, or an equivalent official Mermaid package or CLI entry point.
+- A self-authored Mermaid syntax parser, grammar recognizer, regex syntax checker, edge parser, node parser, bracket-label parser, sequence alias parser, or source-level visible-label parser is explicitly out of scope.
+- Legacy `graph` declarations are not supported in 0.3.0; reject them before invoking Mermaid tooling and use `flowchart` instead.
+- Compare `diagram_type` with the Mermaid tool-reported diagram type after normalization, for example `flowchart-v2` to `flowchart` and `sequence` to `sequenceDiagram`.
+- Future visible-label automation must inspect Mermaid tooling output, such as rendered SVG text, rather than Mermaid source.
 - A validation warning has `code`, `json_path`, and `message`.
 - Warnings do not block rendering by default.
 - Strict validation mode promotes warnings to errors.

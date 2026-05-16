@@ -10,6 +10,7 @@ from unittest import mock
 
 from tests.helpers_v030 import write_valid_package
 
+from scripts import v030_mermaid
 from scripts import validate_structure
 from scripts.v030_mermaid import mermaid_validation_result
 from scripts.v030_package import load_manifest_package
@@ -112,6 +113,19 @@ class V030MermaidToolingTests(unittest.TestCase):
         self.assertTrue(result.ok, [issue.format() for issue in result.errors])
         self.assertTrue(any(issue.code == "mermaid.warning" for issue in result.warnings), [issue.format() for issue in result.warnings])
 
+    def test_mermaid_module_discovery_uses_mmdc_package_layout(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            mmdc = root / "bin" / "mmdc"
+            module = root / "node_modules" / "@mermaid-js" / "mermaid-cli" / "node_modules" / "mermaid" / "dist" / "mermaid.esm.mjs"
+            mmdc.parent.mkdir(parents=True)
+            module.parent.mkdir(parents=True)
+            mmdc.write_text("", encoding="utf-8")
+            module.write_text("", encoding="utf-8")
+            with mock.patch.dict(os.environ, {"MERMAID_ESM_PATH": "", "MERMAID_PACKAGE_PATH": ""}, clear=False):
+                with mock.patch("scripts.v030_mermaid.shutil.which", return_value=str(mmdc)):
+                    self.assertEqual(module, v030_mermaid._locate_mermaid_module())
+
     def test_strict_cli_promotes_mermaid_warnings_to_errors(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest = write_valid_package(tmpdir)
@@ -130,8 +144,8 @@ class V030MermaidToolingTests(unittest.TestCase):
         tmpdir, package = valid_package_with_source("flowchart TD\n  a[Start] --> b[Done]")
         with tmpdir:
             env = {
-                "MERMAID_NODE_PATH": "/home/hyx/.local/bin/node",
                 **os.environ,
+                "MERMAID_NODE_PATH": "/home/hyx/.local/bin/node",
             }
             with mock.patch.dict(os.environ, env, clear=False):
                 result = mermaid_validation_result(package)

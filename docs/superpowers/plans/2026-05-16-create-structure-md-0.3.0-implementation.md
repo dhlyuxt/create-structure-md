@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the incompatible 0.3.0 create-structure-md mainline from the committed redesign spec, with layered manifest input, fixed eight-chapter rendering, package validation, Mermaid readability gates, repo-understand workflow documentation, examples, and tests.
+**Goal:** Build the incompatible 0.3.0 create-structure-md mainline from the committed redesign spec, with layered manifest input, fixed eight-chapter rendering, package validation, a Mermaid official tooling gate, repo-understand workflow documentation, examples, and tests.
 
 **Architecture:** Rebuild the active skill from clean root-level files while treating `docs/superpowers/history/V1` and `docs/superpowers/history/V2` as read-only reference material. The validator loads `structure.manifest.json`, resolves only manifest-owned child JSON files, validates each file with 0.3.0 schemas, then runs package-level semantic rules before rendering. The renderer consumes the validated package model and emits one Chinese Markdown document with human-readable labels and hidden internal IDs.
 
-**Tech Stack:** Python 3 standard library, `jsonschema`, `unittest`, Mermaid source string inspection, root-level skill files, JSON Schema Draft 2020-12.
+**Tech Stack:** Python 3 standard library, `jsonschema`, `unittest`, Mermaid official parser/CLI tooling such as `mermaid.parse` or `mmdc`, root-level skill files, JSON Schema Draft 2020-12.
 
 ---
 
@@ -37,7 +37,7 @@ Each task commits its own passing slice. When `git add` or `git commit` needs sa
 - Create: `references/document-structure.md`
   - Rendering contract for the fixed Chinese eight-chapter document.
 - Create: `references/mermaid-rules.md`
-  - Mermaid visibility and readability gate rules.
+  - Mermaid official tooling gate rules and source-parser prohibition.
 - Create: `references/repo-understand-workflow.md`
   - Workflow contract for using repo-understand before building DSL content, especially for Chapter 6 mechanism deep dives.
 - Create: `references/review-checklist.md`
@@ -59,7 +59,7 @@ Each task commits its own passing slice. When `git add` or `git commit` needs sa
 - Create: `scripts/v030_semantics.py`
   - Package-level semantic validation: references, ID uniqueness, empty mechanisms, SourceRef repository checks.
 - Create: `scripts/v030_mermaid.py`
-  - Diagram collection and Mermaid declaration/readability checks.
+  - Diagram collection, Mermaid official parser invocation, and narrow project policy checks.
 - Create: `scripts/v030_renderer.py`
   - Markdown rendering functions for the eight fixed chapters.
 - Create: `scripts/validate_structure.py`
@@ -79,7 +79,7 @@ Each task commits its own passing slice. When `git add` or `git commit` needs sa
 - Create: `tests/test_v030_semantics.py`
   - Cross-file reference, ID uniqueness, SourceRef, and empty-mechanism tests.
 - Create: `tests/test_v030_mermaid.py`
-  - Mermaid declaration and visible-label readability tests.
+  - Mermaid official tooling integration contract tests.
 - Create: `tests/test_v030_renderer.py`
   - Markdown renderer tests for chapter order, ID hiding, Chapter 6, and output path behavior.
 - Create: `tests/test_v030_docs.py`
@@ -2199,118 +2199,142 @@ git commit -m "feat: validate 0.3.0 package semantics"
 
 ---
 
-### Task 5: Mermaid Readability Gate
+### Task 5: Mermaid Tooling Gate
 
 **Files:**
 - Create: `scripts/v030_mermaid.py`
 - Create: `tests/test_v030_mermaid.py`
 - Create: `references/mermaid-rules.md`
-- Modify: `scripts/validate_structure.py`
+- Modify only if needed: `scripts/validate_structure.py`
 
-- [ ] **Step 1: Write the failing Mermaid tests**
+- [ ] **Step 1: Remove the old Mermaid source-inspection design**
 
-Create `tests/test_v030_mermaid.py`:
+Do not implement Mermaid syntax with regexes, token splitting, local grammar rules, edge parsing, node parsing, bracket-label extraction, sequence alias parsing, or source-level visible-label parsing. Do not infer rendered labels by parsing Mermaid source. Do not keep a compatibility layer for a custom source-inspection approach.
+
+Keep only:
+
+- a thin Python integration layer that calls official Mermaid tooling and converts tool results to `ValidationResult` diagnostics
+- path discovery for Node and Mermaid packages
+- JSON serialization/deserialization for the tool process
+- Mermaid result-name normalization, such as `flowchart-v2` to `flowchart` and `sequence` to `sequenceDiagram`
+- first non-comment, non-empty declaration word extraction only for the project policy that rejects legacy `graph`
+
+- [ ] **Step 2: Write the failing Mermaid tooling tests**
+
+Create `tests/test_v030_mermaid.py` with focused contract tests:
 
 ```python
+import contextlib
+import io
 import json
+import os
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from tests.helpers_v030 import write_valid_package
 
+from scripts import v030_mermaid
+from scripts import validate_structure
 from scripts.v030_mermaid import mermaid_validation_result
 from scripts.v030_package import load_manifest_package
+from scripts.v030_types import ValidationResult
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PYTHON = sys.executable
 
 
-class V030MermaidTests(unittest.TestCase):
-    def test_diagram_type_must_match_first_source_token(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            package = load_manifest_package(write_valid_package(tmpdir))
-            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = "sequenceDiagram\n  A->>B: hi"
-            result = mermaid_validation_result(package)
-        self.assertFalse(result.ok)
-        self.assertTrue(any("diagram_type does not match Mermaid declaration" in issue.message for issue in result.errors))
+def valid_package_with_source(source: str, diagram_type: str = "flowchart"):
+    tmpdir = tempfile.TemporaryDirectory()
+    manifest = write_valid_package(tmpdir.name)
+    package = load_manifest_package(manifest)
+    diagram = package.chapters["repository_mainline"]["mainline_overview_diagram"]
+    diagram["diagram_type"] = diagram_type
+    diagram["source"] = source
+    return tmpdir, package
 
-    def test_legacy_graph_declaration_is_rejected(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            package = load_manifest_package(write_valid_package(tmpdir))
-            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = "graph TD\n  a[开始] --> b[结束]"
-            result = mermaid_validation_result(package)
-        self.assertFalse(result.ok)
-        self.assertTrue(any("Legacy graph declarations are not supported" in issue.message for issue in result.errors))
 
-    def test_visible_labels_must_not_leak_old_internal_ids(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            package = load_manifest_package(write_valid_package(tmpdir))
-            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = "flowchart TD\n  a[MOD-CORE] --> b[结束]"
-            result = mermaid_validation_result(package)
-        self.assertFalse(result.ok)
-        self.assertTrue(any("visible Mermaid label leaks internal ID" in issue.message for issue in result.errors))
+def completed_tool(payload, returncode=0, stderr=""):
+    return subprocess.CompletedProcess(args=["node"], returncode=returncode, stdout=json.dumps(payload), stderr=stderr)
 
-    def test_internal_node_ids_are_allowed_when_labels_are_human_readable(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            package = load_manifest_package(write_valid_package(tmpdir))
-            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = "flowchart TD\n  mod_core[存储核心] --> platform_port[平台适配]"
-            result = mermaid_validation_result(package)
+
+class V030MermaidToolingTests(unittest.TestCase):
+    def run_with_tool_result(self, package, payload, returncode=0, stderr=""):
+        with mock.patch("scripts.v030_mermaid._locate_node", return_value=Path("/tool/node")):
+            with mock.patch("scripts.v030_mermaid._locate_mermaid_module", return_value=Path("/tool/mermaid.esm.mjs")):
+                with mock.patch("scripts.v030_mermaid.subprocess.run", return_value=completed_tool(payload, returncode, stderr)):
+                    return mermaid_validation_result(package)
+
+    def test_valid_flowchart_succeeds_when_tool_reports_flowchart_v2(self):
+        tmpdir, package = valid_package_with_source("flowchart TD\n  a[Start] --> b[Done]")
+        with tmpdir:
+            result = self.run_with_tool_result(package, {"ok": True, "diagramType": "flowchart-v2"})
         self.assertTrue(result.ok, [issue.format() for issue in result.errors])
 
-    def test_state_diagram_warns_when_visible_label_syntax_is_not_covered(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            package = load_manifest_package(write_valid_package(tmpdir))
-            package.mechanisms[0].data["diagram"] = {
-                "id": "mechanism_state",
-                "title": "机制状态",
-                "diagram_type": "stateDiagram-v2",
-                "description": "状态流转。",
-                "source": "stateDiagram-v2\n  [*] --> Ready\n  Ready: 存储就绪",
-            }
-            result = mermaid_validation_result(package)
-        self.assertTrue(result.ok, [issue.format() for issue in result.errors])
-        self.assertTrue(any("Unsupported visible-label syntax" in issue.message for issue in result.warnings))
+    def test_invalid_mermaid_syntax_returns_syntax_error(self):
+        tmpdir, package = valid_package_with_source("flowchart TD\n  a -->")
+        with tmpdir:
+            result = self.run_with_tool_result(package, {"ok": False, "error": "Parse error"})
+        self.assertFalse(result.ok)
+        self.assertTrue(any(issue.code == "mermaid.syntax" for issue in result.errors))
 
-    def test_mixed_supported_and_unsupported_label_syntax_warns(self):
+    def test_dsl_type_mismatch_returns_diagram_type_error(self):
+        tmpdir, package = valid_package_with_source("sequenceDiagram\n  A->>B: hi", diagram_type="flowchart")
+        with tmpdir:
+            result = self.run_with_tool_result(package, {"ok": True, "diagramType": "sequence"})
+        self.assertFalse(result.ok)
+        self.assertTrue(any(issue.code == "mermaid.diagram_type" for issue in result.errors))
+
+    def test_legacy_graph_declaration_is_rejected_before_tooling(self):
+        tmpdir, package = valid_package_with_source("%% comment\ngraph TD\n  a --> b")
+        with tmpdir:
+            with mock.patch("scripts.v030_mermaid.subprocess.run") as run:
+                result = mermaid_validation_result(package)
+        self.assertFalse(result.ok)
+        self.assertTrue(any(issue.code == "mermaid.legacy_graph" for issue in result.errors))
+        run.assert_not_called()
+
+    def test_missing_node_mermaid_package_or_failed_invocation_returns_tooling_error(self):
+        tmpdir, package = valid_package_with_source("flowchart TD\n  a --> b")
+        with tmpdir:
+            with mock.patch("scripts.v030_mermaid._locate_node", return_value=None):
+                result = mermaid_validation_result(package)
+        self.assertFalse(result.ok)
+        self.assertTrue(any(issue.code == "mermaid.tooling" for issue in result.errors))
+
+    def test_mermaid_module_discovery_uses_mmdc_package_layout(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            package = load_manifest_package(write_valid_package(tmpdir))
-            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = "flowchart TD\n  a[应用] --> b[核心]\n  b -- 失败路径 --> c[错误处理]"
-            result = mermaid_validation_result(package)
-        self.assertTrue(result.ok, [issue.format() for issue in result.errors])
-        self.assertTrue(any("Unsupported visible-label syntax" in issue.message for issue in result.warnings))
+            root = Path(tmpdir)
+            mmdc = root / "bin" / "mmdc"
+            module = root / "node_modules" / "@mermaid-js" / "mermaid-cli" / "node_modules" / "mermaid" / "dist" / "mermaid.esm.mjs"
+            mmdc.parent.mkdir(parents=True)
+            module.parent.mkdir(parents=True)
+            mmdc.write_text("", encoding="utf-8")
+            module.write_text("", encoding="utf-8")
+            with mock.patch.dict(os.environ, {"MERMAID_ESM_PATH": "", "MERMAID_PACKAGE_PATH": ""}, clear=False):
+                with mock.patch("scripts.v030_mermaid.shutil.which", return_value=str(mmdc)):
+                    self.assertEqual(module, v030_mermaid._locate_mermaid_module())
 
     def test_strict_cli_promotes_mermaid_warnings_to_errors(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest = write_valid_package(tmpdir)
-            package = load_manifest_package(manifest)
-            package.mechanisms[0].data["diagram"] = {
-                "id": "mechanism_state",
-                "title": "机制状态",
-                "diagram_type": "stateDiagram-v2",
-                "description": "状态流转。",
-                "source": "stateDiagram-v2\n  [*] --> Ready\n  Ready: 存储就绪",
-            }
-            package.mechanisms[0].filesystem_path.write_text(json.dumps(package.mechanisms[0].data, ensure_ascii=False, indent=2), encoding="utf-8")
-            completed = subprocess.run(
-                [PYTHON, str(ROOT / "scripts/validate_structure.py"), str(manifest), "--strict"],
-                cwd=ROOT,
-                text=True,
-                capture_output=True,
-                check=False,
-            )
-        self.assertEqual(2, completed.returncode)
-        self.assertIn("strict mode treats validation warnings as errors", completed.stderr)
+            warning_result = ValidationResult()
+            warning_result.warn("mermaid.warning", "$.repository_mainline.mainline_overview_diagram.source", "tool warning")
+            with mock.patch("scripts.validate_structure.mermaid_validation_result", return_value=warning_result):
+                stderr = io.StringIO()
+                with contextlib.redirect_stderr(stderr):
+                    code = validate_structure.main([str(manifest), "--strict"])
+        self.assertEqual(2, code)
+        self.assertIn("strict mode treats validation warnings as errors", stderr.getvalue())
 
 
 if __name__ == "__main__":
     unittest.main()
 ```
 
-- [ ] **Step 2: Run Mermaid tests and verify they fail**
+- [ ] **Step 3: Run Mermaid tests and verify they fail**
 
 Run:
 
@@ -2320,82 +2344,31 @@ PYTHONDONTWRITEBYTECODE=1 /home/hyx/miniconda3/envs/agent/bin/python -m unittest
 
 Expected: FAIL because `scripts/v030_mermaid.py` does not exist.
 
-- [ ] **Step 3: Implement Mermaid validation**
+- [ ] **Step 4: Implement Mermaid official-tool validation**
 
-Create `scripts/v030_mermaid.py`:
+Create `scripts/v030_mermaid.py` as a thin wrapper around official Mermaid tooling:
 
-```python
-import re
+- collect diagrams with `collect_diagrams` from `scripts.v030_semantics`
+- locate Node through an explicit environment variable first, then `PATH`
+- locate Mermaid through an explicit environment variable first, then the installed `mmdc` package layout, then local `node_modules`
+- call Node with Mermaid's own ESM API, preferably `mermaid.parse(source)`
+- map Mermaid parse failures to `mermaid.syntax`
+- map missing executable/package, non-JSON output, or failed process invocation to `mermaid.tooling`
+- map official Mermaid diagram type names to DSL names, including `flowchart-v2 -> flowchart` and `sequence -> sequenceDiagram`
+- reject a first non-comment declaration word of `graph` as `mermaid.legacy_graph` before invoking the tool
+- return a `ValidationResult`
 
-from scripts.v030_semantics import collect_diagrams
-from scripts.v030_types import ValidationResult
+Forbidden helper logic:
 
+- Mermaid edge parsing
+- Mermaid node parsing
+- flowchart bracket-label parsing
+- sequence participant alias parsing
+- state-diagram grammar recognition
+- regex checks that try to decide Mermaid syntax validity
+- source-level visible-label parsing
 
-OLD_INTERNAL_ID_RE = re.compile(r"\b(?:MOD|RUN|FLOW|MER|STEP|CAP|CFG|DATA|COL|RISK|ASM)-[A-Za-z0-9_-]+\b")
-FLOWCHART_LABEL_RE = re.compile(r"[\[{(]([^{}\[\]()]*)[\]})]")
-FLOWCHART_EDGE_LABEL_RE = re.compile(r"-->\|([^|]+)\|")
-SEQUENCE_ALIAS_RE = re.compile(r"^\s*(?:participant|actor)\s+\S+\s+as\s+(.+?)\s*$")
-UNSUPPORTED_FLOWCHART_LABEL_LINE_RE = re.compile(r"--\s+[^-|>][^-|>]+?\s+-->")
-
-
-def first_mermaid_token(source: str) -> str:
-    for line in source.splitlines():
-        stripped = line.strip()
-        if stripped:
-            return stripped.split()[0]
-    return ""
-
-
-def visible_labels(source: str):
-    for match in FLOWCHART_LABEL_RE.finditer(source):
-        label = match.group(1).strip().strip('"')
-        if label:
-            yield label
-    for match in FLOWCHART_EDGE_LABEL_RE.finditer(source):
-        label = match.group(1).strip().strip('"')
-        if label:
-            yield label
-    for line in source.splitlines():
-        match = SEQUENCE_ALIAS_RE.match(line)
-        if match:
-            yield match.group(1).strip().strip('"')
-
-
-def has_unsupported_visible_label_syntax(diagram_type: str, source: str) -> bool:
-    if diagram_type == "stateDiagram-v2":
-        return True
-    if diagram_type == "flowchart":
-        return any(UNSUPPORTED_FLOWCHART_LABEL_LINE_RE.search(line) for line in source.splitlines())
-    return False
-
-
-def mermaid_validation_result(package) -> ValidationResult:
-    result = ValidationResult()
-    all_diagrams = []
-    for key, chapter in package.chapters.items():
-        all_diagrams.extend(collect_diagrams(chapter, f"$.{key}"))
-    for index, mechanism in enumerate(package.mechanisms):
-        all_diagrams.extend(collect_diagrams(mechanism.data, f"$.key_mechanisms[{index}]"))
-
-    for path, diagram in all_diagrams:
-        token = first_mermaid_token(diagram["source"])
-        if token == "graph":
-            result.error("mermaid.legacy_graph", path + ".source", "Legacy graph declarations are not supported in 0.3.0; use flowchart")
-        elif token != diagram["diagram_type"]:
-            result.error("mermaid.declaration", path + ".source", f"diagram_type does not match Mermaid declaration: {diagram['diagram_type']} != {token}")
-        if has_unsupported_visible_label_syntax(diagram["diagram_type"], diagram["source"]):
-            result.warn("mermaid.label_coverage", path + ".source", f"Unsupported visible-label syntax for {diagram['diagram_type']}; readability check is partial")
-        checked_any_label = False
-        for label in visible_labels(diagram["source"]):
-            checked_any_label = True
-            if OLD_INTERNAL_ID_RE.search(label):
-                result.error("mermaid.visible_id", path + ".source", f"visible Mermaid label leaks internal ID: {label}")
-        if not checked_any_label:
-            result.warn("mermaid.label_coverage", path + ".source", "No supported visible-label syntax found; readability check inspected declaration only")
-    return result
-```
-
-- [ ] **Step 4: Document Mermaid rules**
+- [ ] **Step 5: Document Mermaid rules**
 
 Create `references/mermaid-rules.md`:
 
@@ -2404,114 +2377,43 @@ Create `references/mermaid-rules.md`:
 
 ## Purpose
 
-Mermaid diagrams exist to help a reader build a mental model. They are not ID maps.
+Mermaid diagrams exist to help readers build a mental model. The project validator must not implement a second Mermaid.
 
-## Supported Diagram Types
+## Hard Boundary
+
+Do not add a self-authored Mermaid syntax parser, grammar recognizer, regex syntax checker, edge parser, node parser, bracket-label parser, sequence alias parser, or source-level visible-label parser.
+
+Syntax validation is delegated to Mermaid official tooling, such as `mermaid.parse`, `mmdc`, or another official Mermaid package or CLI entry point.
+
+## Supported DSL Types
 
 - `flowchart`
 - `sequenceDiagram`
 - `stateDiagram-v2`
 
-The first non-empty Mermaid source line must start with the same token as `diagram_type`. Legacy `graph` declarations are rejected.
+The validator maps Mermaid tool result names to DSL names before comparison. For example, `flowchart-v2` and `flowchart` both normalize to `flowchart`, and `sequence` normalizes to `sequenceDiagram`.
 
-## Visible Label Gate
+## Project Policy Checks
 
-The validator inspects these visible-label forms:
+The validator keeps only narrow project policy checks outside Mermaid tooling:
 
-- flowchart bracket labels such as `node[存储核心]`, `node(平台适配)`, and `node{是否已初始化}`
-- sequence aliases such as `participant api as 存储接口`
+- legacy `graph` declarations are rejected; authors must use `flowchart`
+- the DSL `diagram_type` must match the Mermaid tool-reported diagram type after normalization
 
-Visible labels must not expose legacy internal IDs such as `MOD-*`, `RUN-*`, `FLOW-*`, or `MER-*`. Technical node identifiers are allowed when the rendered labels are human-readable.
+These checks are not a Mermaid grammar implementation.
 
-## Warning Policy
+## Visible Labels
 
-If a diagram uses syntax whose visible labels are not inspected, validation emits a warning. Normal validation allows warnings. Strict validation promotes warnings to errors.
+Visible labels must be human-readable and must not expose internal IDs. In 0.3.0, the validator does not implement a source-level visible-label parser.
+
+Future automated label gates must inspect Mermaid tooling output, such as rendered SVG text, rather than parsing Mermaid source locally.
 ```
 
-- [ ] **Step 5: Replace the validation CLI with the final validation pipeline**
+- [ ] **Step 6: Confirm the validation CLI behavior**
 
-Replace `scripts/validate_structure.py` with this complete content. This keeps schema, semantic, and Mermaid diagnostics on one path and makes `--strict` promote every warning to failure:
+`scripts/validate_structure.py` should continue to run schema, semantic, and Mermaid diagnostics on one path and make `--strict` promote every warning to failure. If it already does this, leave it alone.
 
-```python
-#!/usr/bin/env python3
-import argparse
-import json
-import sys
-from pathlib import Path
-
-from scripts.v030_mermaid import mermaid_validation_result
-from scripts.v030_package import load_manifest_package, manifest_shape_errors
-from scripts.v030_schema import schema_validation_result
-from scripts.v030_semantics import semantic_validation_result
-
-
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Validate create-structure-md 0.3.0 manifest package.")
-    parser.add_argument("manifest", help="Path to structure.manifest.json")
-    parser.add_argument("--strict", action="store_true", help="Treat warnings as errors.")
-    parser.add_argument("--repo-root", help="Optional repository root for SourceRef existence checks.")
-    return parser
-
-
-def print_result(result, *, strict: bool) -> int:
-    for issue in result.warnings:
-        print(issue.format(), file=sys.stderr)
-    if result.errors or (strict and result.warnings):
-        for issue in result.errors:
-            print(issue.format(), file=sys.stderr)
-        if strict and result.warnings:
-            print("ERROR: strict mode treats validation warnings as errors", file=sys.stderr)
-        return 2
-    return 0
-
-
-def main(argv=None) -> int:
-    parser = build_parser()
-    args = parser.parse_args(argv)
-    manifest_path = Path(args.manifest)
-    try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        print(f"file not found: {manifest_path}", file=sys.stderr)
-        return 2
-    except json.JSONDecodeError as exc:
-        print(f"invalid JSON at line {exc.lineno}, column {exc.colno}: {exc.msg}", file=sys.stderr)
-        return 2
-    if isinstance(manifest, dict) and "dsl_version" in manifest:
-        print("ERROR: $.dsl_version: structure.manifest.json must not contain dsl_version", file=sys.stderr)
-        return 2
-    shape_errors = manifest_shape_errors(manifest)
-    if shape_errors:
-        for issue in shape_errors:
-            print(issue.format(), file=sys.stderr)
-        return 2
-    try:
-        package = load_manifest_package(manifest_path)
-    except ValueError as exc:
-        print(str(exc), file=sys.stderr)
-        return 2
-
-    schema_code = print_result(schema_validation_result(package), strict=args.strict)
-    if schema_code:
-        return schema_code
-    semantic_code = print_result(
-        semantic_validation_result(package, repo_root=Path(args.repo_root) if args.repo_root else None),
-        strict=args.strict,
-    )
-    if semantic_code:
-        return semantic_code
-    mermaid_code = print_result(mermaid_validation_result(package), strict=args.strict)
-    if mermaid_code:
-        return mermaid_code
-    print("Validation succeeded")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
-```
-
-- [ ] **Step 6: Run Mermaid and previous tests**
+- [ ] **Step 7: Run Mermaid and previous tests**
 
 Run:
 
@@ -2521,13 +2423,13 @@ PYTHONDONTWRITEBYTECODE=1 /home/hyx/miniconda3/envs/agent/bin/python -m unittest
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit Mermaid validation**
+- [ ] **Step 8: Commit Mermaid validation**
 
 Run:
 
 ```bash
 git add scripts/v030_mermaid.py scripts/validate_structure.py references/mermaid-rules.md tests/test_v030_mermaid.py
-git commit -m "feat: add 0.3.0 mermaid readability gate"
+git commit -m "feat: add 0.3.0 mermaid tooling gate"
 ```
 
 ---
@@ -3525,7 +3427,7 @@ Spec coverage:
 - No JSON payload `dsl_version` and 0.2.0 incompatibility are covered by Task 1 and Task 7.
 - Chapter JSON field contracts and enum values are covered by Task 3.
 - Package-level semantic rules are covered by Task 4.
-- Mermaid declaration and visible-label readability rules are covered by Task 5.
+- Mermaid official tooling validation, legacy `graph` rejection, and diagram type normalization are covered by Task 5.
 - repo-understand workflow and Chapter 6 subagent boundary are covered by Task 7.
 - Examples and end-to-end rendering are covered by Task 8.
 - Historical archive non-modification and no deletion command behavior are covered by Task 9.
