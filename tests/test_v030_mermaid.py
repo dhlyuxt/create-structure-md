@@ -66,6 +66,26 @@ class V030MermaidTests(unittest.TestCase):
                 self.assertFalse(result.ok)
                 self.assertTrue(any("visible Mermaid label leaks internal ID: MOD-CORE" in issue.message for issue in result.errors))
 
+    def test_unaliased_sequence_participants_must_not_leak_old_internal_ids(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            diagram = package.chapters["repository_mainline"]["mainline_overview_diagram"]
+            diagram["diagram_type"] = "sequenceDiagram"
+            diagram["source"] = "sequenceDiagram\n  participant MOD-CORE"
+            result = mermaid_validation_result(package)
+        self.assertFalse(result.ok)
+        self.assertTrue(any("visible Mermaid label leaks internal ID: MOD-CORE" in issue.message for issue in result.errors))
+
+    def test_human_readable_unaliased_sequence_participants_pass_without_warning(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            diagram = package.chapters["repository_mainline"]["mainline_overview_diagram"]
+            diagram["diagram_type"] = "sequenceDiagram"
+            diagram["source"] = "sequenceDiagram\n  participant 存储接口\n  participant 存储核心\n  存储接口->>存储核心: 写入成功"
+            result = mermaid_validation_result(package)
+        self.assertTrue(result.ok, [issue.format() for issue in result.errors])
+        self.assertFalse(result.warnings, [issue.format() for issue in result.warnings])
+
     def test_flowchart_labels_with_parentheses_must_not_hide_old_internal_ids(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             package = load_manifest_package(write_valid_package(tmpdir))
@@ -137,6 +157,8 @@ class V030MermaidTests(unittest.TestCase):
         self.assertIn("`-->|失败路径|`", rules)
         self.assertIn("sequence message labels", rules)
         self.assertIn("`api->>core: 写入成功`", rules)
+        self.assertIn("unaliased sequence participant and actor names", rules)
+        self.assertIn("`participant 存储接口`", rules)
 
 
 if __name__ == "__main__":

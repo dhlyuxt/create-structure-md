@@ -7,7 +7,8 @@ from scripts.v030_types import ValidationResult
 OLD_INTERNAL_ID_RE = re.compile(r"\b(?:MOD|RUN|FLOW|MER|STEP|CAP|CFG|DATA|COL|RISK|ASM)-[A-Za-z0-9_-]+\b")
 FLOWCHART_NODE_LABEL_RE = re.compile(r"(?<![\w])[\w.:-]+\s*(?:\[([^\]\n]+)\]|\(([^\)\n]+)\)|\{([^}\n]+)\})")
 FLOWCHART_EDGE_LABEL_RE = re.compile(r"-->\|([^|]+)\|")
-SEQUENCE_ALIAS_RE = re.compile(r"^\s*(?:participant|actor)\s+\S+\s+as\s+(.+?)\s*$")
+SEQUENCE_ALIAS_RE = re.compile(r"^\s*(?:create\s+)?(?:participant|actor)\s+\S+\s+as\s+(.+?)\s*$")
+SEQUENCE_DECLARATION_RE = re.compile(r"^\s*(?:create\s+)?(?:participant|actor)\s+(.+?)\s*$")
 SEQUENCE_MESSAGE_RE = re.compile(r"^\s*\S+\s*(?:-{1,2}(?:>>?|x|\))|={1,2}(?:>>?|x|\)))[+-]?\s*\S+\s*:\s*(.+?)\s*$")
 SEQUENCE_UNSUPPORTED_VISIBLE_LINE_RE = re.compile(r"^\s*(?:Note|loop|alt|opt|par|and|rect|critical|break)\b")
 UNSUPPORTED_FLOWCHART_LABEL_LINE_RE = re.compile(r"--\s+[^-|>][^-|>]+?\s+-->")
@@ -47,6 +48,13 @@ def visible_labels(diagram_type: str, source: str):
             label = match.group(1).strip().strip('"')
             if label:
                 yield label
+            continue
+        match = SEQUENCE_DECLARATION_RE.match(line)
+        if match:
+            label = match.group(1).strip().strip('"')
+            if label:
+                yield label
+            continue
         match = SEQUENCE_MESSAGE_RE.match(line)
         if not match:
             continue
