@@ -124,6 +124,25 @@ class V030ChapterSchemaTests(unittest.TestCase):
         self.assertIn("object", completed.stderr)
         self.assertNotIn("Traceback", completed.stderr)
 
+    def test_cli_non_object_chapter_header_reports_schema_error_without_traceback(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest_path = write_valid_package(tmpdir)
+            document = Path(tmpdir) / "chapters/01-document.json"
+            data = json.loads(document.read_text(encoding="utf-8"))
+            data["chapter"] = []
+            document.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+            completed = subprocess.run(
+                [PYTHON, str(ROOT / "scripts/validate_structure.py"), str(manifest_path)],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        self.assertEqual(2, completed.returncode)
+        self.assertIn("chapter", completed.stderr)
+        self.assertIn("object", completed.stderr)
+        self.assertNotIn("Traceback", completed.stderr)
+
     def test_cli_non_object_mechanism_root_reports_schema_error_without_traceback(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest_path = write_valid_package(tmpdir)

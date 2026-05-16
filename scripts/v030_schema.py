@@ -51,6 +51,8 @@ def schema_validation_result(package: ManifestPackage) -> ValidationResult:
         if not isinstance(data, dict):
             continue
         chapter = data.get("chapter", {})
+        if not isinstance(chapter, dict):
+            continue
         if chapter.get("key") != key:
             result.error("chapter.key", f"$.{key}.chapter.key", "chapter.key must match manifest property")
     for index, mechanism in enumerate(package.mechanisms):
