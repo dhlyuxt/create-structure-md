@@ -40,6 +40,8 @@ There is no `chapters/06-key-mechanisms.json` aggregate file. Chapter 6 is assem
 
 Chapter 6 mechanism keys are inferred from each mechanism file stem. For example, `chapters/06-key-mechanisms/storage-flow.json` has the mechanism key `storage-flow`.
 
+Mechanism keys must match `^[a-z0-9][a-z0-9_-]*$`. They must be unique package-wide, even if two mechanism files are placed in different directories.
+
 Mechanism JSON stores accepted content, not analysis transcript. repo-understand notes, subagent logs, command output, and rejected interpretations stay outside the renderable DSL.
 
 ## Chapter Contracts
@@ -50,5 +52,7 @@ The fixed eight-chapter Markdown structure is described in `references/document-
 - `schemas/v0.3.0/chapter.schema.json`
 
 The redesign rationale and chapter boundaries are recorded in `docs/superpowers/specs/2026-05-16-create-structure-md-0.3.0-redesign.md`.
+
+The seven single-path chapter files use the regular chapter shape and include a `chapter` header whose key matches the manifest property. Chapter 6 mechanism JSON uses the `MechanismChapter` shape and must not contain a `chapter` header; its mechanism key comes from the manifest path stem.
 
 Chapter JSON files are content-bearing. They must store facts, prose, tables, references, and Mermaid sources that can be rendered. They must not store prompts, analysis workflow rules, or repository-reading transcripts.

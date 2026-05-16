@@ -37,6 +37,11 @@ class V030DocumentationTests(unittest.TestCase):
                 "key_mechanisms",
                 "DocumentInfo.language",
                 "SourceRef",
+                "inferred from each mechanism file stem",
+                "^[a-z0-9][a-z0-9_-]*$",
+                "unique package-wide",
+                "MechanismChapter",
+                "must not contain a `chapter` header",
             ],
         )
 
@@ -64,8 +69,10 @@ class V030DocumentationTests(unittest.TestCase):
 
     def test_contract_docs_do_not_name_example_repository(self):
         for relative_path in [
+            "SKILL.md",
             "references/dsl-spec.md",
             "references/document-structure.md",
+            "references/repo-understand-workflow.md",
             "references/review-checklist.md",
         ]:
             with self.subTest(path=relative_path):
