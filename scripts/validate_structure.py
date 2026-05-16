@@ -26,6 +26,9 @@ def main(argv=None) -> int:
     except FileNotFoundError:
         print(f"file not found: {manifest_path}", file=sys.stderr)
         return 2
+    except OSError as exc:
+        print(f"unable to read manifest {manifest_path}: {exc.strerror or exc}", file=sys.stderr)
+        return 2
     except json.JSONDecodeError as exc:
         print(f"invalid JSON at line {exc.lineno}, column {exc.colno}: {exc.msg}", file=sys.stderr)
         return 2

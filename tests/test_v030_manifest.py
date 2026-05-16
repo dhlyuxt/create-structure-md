@@ -75,6 +75,20 @@ class V030ManifestTests(unittest.TestCase):
         self.assertEqual(2, completed.returncode)
         self.assertNotIn("Traceback", completed.stderr)
 
+    def test_manifest_cli_reports_manifest_directory_without_traceback(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest_path = Path(tmpdir) / "structure.manifest.json"
+            manifest_path.mkdir()
+            completed = subprocess.run(
+                [PYTHON, str(ROOT / "scripts/validate_structure.py"), str(manifest_path)],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        self.assertEqual(2, completed.returncode)
+        self.assertNotIn("Traceback", completed.stderr)
+
     def test_manifest_rejects_aggregate_key_mechanisms_file(self):
         manifest = dict(FIXED_MANIFEST)
         manifest["key_mechanisms"] = ["chapters/06-key-mechanisms.json"]
