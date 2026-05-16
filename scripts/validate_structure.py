@@ -6,6 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from scripts.v030_mermaid import mermaid_validation_result
 from scripts.v030_package import load_manifest_package, manifest_shape_errors
 from scripts.v030_schema import schema_validation_result
 from scripts.v030_semantics import semantic_validation_result
@@ -25,6 +26,8 @@ def print_result(result, *, strict: bool) -> int:
     if result.errors or (strict and result.warnings):
         for issue in result.errors:
             print(issue.format(), file=sys.stderr)
+        if strict and result.warnings:
+            print("ERROR: strict mode treats validation warnings as errors", file=sys.stderr)
         return 2
     return 0
 
@@ -66,6 +69,9 @@ def main(argv=None) -> int:
     )
     if semantic_code:
         return semantic_code
+    mermaid_code = print_result(mermaid_validation_result(package), strict=args.strict)
+    if mermaid_code:
+        return mermaid_code
     print("Validation succeeded")
     return 0
 
