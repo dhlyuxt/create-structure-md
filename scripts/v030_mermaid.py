@@ -72,14 +72,19 @@ def explicit_flowchart_labels(content: str):
 
 
 def normalized_flowchart_endpoint_statement(statement: str) -> str:
-    parts = []
-    start = 0
-    for match in FLOWCHART_TEXTUAL_EDGE_RE.finditer(statement):
-        parts.append(statement[start:match.start()])
-        parts.append(f"{match.group('left')} --> {match.group('right')}")
-        start = match.end()
-    parts.append(statement[start:])
-    return "".join(parts)
+    while True:
+        parts = []
+        start = 0
+        changed = False
+        for match in FLOWCHART_TEXTUAL_EDGE_RE.finditer(statement):
+            parts.append(statement[start:match.start()])
+            parts.append(f"{match.group('left')} --> {match.group('right')}")
+            start = match.end()
+            changed = True
+        parts.append(statement[start:])
+        if not changed:
+            return statement
+        statement = "".join(parts)
 
 
 def visible_unlabeled_flowchart_node_ids(lines, labeled_node_ids: set[str]):
