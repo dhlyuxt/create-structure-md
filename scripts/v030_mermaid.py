@@ -4,7 +4,7 @@ from scripts.v030_semantics import collect_diagrams
 from scripts.v030_types import ValidationResult
 
 
-OLD_INTERNAL_ID_RE = re.compile(r"\b(?:MOD|RUN|FLOW|MER|STEP|CAP|CFG|DATA|COL|RISK|ASM)-[A-Za-z0-9_-]+\b")
+OLD_INTERNAL_ID_RE = re.compile(r"(?<![A-Za-z0-9_-])(?:MOD|RUN|FLOW|MER|STEP|CAP|CFG|DATA|COL|RISK|ASM)-[A-Za-z0-9_-]+(?![A-Za-z0-9_-])")
 FLOWCHART_NODE_LABEL_RE = re.compile(
     r"(?<![\w])(?P<id>[A-Za-z0-9_.:-]+)\s*"
     r"(?:\[(?P<bracket>[^\]\n]+)\]|\((?P<paren>[^\)\n]+)\)|\{(?P<brace>[^}\n]+)\})"

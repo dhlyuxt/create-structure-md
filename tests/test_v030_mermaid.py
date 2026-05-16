@@ -48,6 +48,22 @@ class V030MermaidTests(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertTrue(any("visible Mermaid label leaks internal ID" in issue.message for issue in result.errors))
 
+    def test_visible_labels_must_not_leak_embedded_old_internal_ids(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = "flowchart TD\n  a[存储MOD-CORE核心] --> b[结束]"
+            result = mermaid_validation_result(package)
+        self.assertFalse(result.ok)
+        self.assertTrue(any("visible Mermaid label leaks internal ID" in issue.message for issue in result.errors))
+
+    def test_human_readable_chinese_labels_without_old_internal_ids_are_allowed(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = "flowchart TD\n  a[存储核心] --> b[平台适配]"
+            result = mermaid_validation_result(package)
+        self.assertTrue(result.ok, [issue.format() for issue in result.errors])
+        self.assertFalse(result.warnings, [issue.format() for issue in result.warnings])
+
     def test_internal_node_ids_are_allowed_when_labels_are_human_readable(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             package = load_manifest_package(write_valid_package(tmpdir))
