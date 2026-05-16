@@ -34,8 +34,8 @@ def _numbered(lines: list[str], index: int, text: str) -> None:
         _line(lines, f"{index}. {text}")
 
 
-def _diagram(lines: list[str], diagram: dict) -> None:
-    _line(lines, f"### {diagram['title']}")
+def _diagram(lines: list[str], diagram: dict, *, level: int = 3) -> None:
+    _line(lines, f"{'#' * level} {diagram['title']}")
     _line(lines)
     _line(lines, diagram["description"])
     _line(lines)
@@ -134,7 +134,11 @@ def _chapter3(lines: list[str], chapter: dict) -> None:
     for item in chapter["important_files"]:
         _bullet(lines, f"{item['path']}：{item['role']}。{item['why_it_matters']}")
     _line(lines)
-    _line(lines, chapter["directory_relationships"]["summary"])
+    relationships = chapter["directory_relationships"]
+    _line(lines, relationships["summary"])
+    if "diagram" in relationships:
+        _line(lines)
+        _diagram(lines, relationships["diagram"])
     for note in chapter["boundary_notes"]:
         _bullet(lines, f"{note['area']}：{note['note']}")
     _line(lines)
@@ -145,6 +149,8 @@ def _chapter4(lines: list[str], chapter: dict, module_names: dict[str, str]) -> 
     _line(lines)
     _line(lines, chapter["summary"])
     _line(lines)
+    if "layer_diagram" in chapter:
+        _diagram(lines, chapter["layer_diagram"])
     _line(lines, "### 分层")
     for layer in chapter["layers"]:
         _bullet(lines, f"{layer['name']}：{layer['role']} 职责：{_join(layer['responsibilities'])}。路径：{_join(layer['paths'])}。{layer.get('notes', '')}")
@@ -180,6 +186,9 @@ def _chapter5(lines: list[str], chapter: dict, module_names: dict[str, str]) -> 
             suffix = f" 模块：{modules}。" if modules else ""
             source_suffix = f" 参考：{sources}。" if sources else ""
             _numbered(lines, step["order"], f"{step['step']} 影响：{step['effect']}。{suffix}{source_suffix}")
+        if "detail_diagram" in mainline:
+            _line(lines)
+            _diagram(lines, mainline["detail_diagram"], level=4)
         _bullet(lines, f"结果：{mainline['result']}")
         _bullet(lines, mainline.get("notes", ""))
         _line(lines)
@@ -208,6 +217,8 @@ def _chapter6(lines: list[str], package: ManifestPackage, module_names: dict[str
         _line(lines)
         _line(lines, data["mechanism_overview"])
         _line(lines)
+        if "diagram" in data:
+            _diagram(lines, data["diagram"], level=4)
         _line(lines, "#### 流程")
         for step in data["flow"]:
             sources = _source_refs(step.get("source_refs", []))

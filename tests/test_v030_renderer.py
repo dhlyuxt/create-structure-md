@@ -75,6 +75,63 @@ class V030RendererTests(unittest.TestCase):
             for text in expected:
                 self.assertIn(text, markdown)
 
+    def test_renders_directory_relationship_diagram_when_present(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            package.chapters["directory_map"]["directory_relationships"]["diagram"] = {
+                "id": "directory_relationships",
+                "title": "目录关系图",
+                "diagram_type": "flowchart",
+                "description": "展示公共头文件到核心实现的目录关系。",
+                "source": "flowchart TD\n  headers[公共头文件] --> core[核心实现]",
+            }
+            markdown = render_markdown(package)
+        self.assertIn("### 目录关系图", markdown)
+        self.assertIn("```mermaid\nflowchart TD\n  headers[公共头文件] --> core[核心实现]\n```", markdown)
+
+    def test_renders_layer_diagram_when_present(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            package.chapters["module_layers"]["layer_diagram"] = {
+                "id": "layer_view",
+                "title": "分层关系图",
+                "diagram_type": "flowchart",
+                "description": "展示接口层与核心层的调用关系。",
+                "source": "flowchart TD\n  api[接口层] --> core[核心层]",
+            }
+            markdown = render_markdown(package)
+        self.assertIn("### 分层关系图", markdown)
+        self.assertIn("```mermaid\nflowchart TD\n  api[接口层] --> core[核心层]\n```", markdown)
+
+    def test_renders_mainline_detail_diagram_when_present(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            package.chapters["repository_mainline"]["mainlines"][0]["detail_diagram"] = {
+                "id": "init_detail",
+                "title": "初始化细节图",
+                "diagram_type": "sequenceDiagram",
+                "description": "展示应用、存储接口与存储核心之间的初始化交互。",
+                "source": "sequenceDiagram\n  participant App as 应用\n  participant Api as 存储接口\n  participant Core as 存储核心\n  App->>Api: 初始化\n  Api->>Core: 准备状态",
+            }
+            markdown = render_markdown(package)
+        self.assertIn("#### 初始化细节图", markdown)
+        self.assertIn("```mermaid\nsequenceDiagram\n  participant App as 应用", markdown)
+        self.assertIn("Api->>Core: 准备状态\n```", markdown)
+
+    def test_renders_mechanism_diagram_when_present(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            package.mechanisms[0].data["diagram"] = {
+                "id": "persistence_flow",
+                "title": "持久化写入流程图",
+                "diagram_type": "flowchart",
+                "description": "展示写入请求如何进入平台适配。",
+                "source": "flowchart TD\n  core[存储核心] --> port[平台适配]",
+            }
+            markdown = render_markdown(package)
+        self.assertIn("#### 持久化写入流程图", markdown)
+        self.assertIn("```mermaid\nflowchart TD\n  core[存储核心] --> port[平台适配]\n```", markdown)
+
     def test_render_cli_writes_default_output_file_and_prints_path(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest = write_valid_package(tmpdir)

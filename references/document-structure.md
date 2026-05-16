@@ -18,6 +18,10 @@ titles, explanations, and descriptions instead of internal/reference IDs. Module
 references resolve through Chapter 4 module names. Mechanism references resolve
 through mechanism section titles.
 
+Optional diagram objects are rendered when supplied, including directory
+relationship diagrams, module layer diagrams, mainline detail diagrams, and
+mechanism diagrams. Diagram bodies are emitted as fenced `mermaid` blocks.
+
 Chapter 6 renders each selected mechanism as a direct subchapter:
 
 ```markdown
