@@ -147,7 +147,9 @@ class V030MermaidToolingTests(unittest.TestCase):
                 **os.environ,
                 "MERMAID_NODE_PATH": "/home/hyx/.local/bin/node",
             }
-            with mock.patch.dict(os.environ, env, clear=False):
+            env.pop("MERMAID_ESM_PATH", None)
+            env.pop("MERMAID_PACKAGE_PATH", None)
+            with mock.patch.dict(os.environ, env, clear=True):
                 result = mermaid_validation_result(package)
         self.assertTrue(result.ok, [issue.format() for issue in result.errors])
 
