@@ -169,6 +169,22 @@ class V030MermaidTests(unittest.TestCase):
         self.assertTrue(any("visible Mermaid label leaks internal ID: MOD-CORE" in issue.message for issue in result.errors))
         self.assertTrue(any("visible Mermaid label leaks internal ID: RUN-LOAD" in issue.message for issue in result.errors))
 
+    def test_same_line_flowchart_declaration_tail_checks_unlabeled_old_ids(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = "flowchart TD; a[应用] --> MOD-CORE"
+            result = mermaid_validation_result(package)
+        self.assertFalse(result.ok)
+        self.assertTrue(any("visible Mermaid label leaks internal ID: MOD-CORE" in issue.message for issue in result.errors))
+
+    def test_same_line_flowchart_with_human_readable_labels_is_allowed(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = "flowchart TD; a[应用] --> b[核心]"
+            result = mermaid_validation_result(package)
+        self.assertTrue(result.ok, [issue.format() for issue in result.errors])
+        self.assertFalse(result.warnings, [issue.format() for issue in result.warnings])
+
     def test_unlabeled_flowchart_old_ids_still_error_after_textual_edge_classification(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             package = load_manifest_package(write_valid_package(tmpdir))

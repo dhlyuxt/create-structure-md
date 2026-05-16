@@ -90,9 +90,14 @@ def normalized_flowchart_endpoint_statement(statement: str) -> str:
 def visible_unlabeled_flowchart_node_ids(lines, labeled_node_ids: set[str]):
     for line in lines:
         stripped = line.strip()
-        if not stripped or stripped.startswith(("flowchart", "subgraph")) or stripped == "end":
+        if not stripped or stripped.startswith("subgraph") or stripped == "end":
             continue
-        for statement in line.split(";"):
+        statement_source = line
+        if stripped.startswith("flowchart"):
+            if ";" not in line:
+                continue
+            statement_source = line.split(";", 1)[1]
+        for statement in statement_source.split(";"):
             statement = statement.strip()
             if not statement:
                 continue
