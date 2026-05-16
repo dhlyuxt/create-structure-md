@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.v030_package import load_manifest_package, manifest_shape_errors
 from scripts.v030_schema import schema_validation_result
+from scripts.v030_semantics import semantic_validation_result
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -16,6 +17,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--strict", action="store_true", help="Treat warnings as errors.")
     parser.add_argument("--repo-root", help="Optional repository root for SourceRef existence checks.")
     return parser
+
+
+def print_result(result, *, strict: bool) -> int:
+    for issue in result.warnings:
+        print(issue.format(), file=sys.stderr)
+    if result.errors or (strict and result.warnings):
+        for issue in result.errors:
+            print(issue.format(), file=sys.stderr)
+        return 2
+    return 0
 
 
 def main(argv=None) -> int:
@@ -46,11 +57,15 @@ def main(argv=None) -> int:
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    schema_result = schema_validation_result(package)
-    if schema_result.errors:
-        for issue in schema_result.errors:
-            print(issue.format(), file=sys.stderr)
-        return 2
+    schema_code = print_result(schema_validation_result(package), strict=args.strict)
+    if schema_code:
+        return schema_code
+    semantic_code = print_result(
+        semantic_validation_result(package, repo_root=Path(args.repo_root) if args.repo_root else None),
+        strict=args.strict,
+    )
+    if semantic_code:
+        return semantic_code
     print("Validation succeeded")
     return 0
 
