@@ -1,0 +1,9 @@
+flowchart TD
+  A["Prepare DSL"] --> B["validate_dsl.py"]
+  B --> C["Mermaid pre gate"]
+  C --> D["render_markdown.py"]
+  D --> E["Mermaid post gate"]
+  F["install_skill.py"] --> G["Codex skill dir"]
+  H["unittest"] --> B
+  H --> C
+  H --> D

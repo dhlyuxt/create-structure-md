@@ -1,0 +1,13 @@
+flowchart TD
+  SCHEMA["Schema"] --> DSLVAL["DSL validation"]
+  FOUNDATION["V2 foundation"] --> DSLVAL
+  FOUNDATION --> MER["Mermaid gates"]
+  FOUNDATION --> RENDER["Renderer"]
+  DSLVAL --> RENDER
+  MER --> RENDER
+  INSTALL["Installer"] --> RUNTIME["Runtime entries"]
+  TESTS["Tests"] --> SCHEMA
+  TESTS --> DSLVAL
+  TESTS --> MER
+  TESTS --> RENDER
+  TESTS --> INSTALL

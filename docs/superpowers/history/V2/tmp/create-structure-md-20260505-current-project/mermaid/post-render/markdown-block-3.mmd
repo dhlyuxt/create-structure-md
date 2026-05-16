@@ -1,0 +1,6 @@
+flowchart TD
+  A["Parse args"] --> B["Load JSON"]
+  B --> C["Require V2"]
+  C --> D["Schema validation"]
+  D --> E["Semantic checks"]
+  E --> F["Report result"]

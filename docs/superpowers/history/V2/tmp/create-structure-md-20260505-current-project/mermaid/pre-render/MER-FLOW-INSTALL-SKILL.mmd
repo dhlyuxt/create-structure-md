@@ -1,0 +1,8 @@
+flowchart TD
+  A["Resolve target"] --> B["Validate source"]
+  B --> C["Print plan"]
+  C --> D{"Dry run"}
+  D -->|yes| E["Exit"]
+  D -->|no| F{"Target exists"}
+  F -->|no| G["Copy entries"]
+  F -->|yes| H["Fail with cleanup command"]

@@ -1,0 +1,13 @@
+sequenceDiagram
+  participant C as Codex
+  participant V as validate_dsl
+  participant M as mermaid_gate
+  participant R as render_markdown
+  C->>V: validate structure.dsl.json
+  V-->>C: validation result
+  C->>M: pre-render gate
+  M-->>C: strict result
+  C->>R: render Markdown
+  R-->>C: output path
+  C->>M: post-render gate
+  M-->>C: completeness and strict result
