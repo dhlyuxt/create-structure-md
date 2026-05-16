@@ -101,6 +101,29 @@ def normalized_flowchart_endpoint_statement(statement: str) -> str:
         statement = "".join(parts)
 
 
+def normalized_flowchart_label_statement(statement: str) -> str:
+    while True:
+        protected_statement = mask_supported_flowchart_label_contents(statement)
+        parts = []
+        start = 0
+        changed = False
+        for match in FLOWCHART_TEXTUAL_EDGE_RE.finditer(protected_statement):
+            parts.append(statement[start:match.start()])
+            parts.append(statement[match.start("left"):match.end("left")])
+            parts.append(" --> ")
+            parts.append(statement[match.start("right"):match.end("right")])
+            start = match.end()
+            changed = True
+        parts.append(statement[start:])
+        if not changed:
+            return statement
+        statement = "".join(parts)
+
+
+def explicit_flowchart_label_content(lines) -> str:
+    return "\n".join(normalized_flowchart_label_statement(line) for line in lines)
+
+
 def visible_unlabeled_flowchart_node_ids(lines, labeled_node_ids: set[str]):
     for line in lines:
         stripped = line.strip()
@@ -179,7 +202,7 @@ def visible_labels(diagram_type: str, source: str):
     content = "\n".join(lines)
     if diagram_type == "flowchart":
         labeled_node_ids = set()
-        for node_id, label in explicit_flowchart_labels(content):
+        for node_id, label in explicit_flowchart_labels(explicit_flowchart_label_content(lines)):
             labeled_node_ids.add(node_id)
             yield label
         for match in FLOWCHART_EDGE_LABEL_RE.finditer(content):
