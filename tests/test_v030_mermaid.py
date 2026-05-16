@@ -56,6 +56,14 @@ class V030MermaidTests(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertTrue(any("visible Mermaid label leaks internal ID" in issue.message for issue in result.errors))
 
+    def test_visible_labels_must_not_leak_ascii_embedded_old_internal_ids(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = "flowchart TD\n  a[fooMOD-COREbar] --> b[结束]"
+            result = mermaid_validation_result(package)
+        self.assertFalse(result.ok)
+        self.assertTrue(any("visible Mermaid label leaks internal ID" in issue.message for issue in result.errors))
+
     def test_human_readable_chinese_labels_without_old_internal_ids_are_allowed(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             package = load_manifest_package(write_valid_package(tmpdir))
@@ -219,6 +227,7 @@ class V030MermaidTests(unittest.TestCase):
             ("thick", "flowchart TD\n  a[应用] == 失败路径 ==> b[核心]"),
             ("hyphenated", "flowchart TD\n  a[应用] -- 失败-路径 --> b[核心]"),
             ("plain_line", "flowchart TD\n  a[应用] -- 失败路径 --- b[核心]"),
+            ("dotted_no_arrow", "flowchart TD\n  a -. 失败路径 .- b"),
         ]
         for name, source in sources:
             with self.subTest(name=name):
@@ -303,7 +312,7 @@ class V030MermaidTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest = write_valid_package(tmpdir)
             package = load_manifest_package(manifest)
-            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = "flowchart TD\n  a[应用] -- 失败路径 --- b[核心]"
+            package.chapters["repository_mainline"]["mainline_overview_diagram"]["source"] = "flowchart TD\n  a -. 失败路径 .- b"
             package.chapter_files["repository_mainline"].write_text(
                 json.dumps(package.chapters["repository_mainline"], ensure_ascii=False, indent=2),
                 encoding="utf-8",
@@ -333,7 +342,9 @@ class V030MermaidTests(unittest.TestCase):
         self.assertIn("unsupported node shapes", rules)
         self.assertIn("asymmetric flowchart nodes", rules)
         self.assertIn("textual flowchart edge labels", rules)
+        self.assertIn("`-. 失败路径 .-`", rules)
         self.assertIn("sequence boxes", rules)
+        self.assertIn("embedded in surrounding text", rules)
         self.assertIn("state diagrams are supported by schema but non-strict", rules)
 
 

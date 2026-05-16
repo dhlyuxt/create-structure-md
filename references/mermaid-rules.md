@@ -25,12 +25,12 @@ The validator inspects these visible-label forms:
 - implicit sequence participant names in messages such as `应用->>核心: 写入成功`
 - sequence message labels such as `api->>core: 写入成功`
 
-Visible labels must not expose legacy internal IDs such as `MOD-*`, `RUN-*`, `FLOW-*`, or `MER-*`. Technical node identifiers are allowed when explicit rendered labels are human-readable.
+Visible labels must not expose legacy internal IDs such as `MOD-*`, `RUN-*`, `FLOW-*`, or `MER-*`, including when they are embedded in surrounding text. Technical node identifiers are allowed when explicit rendered labels are human-readable.
 
 Mermaid comment lines that start with `%%` are ignored by the visible-label gate.
 
 ## Warning Policy
 
-If a diagram uses syntax whose visible labels are not inspected, validation emits a warning. This includes unsupported node shapes such as asymmetric flowchart nodes, textual flowchart edge labels, and sequence boxes. Normal validation allows warnings. Strict validation promotes warnings to errors.
+If a diagram uses syntax whose visible labels are not inspected, validation emits a warning. This includes unsupported node shapes such as asymmetric flowchart nodes, textual flowchart edge labels such as `-. 失败路径 .-`, and sequence boxes. Normal validation allows warnings. Strict validation promotes warnings to errors.
 
 `stateDiagram-v2` state diagrams are supported by schema but non-strict due to partial label coverage until state label inspection is implemented.
