@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://create-structure-md.local/schemas/v0.3.0/structure.manifest.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "document",
+    "repository_overview",
+    "directory_map",
+    "module_layers",
+    "repository_mainline",
+    "key_mechanisms",
+    "integration_boundaries",
+    "risks_validation"
+  ],
+  "properties": {
+    "document": { "$ref": "#/$defs/manifestPath" },
+    "repository_overview": { "$ref": "#/$defs/manifestPath" },
+    "directory_map": { "$ref": "#/$defs/manifestPath" },
+    "module_layers": { "$ref": "#/$defs/manifestPath" },
+    "repository_mainline": { "$ref": "#/$defs/manifestPath" },
+    "key_mechanisms": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/manifestPath" }
+    },
+    "integration_boundaries": { "$ref": "#/$defs/manifestPath" },
+    "risks_validation": { "$ref": "#/$defs/manifestPath" }
+  },
+  "$defs": {
+    "manifestPath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?/)(?!.*//)[A-Za-z0-9._/-]+\\.json$"
+    }
+  }
+}
