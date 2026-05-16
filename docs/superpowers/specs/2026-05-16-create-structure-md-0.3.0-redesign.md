@@ -80,9 +80,11 @@ Chapter 4 must not become an API reference. Function prototypes, parameter table
 
 Mermaid diagrams and visible prose must be human-first.
 
-- Visible Mermaid labels must use human-readable names such as "核心初始化", "ENV 存储", or "端口适配".
+- Visible Mermaid labels must use human-readable names such as "初始化流程", "持久化存储", or "平台适配".
 - Visible Mermaid labels must not show internal IDs such as `MOD-*`, `RUN-*`, `FLOW-*`, or `MER-*`.
-- Internal IDs may remain in manifest data, child JSON, and validation metadata.
+- Internal IDs may remain in child JSON reference fields and validation metadata.
+- Mermaid source may use technical node identifiers when the visible node labels remain human-readable.
+- The readability gate checks rendered/visible labels, not every raw Mermaid source token.
 - `diagram-id` metadata may remain in Markdown source if gate tooling needs it, but the rendered diagram and surrounding prose must not depend on it for meaning.
 - Diagrams are included only when they help readers build a mental model.
 - Chapter 6 does not require every mechanism to have a diagram.
@@ -94,8 +96,11 @@ Mermaid diagrams and visible prose must be human-first.
 
 - Do not preserve the old `dsl_version: "0.2.0"` contract.
 - Do not promise compatibility with old `structure.dsl.json` inputs.
-- Use `dsl_version: "0.3.0"`.
 - Use `structure.manifest.json` as the new main input name.
+- JSON payloads do not carry `dsl_version`.
+- The DSL version is selected by validator, schema path, and renderer mode, such as `schemas/v0.3.0/structure.manifest.schema.json`.
+
+0.3.0 targets C-oriented repositories first. Other language profiles are out of scope for this version unless a later profile explicitly extends the chapter contracts.
 
 ## Layered DSL Model
 
@@ -107,13 +112,17 @@ Chapter JSON must be content-bearing, not prompt-bearing. It should store facts 
 
 During design discussion, chapter JSON shapes should be expressed as generic field contracts rather than repository-specific filled examples. This avoids making one repository's content look like the DSL contract.
 
-The main JSON is a chapter directory only. It must not carry document metadata, repository metadata, repository-understanding workflow details, validation policy, output filename, or writing guidance.
+The main JSON is a chapter directory only. It must not carry document metadata, repository metadata, repository-understanding workflow details, validation policy, output filename, writing guidance, or DSL version metadata.
 
-The manifest owns only the fixed chapter list and direct child JSON paths. The chapter count and chapter keys are fixed by the 0.3.0 contract.
+The manifest owns only the fixed chapter keys and directly referenced child JSON paths. The chapter count and chapter keys are fixed by the 0.3.0 contract.
 
-Only the manifest may reference chapter JSON files. Chapter JSON files must not reference other JSON files.
+Only the manifest may compose the document by referencing child JSON files. Chapter JSON files must not include, load, or compose other JSON files.
 
-Chapter 6 is the only exception to the one-path-per-chapter shape. The manifest may split the fixed `key_mechanisms` chapter into multiple mechanism subchapter JSON files directly in the manifest. These are still direct manifest children, not grandchildren referenced from a chapter JSON file.
+Diagnostic fields may point at a manifest child path only to identify where an issue was found. Such diagnostic path fields do not authorize the renderer or validator to load additional chapter JSON beyond the manifest-owned file set.
+
+Chapter 6 is the only exception to the one-path-per-chapter shape. The manifest splits the fixed `key_mechanisms` chapter into multiple mechanism subchapter JSON files directly in the manifest. These files are directly referenced by the manifest, not grandchildren referenced from another DSL JSON file.
+
+There is no `chapters/06-key-mechanisms.json` aggregate file. The Chapter 6 title comes from the fixed chapter contract. The order of `key_mechanisms` paths in `structure.manifest.json` is the render order of Chapter 6 subchapters.
 
 Suggested child files:
 
@@ -128,7 +137,11 @@ Suggested child files:
 
 This keeps the top-level document navigable and prevents process metadata from leaking into the content model.
 
-## Repository Understanding Stage
+## Skill Behavior And Analysis Workflow
+
+This section describes skill behavior, not DSL fields. None of the workflow details below should appear in `structure.manifest.json` or in chapter JSON content unless a later explicit provenance sidecar is designed.
+
+### Repository Understanding Stage
 
 0.3.0 introduces a repository understanding stage for C repositories.
 
@@ -142,7 +155,7 @@ create-structure-md should no longer pretend that repository understanding is ou
 
 repo-understand produces understanding material, not final Markdown. Final documentation still comes from the DSL renderer.
 
-## Key Mechanism Subagent Workflow
+### Key Mechanism Subagent Workflow
 
 Chapter 6 is the main place where repo-understand should be used deeply.
 
@@ -159,6 +172,8 @@ Each subagent should:
 - avoid writing final Markdown directly.
 
 The main agent integrates each accepted subagent output into one direct manifest child under `chapters/06-key-mechanisms/<mechanism-key>.json`.
+
+The mechanism JSON stores the accepted content, not the analysis transcript. Subagent identity, CLI query logs, and repo-understand command summaries belong in implementation logs or a future explicit provenance sidecar, not in the renderable DSL.
 
 ## Historical Archive Policy
 
@@ -180,256 +195,307 @@ Deletion is not part of this workflow. If cleanup requires deletion, provide com
 
 ## Draft DSL Contracts
 
-This section records the current agreed 0.3.0 DSL shape. The shapes below are generic field contracts, not repository-specific filled examples.
+This section records the current agreed 0.3.0 DSL shape. The contracts below are not writing prompts and not repository-specific filled examples.
+
+Schema and renderer implementation should depend on this section. The workflow section above explains how agents prepare content, not what schemas or renderers must accept.
+
+JSON examples in this section must be valid JSON. Field contracts use prose so that placeholder strings such as `"high | medium | low"` are not mistaken for literal JSON values.
+
+### Shared Types And Reference Rules
+
+Common scalar types:
+
+- `path`: normalized repository-relative POSIX path string.
+- `symbol`: source symbol name string.
+- `manifest-path`: normalized relative POSIX path string from `structure.manifest.json` to a child JSON file.
+- `mechanism-key`: key inferred from a Chapter 6 mechanism file stem; it must match the mechanism key rules below.
+- `diagram-source`: Mermaid source string.
+- `confidence`: enum, one of `high`, `medium`, `low`.
+- `chapter-key`: enum, one of `document`, `repository_overview`, `directory_map`, `module_layers`, `repository_mainline`, `key_mechanisms`, `integration_boundaries`, `risks_validation`.
+
+Reference identifiers:
+
+- `layer-id`, `module-id`, `mainline-id`, `risk-id`, `assumption-id`, `gap-id`, `item-id`, and `diagram-id` are internal reference IDs.
+- Internal IDs must match `^[a-z0-9][a-z0-9_-]*$`, are case-sensitive, and must be unique within their owning collection.
+- `module_ref` and `module_refs` values must resolve to `module-id` values declared in Chapter 4.
+- `layer_id` values in modules must resolve to a `layer-id` declared in Chapter 4.
+- `related_mechanisms` values must resolve to mechanism keys inferred from `key_mechanisms` file stems in `structure.manifest.json`.
+- The fixed chapter contract defines chapter render order; JSON object property order is not semantic.
+- Single-path chapter JSON `chapter.key` values must match the manifest property that references the file.
+- Mechanism JSON files do not contain `chapter.key`; their mechanism keys come from manifest path stems.
+
+JSON Schema defaults:
+
+- Required fields must be present and non-null.
+- Optional fields may be omitted; if present, optional fields must not be `null` unless a field contract explicitly permits `null`.
+- String fields must have `minLength: 1` unless a field contract explicitly allows an empty string.
+- Required arrays must be present. They may be empty unless a rule says `minItems 1`.
+- Object schemas default to `additionalProperties: false`.
+- Enum values are case-sensitive literal strings.
+- Repository `path` values receive lexical schema validation in all modes; existence checks require repository snapshot context and belong to semantic validation.
+
+Semantic validation defaults:
+
+- Ordered arrays use positive integer `order` values starting at 1 without gaps.
+- Manifest paths and diagnostic manifest paths must resolve to paths declared in `structure.manifest.json`, as specified by each field.
+- ID references must resolve unless the owning field is explicitly described as free text.
+- Repository `path` existence checks run only when repository snapshot context is available.
+
+Named object contracts:
+
+Notation:
+
+- `field: type` means required field.
+- `field?: type` means optional field.
+- `array<T>` means an array whose items are `T`.
+- `array<T>, minItems N` adds an array size rule.
+- `enum(...)` means a case-sensitive enum.
+
+Source references:
+
+- `SourceRef`: `path: path`, `symbol?: symbol`.
+- A `SourceRef` always has a `path`.
+- If `symbol` is present, it is scoped to `path`.
+- If `symbol` is present and repository snapshot context is available, semantic validation must confirm that `path` identifies a single source file.
+- If repository snapshot context includes a symbol index, `symbol` must resolve within `path`; unresolved symbols are semantic errors.
+- Without repository snapshot context or without a symbol index, validators must not fail a `SourceRef` because file type or symbol existence cannot be checked.
+- Symbol-only references are not part of 0.3.0 because they require a repository-wide symbol registry and ambiguity policy.
+- 0.3.0 does not define a string grammar such as `path#symbol` or `path:symbol`; source references are structured objects only.
+
+Reusable objects:
+
+- `ChapterHeader`: `key: chapter-key`, `title: string`.
+- `DocumentInfo`: `title: string`, `version: string`, `status: enum(document_status)`, `language: enum(document_language)`, `generated_at: string`, `output_file: string`.
+- `RepositoryInfo`: `name: string`, `root_display_path: string`, `kind: enum(repository_kind)`, `primary_languages: array<string>, minItems 1`.
+- `Scope`: `included: array<ScopeIncluded>`, `excluded: array<ScopeExcluded>`.
+- `ScopeIncluded`: `area: string`, `description: string`.
+- `ScopeExcluded`: `area: string`, `reason: string`.
+- `ConfidenceSummary`: `level: confidence`, `summary: string`, `validation_gaps: array<string>`.
+- `RepositoryOverview`: `summary: string`, `problem_domain: string`, `repository_purpose: string`, `target_readers: array<string>, minItems 1`.
+- `ReaderOrientation`: `read_first: array<string>`, `read_later: array<string>`, `can_skip_initially: array<string>`.
+- `CoreCapability`: `name: string`, `description: string`, `entry_points: array<SourceRef>`, `notes: string`.
+- `ReadingStep`: `order: integer`, `title: string`, `why_read_this: string`, `recommended_files: array<RecommendedFile>`, `expected_takeaway: string`.
+- `RecommendedFile`: `path: path`, `reason: string`.
+- `DirectoryGroup`: `name: string`, `role: enum(directory_group_role)`, `paths: array<path>, minItems 1`, `responsibility: string`, `read_when: string`, `notes: string`.
+- `ImportantFile`: `path: path`, `role: string`, `why_it_matters: string`, `related_chapters: array<chapter-key>`.
+- `RelationshipDiagram`: `summary: string`, `diagram?: Diagram`.
+- `AreaBoundaryNote`: `area: string`, `note: string`.
+- `TopicBoundaryNote`: `topic: string`, `note: string`.
+- `Layer`: `layer_id: layer-id`, `name: string`, `role: string`, `responsibilities: array<string>`, `paths: array<path>, minItems 1`, `notes: string`.
+- `Module`: `module_id: module-id`, `name: string`, `layer_id: layer-id`, `purpose: string`, `source_paths: array<path>, minItems 1`, `owns: array<string>`, `consumes: array<string>`, `produces: array<string>`, `does_not_own: array<string>`, `collaborates_with: array<ModuleCollaboration>`, `read_when: string`, `notes: string`.
+- `ModuleCollaboration`: `module_ref: module-id`, `relationship: string`.
+- `Mainline`: `mainline_id: mainline-id`, `name: string`, `purpose: string`, `entry: MainlineEntry`, `steps: array<MainlineStep>, minItems 1`, `result: string`, `detail_diagram?: Diagram`, `notes: string`.
+- `MainlineEntry`: `kind: enum(mainline_entry_kind)`, `name: string`, `description: string`, `source_ref?: SourceRef`.
+- `MainlineStep`: `order: integer`, `step: string`, `module_refs?: array<module-id>`, `source_refs: array<SourceRef>`, `effect: string`.
+- `MechanismSection`: `title: string`.
+- `SourceFocus`: `source_ref: SourceRef`, `reason: string`.
+- `MechanismStep`: `order: integer`, `step: string`, `source_refs: array<SourceRef>`, `state_or_data: string`, `notes: string`.
+- `StateOrData`: `name: string`, `kind: enum(state_or_data_kind)`, `description: string`, `source_refs: array<SourceRef>`.
+- `CommonMisunderstanding`: `misunderstanding: string`, `correction: string`.
+- `ConfigurationLocation`: `description: string`, `source_ref?: SourceRef`, `external_name?: string`.
+- `RequiredConfiguration`: `name: string`, `kind: enum(required_configuration_kind)`, `location: ConfigurationLocation`, `purpose: string`, `required_when: string`, `notes: string`.
+- `AdaptationLocation`: `description: string`, `source_ref?: SourceRef`, `external_name?: string`.
+- `RequiredAdaptation`: `name: string`, `kind: enum(required_adaptation_kind)`, `location: AdaptationLocation`, `responsibility: string`, `caller_or_consumer: string`, `failure_if_missing: string`.
+- `IntegrationEntry`: `description: string`, `source_ref?: SourceRef`, `external_name?: string`, `command?: string`.
+- `IntegrationPath`: `name: string`, `scenario: string`, `recommended_entry: IntegrationEntry`, `steps: array<string>, minItems 1`, `reference_examples: array<path>`, `notes: string`.
+- `ExternalDependency`: `name: string`, `kind: enum(external_dependency_kind)`, `used_by: string`, `integration_role: string`, `notes: string`.
+- `OutOfScopeResponsibility`: `topic: string`, `owner: enum(out_of_scope_owner)`, `reason: string`.
+- `Risk`: `risk_id: risk-id`, `description: string`, `impact: string`, `mitigation: string`, `related_modules: array<module-id>`, `related_mechanisms: array<mechanism-key>`, `confidence: confidence`.
+- `Assumption`: `assumption_id: assumption-id`, `description: string`, `rationale: string`, `validation_suggestion: string`, `confidence: confidence`.
+- `ValidationGap`: `gap_id: gap-id`, `gap_type: enum(validation_gap_type)`, `description: string`, `why_it_matters: string`, `suggested_validation: string`, `related_chapters: array<chapter-key>`, `confidence: confidence`.
+- `LowConfidenceLocation`: `kind: enum(low_confidence_location_kind)`, `chapter?: chapter-key`, `path?: manifest-path`.
+- `LowConfidenceItem`: `item_id: item-id`, `location: LowConfidenceLocation`, `description: string`, `reason: string`, `needed_evidence: string`.
+
+Named enum values:
+
+- `directory_group_role`: `main_source`, `public_headers`, `platform_port`, `plugin`, `demo`, `docs`, `tests`, `third_party`, `build`, `generated`, `other`.
+- `mainline_entry_kind`: `api`, `command`, `build_target`, `startup`, `user_action`, `external_event`, `other`.
+- `state_or_data_kind`: `state`, `struct`, `enum`, `macro`, `storage_layout`, `runtime_value`, `artifact`, `other`.
+- `required_configuration_kind`: `macro`, `config_file`, `build_option`, `environment`, `runtime_setting`, `other`.
+- `required_adaptation_kind`: `port_function`, `platform_hook`, `driver_binding`, `memory_hook`, `logging_hook`, `other`.
+- `external_dependency_kind`: `library`, `hardware`, `toolchain`, `os`, `protocol`, `service`, `other`.
+- `out_of_scope_owner`: `caller`, `platform`, `application`, `build_system`, `deployment`, `unknown`.
+- `validation_gap_type`: `analysis_gap`, `missing_build_validation`, `missing_runtime_validation`, `uncertain_behavior`, `no_key_mechanisms_selected`, `other`.
+- `document_status`: `draft`, `reviewed`, `final`.
+- `document_language`: `zh-CN`.
+- `repository_kind`: `c_library`, `c_application`, `firmware`, `mixed`, `other`.
+- `low_confidence_location_kind`: `chapter`, `manifest_path`.
+
+Language and title policy:
+
+- 0.3.0 supports Chinese output first.
+- Fixed chapter titles in this spec are Chinese literals and are valid for `DocumentInfo.language = "zh-CN"`.
+- `DocumentInfo.language` must be `zh-CN`.
+- Other output languages require a later localization profile and are hard validation errors in 0.3.0.
+
+Path rules for `path`:
+
+- A `path` must be normalized lexically as a relative POSIX path.
+- A `path` must not start with `/`, contain `\`, contain empty path segments, or contain `.` or `..` path segments.
+- A `path` may refer to a source file, source directory, build file, generated artifact, or documented repository artifact depending on field context.
+- When repository snapshot context is available, `SourceRef.path` values must resolve or produce semantic validation errors.
+- Non-`SourceRef` repository `path` fields are checked lexically by schema. Snapshot existence checks for those fields are semantic validator policy and may be warnings when the path intentionally describes generated, optional, or external artifacts.
+- `root_display_path` is display text, not a repository-relative `path`; it may be a repository name or a sanitized display path. Renderers should not expose local absolute paths by default.
+
+Conditional object rules:
+
+- `LowConfidenceLocation.kind = "chapter"` requires `chapter` and forbids `path`.
+- `LowConfidenceLocation.kind = "manifest_path"` requires `path` and forbids `chapter`.
+- `LowConfidenceLocation.path` is a diagnostic manifest path. It must equal one normalized path declared in `structure.manifest.json`, but renderers and validators must not load files because of this field.
+- `RequiredConfiguration.kind` values `environment`, `build_option`, and `runtime_setting` do not require `location.source_ref`; `location.description` and optional `location.external_name` carry the location.
+- `RequiredAdaptation.kind` values `driver_binding` and `other` do not require `location.source_ref`; `location.description` and optional `location.external_name` carry the location.
+
+Content quality guidance:
+
+- `RequiredConfiguration.kind` values `macro` and `config_file` should include `location.source_ref` when source evidence is known.
+- `RequiredAdaptation.kind` values `port_function`, `platform_hook`, `memory_hook`, and `logging_hook` should include `location.source_ref` when source evidence is known.
+- These source evidence recommendations are not schema rules and do not produce validator diagnostics unless a later provenance mechanism makes evidence availability machine-checkable.
+
+Internal ID uniqueness ranges:
+
+- `layer-id`: unique within Chapter 4 `layers`.
+- `module-id`: unique within Chapter 4 `modules`.
+- `mainline-id`: unique within Chapter 5 `mainlines`.
+- `risk-id`: unique within Chapter 8 `risks`.
+- `assumption-id`: unique within Chapter 8 `assumptions`.
+- `gap-id`: unique within Chapter 8 `validation_gaps`.
+- `item-id`: unique within Chapter 8 `low_confidence_items`.
+- `diagram-id`: unique package-wide.
 
 ### `structure.manifest.json`
 
-The manifest is a chapter directory only. It contains no metadata other than direct child paths.
+The manifest is a pure chapter path directory. It contains exactly the fixed eight top-level properties shown below and no other fields.
 
 ```json
 {
-  "chapters": [
-    {
-      "key": "document",
-      "path": "chapters/01-document.json"
-    },
-    {
-      "key": "repository_overview",
-      "path": "chapters/02-repository-overview.json"
-    },
-    {
-      "key": "directory_map",
-      "path": "chapters/03-directory-map.json"
-    },
-    {
-      "key": "module_layers",
-      "path": "chapters/04-module-layers.json"
-    },
-    {
-      "key": "repository_mainline",
-      "path": "chapters/05-repository-mainline.json"
-    },
-    {
-      "key": "key_mechanisms",
-      "sections": [
-        {
-          "key": "mechanism-key",
-          "path": "chapters/06-key-mechanisms/mechanism-key.json"
-        }
-      ]
-    },
-    {
-      "key": "integration_boundaries",
-      "path": "chapters/07-integration-boundaries.json"
-    },
-    {
-      "key": "risks_validation",
-      "path": "chapters/08-risks-validation.json"
-    }
-  ]
+  "document": "chapters/01-document.json",
+  "repository_overview": "chapters/02-repository-overview.json",
+  "directory_map": "chapters/03-directory-map.json",
+  "module_layers": "chapters/04-module-layers.json",
+  "repository_mainline": "chapters/05-repository-mainline.json",
+  "key_mechanisms": [
+    "chapters/06-key-mechanisms/mechanism-key.json"
+  ],
+  "integration_boundaries": "chapters/07-integration-boundaries.json",
+  "risks_validation": "chapters/08-risks-validation.json"
 }
 ```
 
 Rules:
 
-- `chapters` contains exactly the fixed eight chapter keys in the fixed order shown above.
-- All chapters except `key_mechanisms` use exactly one `path`.
-- `key_mechanisms` uses `sections[]` and no chapter-level `path`.
-- Each `sections[]` item renders as one Chapter 6 subchapter.
-- Manifest children are direct children only; child JSON files must not reference other JSON files.
+- All properties are required.
+- All values except `key_mechanisms` are single child JSON paths.
+- `key_mechanisms` is an array of child JSON paths.
+- `key_mechanisms` may contain any number of mechanisms. If it is empty, the renderer still emits the Chapter 6 title plus the fixed sentence `本次分析未选择可深读的关键机制。`, and Chapter 8 must record why no mechanism deep dive was selected.
+- Each `key_mechanisms` path renders as one Chapter 6 subchapter.
+- The order of `key_mechanisms` array entries is the Chapter 6 subchapter order.
+- The mechanism key is inferred from the file stem of each `key_mechanisms` path.
+- All manifest paths are relative to the directory containing `structure.manifest.json`.
+- Manifest child files are direct DSL references only; this does not require them to be immediate filesystem children of the manifest directory.
+- Child JSON files must not contain include/load/compose JSON references. Fields explicitly marked as diagnostic locations may contain manifest paths only to locate issues; renderers and validators must not load extra JSON from those diagnostic fields.
+- `chapters/06-key-mechanisms.json` is forbidden; Chapter 6 has no aggregate child JSON.
+- `structure.manifest.json` must not contain `dsl_version`, title, output filename, repository metadata, schema metadata, validation policy, or writing guidance.
+
+Manifest path rules:
+
+- A manifest path must be a normalized relative POSIX path.
+- Normalization is lexical POSIX normalization, not operating-system-specific path resolution.
+- A manifest path must not contain empty path segments, so `chapters//x.json` is invalid.
+- A manifest path must not start with `/`.
+- A manifest path must not contain `\`.
+- A manifest path must not contain `.` or `..` path segments.
+- A manifest path must end with the lowercase extension `.json`.
+- Manifest paths must be unique across all eight manifest properties and all `key_mechanisms` entries after lexical normalization.
+- Referenced files must exist when validation is run against a concrete DSL package.
+- Filesystem validation resolves paths against the directory containing `structure.manifest.json`; symlinks that escape that directory are validation errors.
+
+Mechanism key rules:
+
+- The mechanism key is the basename of a `key_mechanisms` path after removing the final `.json`.
+- The mechanism key must match `^[a-z0-9][a-z0-9_-]*$`.
+- Mechanism keys are case-sensitive and must be unique within the manifest.
+- Invalid mechanism paths, duplicate mechanism keys, or paths that do not end in `.json` are hard validation errors.
 
 ### `chapters/01-document.json`
 
-```json
-{
-  "chapter": {
-    "key": "document",
-    "title": "文档说明"
-  },
-  "document": {
-    "title": "string",
-    "version": "semver-string",
-    "status": "draft | reviewed | final",
-    "language": "language-tag",
-    "generated_at": "iso-8601-string",
-    "output_file": "filename.md"
-  },
-  "repository": {
-    "name": "string",
-    "root_path": "path-string",
-    "kind": "c_library | c_application | firmware | mixed | other",
-    "primary_languages": ["string"]
-  },
-  "scope": {
-    "included": [
-      {
-        "area": "string",
-        "description": "string"
-      }
-    ],
-    "excluded": [
-      {
-        "area": "string",
-        "reason": "string"
-      }
-    ]
-  },
-  "confidence": {
-    "level": "high | medium | low",
-    "summary": "string",
-    "validation_gaps": ["string"]
-  }
-}
-```
+Required:
+
+- `chapter`: `ChapterHeader` with `key` equal to `document` and `title` equal to `文档说明`.
+- `document`: `DocumentInfo`.
+- `repository`: `RepositoryInfo`.
+- `scope`: `Scope`.
+- `confidence`: `ConfidenceSummary`.
+
+Enums:
+
+- `document.status`: `draft`, `reviewed`, or `final`.
+- `repository.kind`: `c_library`, `c_application`, `firmware`, `mixed`, or `other`.
+- `confidence.level`: `confidence`.
+
+Rendering notes:
+
+- This chapter introduces the document, not raw scan statistics.
+- `document.output_file` is a suggested output filename for humans and default tooling. The actual write path is decided by the CLI or render invocation, and an explicit invocation path overrides `document.output_file`.
 
 ### `chapters/02-repository-overview.json`
 
-```json
-{
-  "chapter": {
-    "key": "repository_overview",
-    "title": "仓库概述与阅读路线"
-  },
-  "overview": {
-    "summary": "string",
-    "problem_domain": "string",
-    "repository_purpose": "string",
-    "target_readers": ["string"]
-  },
-  "core_capabilities": [
-    {
-      "name": "string",
-      "description": "string",
-      "entry_points": ["path-or-symbol-string"],
-      "notes": "string"
-    }
-  ],
-  "reading_route": {
-    "summary": "string",
-    "steps": [
-      {
-        "order": 1,
-        "title": "string",
-        "why_read_this": "string",
-        "recommended_files": [
-          {
-            "path": "string",
-            "reason": "string"
-          }
-        ],
-        "expected_takeaway": "string"
-      }
-    ]
-  },
-  "reader_orientation": {
-    "read_first": ["string"],
-    "read_later": ["string"],
-    "can_skip_initially": ["string"]
-  }
-}
-```
+Required:
+
+- `chapter`: `ChapterHeader` with `key` equal to `repository_overview` and `title` equal to `仓库概述与阅读路线`.
+- `overview`: `RepositoryOverview`.
+- `core_capabilities`: array of `CoreCapability`, `minItems 1`.
+- `reading_route.summary`: string.
+- `reading_route.steps`: ordered array of `ReadingStep`, `minItems 1`.
+- `reader_orientation`: `ReaderOrientation`.
+
+Field details:
+
+- `entry_points` is an array of `SourceRef`.
+- `recommended_files` is an array of `RecommendedFile`.
+
+Rendering notes:
+
+- This chapter should name the first files or directories a new reader should inspect.
+- It should not become an exhaustive feature list.
 
 ### `chapters/03-directory-map.json`
 
-```json
-{
-  "chapter": {
-    "key": "directory_map",
-    "title": "目录地图"
-  },
-  "summary": "string",
-  "directory_groups": [
-    {
-      "name": "string",
-      "role": "main_source | public_headers | platform_port | plugin | demo | docs | tests | third_party | build | generated | other",
-      "paths": ["path-string"],
-      "responsibility": "string",
-      "read_when": "string",
-      "notes": "string"
-    }
-  ],
-  "important_files": [
-    {
-      "path": "string",
-      "role": "string",
-      "why_it_matters": "string",
-      "related_chapters": ["chapter-key-string"]
-    }
-  ],
-  "directory_relationships": {
-    "summary": "string",
-    "diagram": {
-      "id": "diagram-id",
-      "title": "string",
-      "diagram_type": "flowchart",
-      "description": "string",
-      "source": "mermaid-source"
-    }
-  },
-  "boundary_notes": [
-    {
-      "area": "string",
-      "note": "string"
-    }
-  ]
-}
-```
+Required:
+
+- `chapter`: `ChapterHeader` with `key` equal to `directory_map` and `title` equal to `目录地图`.
+- `summary`: string.
+- `directory_groups`: array of `DirectoryGroup`, `minItems 1`.
+- `important_files`: array of `ImportantFile`.
+- `directory_relationships`: `RelationshipDiagram`.
+- `boundary_notes`: array of `AreaBoundaryNote`.
+
+Enums:
+
+- `directory_groups[].role`: `main_source`, `public_headers`, `platform_port`, `plugin`, `demo`, `docs`, `tests`, `third_party`, `build`, `generated`, or `other`.
+- `important_files[].related_chapters`: array of `chapter-key`.
+
+Rendering notes:
+
+- Directory groups explain roles, not every file.
 
 ### `chapters/04-module-layers.json`
 
-```json
-{
-  "chapter": {
-    "key": "module_layers",
-    "title": "系统分层与模块职责"
-  },
-  "summary": "string",
-  "layers": [
-    {
-      "layer_id": "layer-id",
-      "name": "string",
-      "role": "string",
-      "responsibilities": ["string"],
-      "paths": ["path-string"],
-      "notes": "string"
-    }
-  ],
-  "modules": [
-    {
-      "module_id": "module-id",
-      "name": "string",
-      "layer_id": "layer-id",
-      "purpose": "string",
-      "source_paths": ["path-string"],
-      "owns": ["string"],
-      "consumes": ["string"],
-      "produces": ["string"],
-      "does_not_own": ["string"],
-      "collaborates_with": [
-        {
-          "module_ref": "module-id",
-          "relationship": "string"
-        }
-      ],
-      "read_when": "string",
-      "notes": "string"
-    }
-  ],
-  "layer_diagram": {
-    "id": "diagram-id",
-    "title": "string",
-    "diagram_type": "flowchart",
-    "description": "string",
-    "source": "mermaid-source"
-  },
-  "boundary_notes": [
-    {
-      "topic": "string",
-      "note": "string"
-    }
-  ]
-}
-```
+Required:
+
+- `chapter`: `ChapterHeader` with `key` equal to `module_layers` and `title` equal to `系统分层与模块职责`.
+- `summary`: string.
+- `layers`: array of `Layer`, `minItems 1`.
+- `modules`: array of `Module`, `minItems 1`.
+- `boundary_notes`: array of `TopicBoundaryNote`.
+
+Optional:
+
+- `layer_diagram`: `Diagram`.
+
+References:
+
+- `modules[].layer_id` resolves to `layers[].layer_id`.
+- `modules[].collaborates_with[].module_ref` resolves to `modules[].module_id`.
 
 Rendering rules:
 
@@ -439,58 +505,33 @@ Rendering rules:
 
 ### `chapters/05-repository-mainline.json`
 
-```json
-{
-  "chapter": {
-    "key": "repository_mainline",
-    "title": "仓库主线"
-  },
-  "summary": "string",
-  "mainline_overview_diagram": {
-    "id": "diagram-id",
-    "title": "string",
-    "diagram_type": "flowchart",
-    "description": "string",
-    "source": "mermaid-source"
-  },
-  "mainlines": [
-    {
-      "mainline_id": "mainline-id",
-      "name": "string",
-      "purpose": "string",
-      "entry": {
-        "kind": "api | command | build_target | startup | user_action | external_event | other",
-        "name": "string",
-        "location": "path-or-symbol-string"
-      },
-      "path": [
-        {
-          "order": 1,
-          "step": "string",
-          "module_ref": "module-id",
-          "source_refs": ["path-or-symbol-string"],
-          "effect": "string"
-        }
-      ],
-      "result": "string",
-      "detail_diagram": {
-        "id": "diagram-id",
-        "title": "string",
-        "diagram_type": "flowchart | sequenceDiagram",
-        "description": "string",
-        "source": "mermaid-source"
-      },
-      "notes": "string"
-    }
-  ],
-  "cross_mainline_notes": [
-    {
-      "topic": "string",
-      "note": "string"
-    }
-  ]
-}
-```
+Required:
+
+- `chapter`: `ChapterHeader` with `key` equal to `repository_mainline` and `title` equal to `仓库主线`.
+- `summary`: string.
+- `mainline_overview_diagram`: `Diagram` with `diagram_type` equal to `flowchart`.
+- `mainlines`: array of `Mainline`, `minItems 1`, `maxItems 3`.
+- `cross_mainline_notes`: array of `TopicBoundaryNote`.
+
+Optional:
+
+- `mainlines[].detail_diagram`: `Diagram`.
+
+Enums:
+
+- `mainlines[].entry.kind`: `api`, `command`, `build_target`, `startup`, `user_action`, `external_event`, or `other`.
+- `mainlines[].detail_diagram.diagram_type`: `flowchart` or `sequenceDiagram`.
+
+References:
+
+- `mainlines[].steps[].module_refs[]` resolves to Chapter 4 `module-id` values when present.
+
+Field details:
+
+- `mainlines[].entry` is `MainlineEntry`.
+- `mainlines[].steps` is an ordered array of `MainlineStep`, `minItems 1`.
+- A mainline step without `module_refs` is allowed when the step describes build, test, external, or user-triggered behavior that is not owned by a Chapter 4 module.
+- `mainlines[].steps[].source_refs` may be an empty array when the step has no repository source location.
 
 Rendering rules:
 
@@ -500,176 +541,133 @@ Rendering rules:
 
 ### `chapters/06-key-mechanisms/<mechanism-key>.json`
 
-Each mechanism file renders as one subchapter under Chapter 6.
+Each mechanism file renders as one subchapter under Chapter 6. The mechanism key is inferred from the file stem in `structure.manifest.json`, not stored inside the mechanism JSON.
 
-```json
-{
-  "section": {
-    "key": "mechanism-key",
-    "title": "string"
-  },
-  "why_it_matters": "string",
-  "reader_prerequisites": ["string"],
-  "related_modules": ["module-id"],
-  "source_focus": [
-    {
-      "path": "path-string",
-      "symbols": ["symbol-name"],
-      "reason": "string"
-    }
-  ],
-  "mechanism_overview": "string",
-  "flow": [
-    {
-      "order": 1,
-      "step": "string",
-      "source_refs": ["path-or-symbol-string"],
-      "state_or_data": "string",
-      "notes": "string"
-    }
-  ],
-  "key_states_or_data": [
-    {
-      "name": "string",
-      "kind": "state | struct | enum | macro | storage_layout | runtime_value | artifact | other",
-      "description": "string",
-      "source_refs": ["path-or-symbol-string"]
-    }
-  ],
-  "diagram": {
-    "id": "diagram-id",
-    "title": "string",
-    "diagram_type": "flowchart | sequenceDiagram | stateDiagram-v2",
-    "description": "string",
-    "source": "mermaid-source"
-  },
-  "common_misunderstandings": [
-    {
-      "misunderstanding": "string",
-      "correction": "string"
-    }
-  ],
-  "validation_gaps": ["string"],
-  "understanding_notes": {
-    "prepared_by": "main_agent | subagent",
-    "repo_understand_used": true,
-    "query_summary": ["string"]
-  },
-  "confidence": "high | medium | low"
-}
-```
+Required:
+
+- `section`: `MechanismSection`.
+- `why_it_matters`: string.
+- `reader_prerequisites`: array of strings.
+- `related_modules`: array of Chapter 4 `module-id`.
+- `source_focus`: array of `SourceFocus`, `minItems 1`.
+- `mechanism_overview`: string.
+- `flow`: ordered array of `MechanismStep`, `minItems 1`.
+- `key_states_or_data`: array of `StateOrData`.
+- `common_misunderstandings`: array of `CommonMisunderstanding`.
+- `validation_gaps`: array of strings.
+- `confidence`: `confidence`.
+
+Optional:
+
+- `diagram`: `Diagram`.
+
+Enums:
+
+- `key_states_or_data[].kind`: `state`, `struct`, `enum`, `macro`, `storage_layout`, `runtime_value`, `artifact`, or `other`.
+- `diagram.diagram_type`: `flowchart`, `sequenceDiagram`, or `stateDiagram-v2`.
 
 Rendering rules:
 
-- `understanding_notes` stays in the mechanism JSON and is not rendered by default.
+- The Chapter 6 title is fixed by the chapter contract, not by an aggregate JSON file.
+- Each mechanism path in the manifest renders as `6.x` using `section.title`.
+- If `key_mechanisms` is empty, the renderer still emits the Chapter 6 title and the fixed empty-chapter sentence defined by the manifest rules.
 - `related_modules` render as module names resolved from Chapter 4.
-- If `repo_understand_used` is false, the mechanism needs a validation gap or explicit explanation.
+- repo-understand usage notes, subagent names, and query summaries are not part of this JSON.
 
 ### `chapters/07-integration-boundaries.json`
 
-```json
-{
-  "chapter": {
-    "key": "integration_boundaries",
-    "title": "配置、移植与集成边界"
-  },
-  "summary": "string",
-  "required_configuration": [
-    {
-      "name": "string",
-      "kind": "macro | config_file | build_option | environment | runtime_setting | other",
-      "location": "path-or-symbol-string",
-      "purpose": "string",
-      "required_when": "string",
-      "notes": "string"
-    }
-  ],
-  "required_adaptations": [
-    {
-      "name": "string",
-      "kind": "port_function | platform_hook | driver_binding | memory_hook | logging_hook | other",
-      "location": "path-or-symbol-string",
-      "responsibility": "string",
-      "caller_or_consumer": "string",
-      "failure_if_missing": "string"
-    }
-  ],
-  "integration_paths": [
-    {
-      "name": "string",
-      "scenario": "string",
-      "recommended_entry": "path-or-symbol-string",
-      "steps": ["string"],
-      "reference_examples": ["path-string"],
-      "notes": "string"
-    }
-  ],
-  "external_dependencies": [
-    {
-      "name": "string",
-      "kind": "library | hardware | toolchain | os | protocol | service | other",
-      "used_by": "string",
-      "integration_role": "string",
-      "notes": "string"
-    }
-  ],
-  "out_of_scope_responsibilities": [
-    {
-      "topic": "string",
-      "owner": "caller | platform | application | build_system | deployment | unknown",
-      "reason": "string"
-    }
-  ]
-}
-```
+Required:
+
+- `chapter`: `ChapterHeader` with `key` equal to `integration_boundaries` and `title` equal to `配置、移植与集成边界`.
+- `summary`: string.
+- `required_configuration`: array of `RequiredConfiguration`.
+- `required_adaptations`: array of `RequiredAdaptation`.
+- `integration_paths`: array of `IntegrationPath`.
+- `external_dependencies`: array of `ExternalDependency`.
+- `out_of_scope_responsibilities`: array of `OutOfScopeResponsibility`.
+
+Enums:
+
+- `required_configuration[].kind`: `macro`, `config_file`, `build_option`, `environment`, `runtime_setting`, or `other`.
+- `required_adaptations[].kind`: `port_function`, `platform_hook`, `driver_binding`, `memory_hook`, `logging_hook`, or `other`.
+- `external_dependencies[].kind`: `library`, `hardware`, `toolchain`, `os`, `protocol`, `service`, or `other`.
+- `out_of_scope_responsibilities[].owner`: `caller`, `platform`, `application`, `build_system`, `deployment`, or `unknown`.
+
+Rendering notes:
+
+- This chapter is allowed to be C/firmware oriented in 0.3.0.
 
 ### `chapters/08-risks-validation.json`
 
-```json
-{
-  "chapter": {
-    "key": "risks_validation",
-    "title": "风险、假设与验证缺口"
-  },
-  "summary": "string",
-  "risks": [
-    {
-      "risk_id": "risk-id",
-      "description": "string",
-      "impact": "string",
-      "mitigation": "string",
-      "related_modules": ["module-id"],
-      "related_mechanisms": ["mechanism-key"],
-      "confidence": "high | medium | low"
-    }
-  ],
-  "assumptions": [
-    {
-      "assumption_id": "assumption-id",
-      "description": "string",
-      "rationale": "string",
-      "validation_suggestion": "string",
-      "confidence": "high | medium | low"
-    }
-  ],
-  "validation_gaps": [
-    {
-      "gap_id": "gap-id",
-      "description": "string",
-      "why_it_matters": "string",
-      "suggested_validation": "string",
-      "related_chapters": ["chapter-key"],
-      "confidence": "high | medium | low"
-    }
-  ],
-  "low_confidence_items": [
-    {
-      "item_id": "item-id",
-      "location": "chapter-key-or-json-path",
-      "description": "string",
-      "reason": "string",
-      "needed_evidence": "string"
-    }
-  ]
-}
-```
+Required:
+
+- `chapter`: `ChapterHeader` with `key` equal to `risks_validation` and `title` equal to `风险、假设与验证缺口`.
+- `summary`: string.
+- `risks`: array of `Risk`.
+- `assumptions`: array of `Assumption`.
+- `validation_gaps`: array of `ValidationGap`.
+- `low_confidence_items`: array of `LowConfidenceItem`.
+
+References:
+
+- `risks[].related_modules` resolves to Chapter 4 `module-id`.
+- `risks[].related_mechanisms` resolves to mechanism keys inferred from manifest paths.
+- `validation_gaps[].related_chapters` uses `chapter-key`.
+
+Rendering notes:
+
+- If `key_mechanisms` is empty, package-level semantic validation requires this chapter to include a `validation_gaps[]` item whose `gap_type` is `no_key_mechanisms_selected` and whose `related_chapters` contains `key_mechanisms`.
+
+### `Diagram`
+
+Required:
+
+- `id`: internal diagram identifier.
+- `title`: visible diagram title.
+- `diagram_type`: Mermaid diagram type.
+- `description`: prose explanation.
+- `source`: `diagram-source`.
+
+Allowed diagram types:
+
+- `flowchart`
+- `sequenceDiagram`
+- `stateDiagram-v2`
+
+Schema rules:
+
+- `id`, `title`, `diagram_type`, `description`, and `source` are required.
+- `id` is a `diagram-id` and must match the internal ID pattern.
+- `diagram_type` must be one of the allowed diagram types above.
+- `source` must be a non-empty string.
+
+Semantic validator rules:
+
+- To match `diagram_type`, take the first non-empty line of `source`, trim it, split it on ASCII whitespace, and compare the first token.
+- `diagram_type = "flowchart"` requires first token `flowchart`.
+- `diagram_type = "sequenceDiagram"` requires first token `sequenceDiagram`.
+- `diagram_type = "stateDiagram-v2"` requires first token `stateDiagram-v2`.
+- Legacy `graph` declarations are not supported in 0.3.0; use `flowchart` instead.
+- Visible labels in `source` must be human-readable.
+- Internal node IDs in `source` are allowed only when rendered labels do not expose them.
+- The 0.3.0 readability gate must document the Mermaid label syntax it can inspect.
+- Unsupported visible-label syntax must produce a validation warning instead of being silently treated as checked.
+- A validation warning has `code`, `json_path`, and `message`.
+- Warnings do not block rendering by default.
+- Strict validation mode promotes warnings to errors.
+
+### Package-Level Semantic Validation Rules
+
+These rules require multiple DSL files or repository context and are not single-file JSON Schema rules.
+
+- All manifest paths must resolve to existing child JSON files within the DSL package.
+- Every single-path chapter JSON `chapter.key` must match the manifest property that references it.
+- Every value whose declared type is `module-id` or `array<module-id>` must resolve to a Chapter 4 `modules[].module_id`, including `module_ref`, `module_refs`, `related_modules`, and similarly named future module reference fields.
+- Every value whose declared type is `layer-id` must resolve to a Chapter 4 `layers[].layer_id`.
+- Every value whose declared type is `mechanism-key` or `array<mechanism-key>` must resolve to a manifest-inferred mechanism key, including `related_mechanisms`.
+- Internal ID uniqueness ranges listed above must be enforced semantically, including package-wide `diagram-id` uniqueness.
+- If `key_mechanisms` is empty, Chapter 8 must contain a `ValidationGap` with `gap_type = no_key_mechanisms_selected` and `related_chapters` containing `key_mechanisms`.
+- `SourceRef.path` values must resolve against the repository snapshot when a snapshot is available.
+- `SourceRef.symbol` file-type checks require repository snapshot context.
+- `SourceRef.symbol` existence checks require repository snapshot context with a symbol index.
+- Without the relevant snapshot context, validators check only `SourceRef` structure and lexical path validity.
