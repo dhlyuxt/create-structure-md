@@ -5,14 +5,17 @@ from scripts.v030_types import ValidationResult
 
 
 OLD_INTERNAL_ID_RE = re.compile(r"\b(?:MOD|RUN|FLOW|MER|STEP|CAP|CFG|DATA|COL|RISK|ASM)-[A-Za-z0-9_-]+\b")
-FLOWCHART_NODE_LABEL_RE = re.compile(r"(?<![\w])[\w.:-]+\s*(?:\[([^\]\n]+)\]|\(([^\)\n]+)\)|\{([^}\n]+)\})")
+FLOWCHART_NODE_LABEL_RE = re.compile(
+    r"(?<![\w])(?P<id>[A-Za-z0-9_.:-]+)\s*"
+    r"(?:\[(?P<bracket>[^\]\n]+)\]|\((?P<paren>[^\)\n]+)\)|\{(?P<brace>[^}\n]+)\})"
+)
 FLOWCHART_EDGE_ENDPOINT_RE = re.compile(
     r"(?P<left>[A-Za-z0-9_.:-]+(?:\[[^\]\n]*\]|\([^\)\n]*\)|\{[^}\n]*\})?)"
     r"\s*(?:[-.=]+(?:>|x|o)|[-.=]+)\s*(?:\|[^|\n]+\|\s*)?"
     r"(?P<right>[A-Za-z0-9_.:-]+(?:\[[^\]\n]*\]|\([^\)\n]*\)|\{[^}\n]*\})?)"
 )
 FLOWCHART_STANDALONE_NODE_RE = re.compile(r"^\s*([A-Za-z0-9_.:-]+)\s*;?\s*$")
-FLOWCHART_EDGE_LABEL_RE = re.compile(r"-->\|([^|]+)\|")
+FLOWCHART_EDGE_LABEL_RE = re.compile(r"[-.=]+(?:>|x|o)?\s*\|([^|\n]+)\|")
 SEQUENCE_ALIAS_RE = re.compile(r"^\s*(?:create\s+)?(?:participant|actor)\s+\S+\s+as\s+(.+?)\s*$")
 SEQUENCE_DECLARATION_RE = re.compile(r"^\s*(?:create\s+)?(?:participant|actor)\s+(.+?)\s*$")
 SEQUENCE_MESSAGE_RE = re.compile(r"^\s*\S+\s*(?:-{1,2}(?:>>?|x|\))|={1,2}(?:>>?|x|\)))[+-]?\s*\S+\s*:\s*(.+?)\s*$")
@@ -43,7 +46,16 @@ def unlabeled_flowchart_node_id(token: str) -> str:
     return token
 
 
-def visible_unlabeled_flowchart_node_ids(lines):
+def explicit_flowchart_labels(content: str):
+    for match in FLOWCHART_NODE_LABEL_RE.finditer(content):
+        node_id = match.group("id").strip().strip('"')
+        label = next(match.group(name) for name in ("bracket", "paren", "brace") if match.group(name) is not None)
+        label = label.strip().strip('"')
+        if node_id and label:
+            yield node_id, label
+
+
+def visible_unlabeled_flowchart_node_ids(lines, labeled_node_ids: set[str]):
     for line in lines:
         stripped = line.strip()
         if not stripped or stripped.startswith(("flowchart", "subgraph")) or stripped == "end":
@@ -51,12 +63,12 @@ def visible_unlabeled_flowchart_node_ids(lines):
         for match in FLOWCHART_EDGE_ENDPOINT_RE.finditer(line):
             for group in ("left", "right"):
                 node_id = unlabeled_flowchart_node_id(match.group(group))
-                if node_id:
+                if node_id and node_id not in labeled_node_ids:
                     yield node_id
         match = FLOWCHART_STANDALONE_NODE_RE.match(line)
         if match:
             node_id = unlabeled_flowchart_node_id(match.group(1))
-            if node_id:
+            if node_id and node_id not in labeled_node_ids:
                 yield node_id
 
 
@@ -64,15 +76,15 @@ def visible_labels(diagram_type: str, source: str):
     lines = list(content_lines(source))
     content = "\n".join(lines)
     if diagram_type == "flowchart":
-        for match in FLOWCHART_NODE_LABEL_RE.finditer(content):
-            label = next(group for group in match.groups() if group is not None).strip().strip('"')
-            if label:
-                yield label
+        labeled_node_ids = set()
+        for node_id, label in explicit_flowchart_labels(content):
+            labeled_node_ids.add(node_id)
+            yield label
         for match in FLOWCHART_EDGE_LABEL_RE.finditer(content):
             label = match.group(1).strip().strip('"')
             if label:
                 yield label
-        yield from visible_unlabeled_flowchart_node_ids(lines)
+        yield from visible_unlabeled_flowchart_node_ids(lines, labeled_node_ids)
     if diagram_type != "sequenceDiagram":
         return
     for line in lines:
