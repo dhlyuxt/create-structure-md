@@ -16,7 +16,11 @@ Missing SVG output after zero exit is an error.
 
 Prefer readable `flowchart` and `sequenceDiagram` diagrams.
 
+Prefer `flowchart` over legacy `graph`.
+
 Use human-readable labels.
+
+Avoid internal IDs in visible labels.
 
 Keep diagrams short enough to review directly in the DSL.
 

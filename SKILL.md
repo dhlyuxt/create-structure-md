@@ -26,7 +26,7 @@ Use `references/mermaid-rules.md` only as auxiliary Mermaid validation guidance.
 
 ## Input Shape
 
-A package contains a root `structure.manifest.json` plus child JSON files for the rendered reader guide sections. Payload JSON files do not carry `dsl_version`; the manifest owns the package contract.
+A package contains a root `structure.manifest.json` plus six fixed child JSON files for the rendered reader guide sections. Neither the manifest nor payload JSON files carry `dsl_version`.
 
 The package should describe a repository for human readers by answering reader questions first, then grounding those answers in paths, modules, flows, and mechanisms where useful.
 
@@ -50,28 +50,50 @@ Subagents may draft bounded content, but their reports are not renderable delive
 
 Repository planning subagent output contract:
 
-- Identify reader questions and proposed sections.
-- Name the repository areas inspected.
-- Return recommendations, risks, and unknowns.
-- Do not return renderable JSON as final authority.
+- `repository_identity`
+- `problems_solved`
+- `main_capabilities`
+- `core_components_candidates`
+- `quick_start_candidates`
+- `layer_candidates`
+- `module_candidates`
+- `main_flow_candidates`
+- `module_detail_candidates`
+- `suggested_extra_subsections`
+- `excluded_or_deferred_content`
+- `open_questions`
+- `repo_understand_usage`
 
 Structure review subagent output contract:
 
-- Check section boundaries, order, reader progression, and duplication.
-- Flag missing context or misplaced detail.
-- Return findings mapped to DSL sections.
+- `review_decision`
+- accepted component rows, layer rows, and module rows
+- accepted main flows and module details
+- section boundary issues
+- content budget issues
+- required revisions
+- `repo_understand_usage`
 
 Module-detail authoring subagent output contract:
 
-- Draft bounded module summaries, responsibilities, mechanisms, and relevant paths.
-- Avoid file-by-file listings and API reference pages.
-- Mark uncertain claims explicitly for main-agent verification.
+- `module_name`
+- `module_location`
+- `module_purpose`
+- `generated_module_object`
+- `mechanisms`
+- `source_evidence_summary`
+- `excluded_details`
+- `unresolved_gaps`
+- `repo_understand_usage`
 
 Adversarial review subagent output contract:
 
-- Challenge whether the package follows 0.4.0 DSL, reader-first structure, block rules, and hygiene requirements.
-- Identify overfitting to implementation scans, process leaks, unsupported block shapes, and unrenderable diagrams.
-- Return concrete accept/reject findings.
+- `review_decision`
+- section boundary findings
+- dump or overdetail findings
+- unsupported block findings
+- module and main flow fit findings
+- required revisions
 
 ## Acceptance Rules
 
@@ -79,11 +101,20 @@ Accept DSL only when:
 
 - It follows create-structure-md 0.4.0.
 - `structure.manifest.json` and child JSON files are the authoritative deliverables.
+- `structure.manifest.json` has exactly these six keys: `document`, `overview`, `quick_start`, `architecture_overview`, `main_flows`, and `module_details`.
+- Every manifest value points to the intended child JSON file, and all six fixed sections exist.
+- Neither the manifest nor payload JSON files include `dsl_version`.
+- Required fixed table structures are present: `overview.core_components.component_table.rows`, `architecture_overview.layers.layer_table.rows`, and `architecture_overview.module_map.module_table.rows`.
 - Fixed sections omit renderer-owned `key` or `title` fields where the spec forbids them.
 - Extra subsections include `key`, `title`, and `blocks`.
+- Free blocks use only supported block types: `text`, `unordered_list`, `ordered_list`, `table`, `mermaid`, and `code`.
+- `first_run.steps`, `main_flows.flows`, and `module_details.modules` are non-empty.
+- Main flows are reader-facing behavior paths, not call chains.
+- Module details describe responsibility units, not file listings.
+- Mechanisms live inside the owning module.
 - Content starts from reader questions and uses paths as evidence, not as the organizing principle.
 - Mermaid blocks, when present, follow the canonical authoring guidance and pass strict Mermaid CLI rendering.
-- Process metadata remains outside the DSL package.
+- Process metadata is absent from JSON and remains outside the DSL package.
 
 ## Rejection Rules
 
