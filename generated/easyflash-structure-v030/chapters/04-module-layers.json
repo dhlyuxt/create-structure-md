@@ -1,0 +1,553 @@
+{
+  "chapter": {
+    "key": "module_layers",
+    "title": "系统分层与模块职责"
+  },
+  "summary": "EasyFlash 的分层可以按调用方向理解为：应用与 demo 调公共 API，初始化编排层根据配置启用功能核心，功能核心通过 port 契约访问平台 Flash，可选插件在公共 API 之上提供更高层类型封装。",
+  "layers": [
+    {
+      "layer_id": "application_layer",
+      "name": "应用与示例层",
+      "role": "发起初始化、读写 ENV、写日志、执行 IAP，并提供真实平台配置样例。",
+      "responsibilities": [
+        "调用 easyflash_init 和功能 API",
+        "定义产品级默认 ENV 集合",
+        "提供 demo 的 main、RT-Thread 线程或 IAP 数据接收入口"
+      ],
+      "paths": [
+        "demo"
+      ],
+      "notes": "库本体不依赖 demo；demo 依赖库和平台外设。"
+    },
+    {
+      "layer_id": "public_contract_layer",
+      "name": "公共契约层",
+      "role": "把编译开关、地址布局、错误码、结构体和公共函数声明暴露给应用与核心实现。",
+      "responsibilities": [
+        "声明 EasyFlash 的 API 调用面",
+        "承载 EF_USING_* 与 Flash 区域配置",
+        "定义 ENV 节点状态、错误码和版本号"
+      ],
+      "paths": [
+        "easyflash/inc"
+      ],
+      "notes": "ef_cfg.h 是集成者必须按平台修改的配置点。"
+    },
+    {
+      "layer_id": "core_feature_layer",
+      "name": "核心功能层",
+      "role": "实现库初始化、ENV、LOG、IAP 和 CRC 机制。",
+      "responsibilities": [
+        "根据配置宏初始化各功能",
+        "维护 Flash 上的数据布局和状态转换",
+        "把所有硬件访问收敛到 port 函数"
+      ],
+      "paths": [
+        "easyflash/src"
+      ],
+      "notes": "核心功能层应该被当作平台无关逻辑阅读。"
+    },
+    {
+      "layer_id": "port_layer",
+      "name": "平台适配层",
+      "role": "把平台无关的读、擦、写、锁和打印需求映射到具体芯片、Flash 和 RTOS。",
+      "responsibilities": [
+        "实现 ef_port_read、ef_port_erase、ef_port_write",
+        "提供 ENV cache 锁和日志输出",
+        "在 ef_port_init 中返回默认 ENV 集合"
+      ],
+      "paths": [
+        "easyflash/port",
+        "demo/env/*/components/easyflash/port"
+      ],
+      "notes": "仓库模板留空，demo 展示 STM32 内部 Flash 和 SFUD SPI Flash 两类绑定方式。"
+    },
+    {
+      "layer_id": "plugin_layer",
+      "name": "可选插件层",
+      "role": "在 ENV 字符串能力之上提供类型化读写和结构体 JSON 序列化。",
+      "responsibilities": [
+        "转换基础类型和字符串数组",
+        "把数组转换成 JSON 字符串保存",
+        "通过 struct2json/cJSON 支撑结构体持久化"
+      ],
+      "paths": [
+        "easyflash/plugins/types"
+      ],
+      "notes": "插件是消费者而非核心依赖，不参与 easyflash_init 自动初始化。"
+    }
+  ],
+  "modules": [
+    {
+      "module_id": "demo_apps",
+      "name": "Demo 应用",
+      "layer_id": "application_layer",
+      "purpose": "展示不同平台和功能场景下如何调用 EasyFlash。",
+      "source_paths": [
+        "demo/env",
+        "demo/log",
+        "demo/iap"
+      ],
+      "owns": [
+        "示例 main、RT-Thread 线程和 IAP 数据接收流程",
+        "示例工程的默认 ENV 内容",
+        "示例平台构建环境"
+      ],
+      "consumes": [
+        "easyflash.h 公共 API",
+        "平台外设库、RTOS 或 SFUD"
+      ],
+      "produces": [
+        "可参考的集成方式",
+        "真实 port 实现样例"
+      ],
+      "does_not_own": [
+        "EasyFlash 核心算法",
+        "公共 API 兼容性"
+      ],
+      "collaborates_with": [
+        {
+          "module_ref": "public_api",
+          "relationship": "通过公共 API 调用库功能。"
+        },
+        {
+          "module_ref": "platform_port",
+          "relationship": "为示例平台提供具体 port 实现。"
+        }
+      ],
+      "read_when": "需要照着一个真实平台接入库时。",
+      "notes": "大量外设库文件可以先跳过。"
+    },
+    {
+      "module_id": "public_api",
+      "name": "公共 API 与配置契约",
+      "layer_id": "public_contract_layer",
+      "purpose": "为应用、核心实现和插件提供统一头文件与配置入口。",
+      "source_paths": [
+        "easyflash/inc/easyflash.h",
+        "easyflash/inc/ef_cfg.h",
+        "easyflash/inc/ef_def.h"
+      ],
+      "owns": [
+        "API 声明",
+        "配置宏模板",
+        "错误码和 ENV 公共类型",
+        "版本号 EF_SW_VERSION"
+      ],
+      "consumes": [
+        "应用选择的 EF_USING_* 宏和 Flash 地址参数"
+      ],
+      "produces": [
+        "编译期功能开关",
+        "核心模块可共享的结构和状态定义"
+      ],
+      "does_not_own": [
+        "Flash 擦写实现",
+        "具体平台默认 ENV 值"
+      ],
+      "collaborates_with": [
+        {
+          "module_ref": "bootstrap_init",
+          "relationship": "声明 easyflash_init 并提供其编译条件。"
+        },
+        {
+          "module_ref": "env_ng",
+          "relationship": "提供 ENV 结构和状态枚举。"
+        },
+        {
+          "module_ref": "platform_port",
+          "relationship": "声明 port 层函数。"
+        }
+      ],
+      "read_when": "需要判断库能做什么、必须配置什么、哪些符号是公开 API 时。",
+      "notes": "不要把 ef_cfg.h 当成可直接生产使用的配置，它含有必须由用户填值的宏。"
+    },
+    {
+      "module_id": "bootstrap_init",
+      "name": "初始化编排",
+      "layer_id": "core_feature_layer",
+      "purpose": "把平台初始化和启用的功能模块按顺序拉起。",
+      "source_paths": [
+        "easyflash/src/easyflash.c"
+      ],
+      "owns": [
+        "easyflash_init 防重入状态",
+        "port、ENV、IAP、LOG 初始化顺序",
+        "初始化结果打印"
+      ],
+      "consumes": [
+        "EF_USING_ENV、EF_USING_IAP、EF_USING_LOG",
+        "ef_port_init 返回的默认 ENV 集合"
+      ],
+      "produces": [
+        "已初始化的 EasyFlash 运行状态",
+        "初始化成功或失败错误码"
+      ],
+      "does_not_own": [
+        "各功能模块内部状态机",
+        "平台 Flash 驱动"
+      ],
+      "collaborates_with": [
+        {
+          "module_ref": "platform_port",
+          "relationship": "先调用 ef_port_init 获取默认 ENV 集合。"
+        },
+        {
+          "module_ref": "env_ng",
+          "relationship": "在启用 ENV 时调用 ef_env_init。"
+        },
+        {
+          "module_ref": "iap_core",
+          "relationship": "在启用 IAP 时调用 ef_iap_init。"
+        },
+        {
+          "module_ref": "log_core",
+          "relationship": "在启用 LOG 时调用 ef_log_init。"
+        }
+      ],
+      "read_when": "追踪应用从 easyflash_init 进入库的第一条主线时。",
+      "notes": "静态调用索引对函数内 extern 声明不总是能建立完整边；源码上下文显示 ef_port_init 和 ef_env_init 确实被调用。"
+    },
+    {
+      "module_id": "env_ng",
+      "name": "新版 ENV 核心",
+      "layer_id": "core_feature_layer",
+      "purpose": "以追加写、状态表、CRC、cache 和 GC 方式维护键值持久化。",
+      "source_paths": [
+        "easyflash/src/ef_env.c"
+      ],
+      "owns": [
+        "sector header 与 ENV header 布局",
+        "ENV 写入、查找、删除、恢复、GC 流程",
+        "ENV cache 与 sector cache",
+        "默认 ENV 迁移和版本自动更新"
+      ],
+      "consumes": [
+        "EF_START_ADDR、ENV_AREA_SIZE、EF_ERASE_MIN_SIZE、EF_WRITE_GRAN",
+        "默认 ENV 集合",
+        "ef_port_read/erase/write/env_lock/env_unlock",
+        "ef_calc_crc32"
+      ],
+      "produces": [
+        "持久化 ENV 节点",
+        "有效 ENV 集合视图",
+        "GC 后整理过的 sector"
+      ],
+      "does_not_own": [
+        "Flash 驱动",
+        "业务 ENV 语义",
+        "legacy 模式的 RAM 缓冲策略"
+      ],
+      "collaborates_with": [
+        {
+          "module_ref": "public_api",
+          "relationship": "实现 easyflash.h 中的 ENV API。"
+        },
+        {
+          "module_ref": "crc_utils",
+          "relationship": "用 CRC32 判断节点头、名称和值是否完整有效。"
+        },
+        {
+          "module_ref": "platform_port",
+          "relationship": "所有 Flash 访问和锁都经由 port 层。"
+        }
+      ],
+      "read_when": "要理解默认 ENV 模式、掉电恢复、追加写或 GC 行为时。",
+      "notes": "这是仓库中函数数和调用边最多的核心文件。"
+    },
+    {
+      "module_id": "env_legacy",
+      "name": "Legacy ENV 兼容实现",
+      "layer_id": "core_feature_layer",
+      "purpose": "保留 V4.0 前 ENV 行为和带磨损均衡变体，服务旧配置或迁移场景。",
+      "source_paths": [
+        "easyflash/src/ef_env_legacy.c",
+        "easyflash/src/ef_env_legacy_wl.c"
+      ],
+      "owns": [
+        "legacy 模式下的 ENV 加载和保存",
+        "legacy 写入字节统计",
+        "legacy 自动更新"
+      ],
+      "consumes": [
+        "legacy 相关编译配置",
+        "ef_port_read/erase/write"
+      ],
+      "produces": [
+        "与旧版本兼容的 ENV 行为"
+      ],
+      "does_not_own": [
+        "默认 NG 模式",
+        "新版 sector GC 模型"
+      ],
+      "collaborates_with": [
+        {
+          "module_ref": "public_api",
+          "relationship": "实现同名 ENV API 的兼容版本。"
+        },
+        {
+          "module_ref": "platform_port",
+          "relationship": "复用相同 Flash 访问接口。"
+        }
+      ],
+      "read_when": "需要理解升级迁移、兼容宏或旧固件行为时。",
+      "notes": "ef_cfg.h 注释说明 legacy 已不推荐继续使用。"
+    },
+    {
+      "module_id": "log_core",
+      "name": "Flash 日志核心",
+      "layer_id": "core_feature_layer",
+      "purpose": "把连续日志写入受限的 Flash 擦除块，并按环形区读取和覆盖旧日志。",
+      "source_paths": [
+        "easyflash/src/ef_log.c"
+      ],
+      "owns": [
+        "LOG 区起始地址计算",
+        "log_start_addr/log_end_addr",
+        "日志 sector 状态和 header",
+        "日志读写、清空和已用大小计算"
+      ],
+      "consumes": [
+        "LOG_AREA_SIZE、EF_ERASE_MIN_SIZE、EF_START_ADDR、ENV_AREA_SIZE",
+        "ef_port_read/erase/write"
+      ],
+      "produces": [
+        "Flash 上的环形日志流",
+        "可通过 index 读取的日志视图"
+      ],
+      "does_not_own": [
+        "日志格式语义",
+        "应用日志生产策略"
+      ],
+      "collaborates_with": [
+        {
+          "module_ref": "bootstrap_init",
+          "relationship": "由 easyflash_init 在 EF_USING_LOG 下初始化。"
+        },
+        {
+          "module_ref": "platform_port",
+          "relationship": "借助 port 层擦写日志区。"
+        }
+      ],
+      "read_when": "需要理解 EF_USING_LOG、环形覆盖或日志区清空时。",
+      "notes": "写入接口要求 size 按 4 字节对齐。"
+    },
+    {
+      "module_id": "iap_core",
+      "name": "IAP 备份区核心",
+      "layer_id": "core_feature_layer",
+      "purpose": "提供固件备份区擦除、写入和复制工具函数。",
+      "source_paths": [
+        "easyflash/src/ef_iap.c"
+      ],
+      "owns": [
+        "bak_app_start_addr 计算",
+        "备份应用区擦除",
+        "下载数据写入备份区",
+        "从备份区复制到应用区或 bootloader"
+      ],
+      "consumes": [
+        "EF_START_ADDR、ENV_AREA_SIZE、LOG_AREA_SIZE",
+        "ef_port_read/erase/write",
+        "调用方传入的目标地址、大小和可选写函数"
+      ],
+      "produces": [
+        "备份区写入结果",
+        "应用区或 bootloader 区复制结果"
+      ],
+      "does_not_own": [
+        "下载协议",
+        "bootloader 跳转策略",
+        "镜像签名和完整性策略"
+      ],
+      "collaborates_with": [
+        {
+          "module_ref": "bootstrap_init",
+          "relationship": "由 easyflash_init 在 EF_USING_IAP 下初始化。"
+        },
+        {
+          "module_ref": "platform_port",
+          "relationship": "借助 port 层操作 Flash。"
+        },
+        {
+          "module_ref": "demo_apps",
+          "relationship": "demo/iap 展示 YMODEM 场景如何写备份区。"
+        }
+      ],
+      "read_when": "需要做固件下载、备份区复制或 bootloader 区擦写时。",
+      "notes": "IAP 功能的安全策略主要由调用方承担。"
+    },
+    {
+      "module_id": "crc_utils",
+      "name": "CRC32 工具",
+      "layer_id": "core_feature_layer",
+      "purpose": "为 ENV 节点内容计算 CRC32。",
+      "source_paths": [
+        "easyflash/src/ef_utils.c"
+      ],
+      "owns": [
+        "ef_calc_crc32 实现"
+      ],
+      "consumes": [
+        "ENV header、name、value 字节流"
+      ],
+      "produces": [
+        "ENV 节点校验值"
+      ],
+      "does_not_own": [
+        "节点状态提交",
+        "Flash 读写"
+      ],
+      "collaborates_with": [
+        {
+          "module_ref": "env_ng",
+          "relationship": "ENV 节点创建和读取时使用 CRC32 校验。"
+        }
+      ],
+      "read_when": "排查 ENV 节点 crc_is_ok 或兼容性问题时。",
+      "notes": "CRC 工具本身很小，但对掉电恢复判断很关键。"
+    },
+    {
+      "module_id": "platform_port",
+      "name": "平台移植接口",
+      "layer_id": "port_layer",
+      "purpose": "把平台无关核心对 Flash 和同步的要求映射到具体硬件。",
+      "source_paths": [
+        "easyflash/port/ef_port.c",
+        "demo/env/stm32f10x/non_os/components/easyflash/port/ef_port.c",
+        "demo/env/stm32f10x/non_os_spi_flash/components/easyflash/port/ef_port.c",
+        "demo/env/stm32f4xx/components/easyflash/port/ef_port.c"
+      ],
+      "owns": [
+        "默认 ENV 集合返回",
+        "Flash read/erase/write 绑定",
+        "ENV cache 锁",
+        "调试和常规打印输出"
+      ],
+      "consumes": [
+        "平台 Flash 驱动",
+        "RTOS 或裸机同步原语",
+        "串口或日志输出能力"
+      ],
+      "produces": [
+        "供核心层调用的 ef_port_* 行为"
+      ],
+      "does_not_own": [
+        "ENV 状态机",
+        "LOG 环形算法",
+        "IAP 地址策略"
+      ],
+      "collaborates_with": [
+        {
+          "module_ref": "env_ng",
+          "relationship": "ENV 所有 Flash 与锁操作都通过 port。"
+        },
+        {
+          "module_ref": "log_core",
+          "relationship": "LOG 读、擦、写都通过 port。"
+        },
+        {
+          "module_ref": "iap_core",
+          "relationship": "IAP 写备份区和复制目标区都通过 port 或调用方传入写函数。"
+        }
+      ],
+      "read_when": "移植到新平台、排查 Flash 错误码或中断锁行为时。",
+      "notes": "模板不执行真实硬件操作，demo port 才是可运行参考。"
+    },
+    {
+      "module_id": "types_plugin",
+      "name": "Types 类型插件",
+      "layer_id": "plugin_layer",
+      "purpose": "复用 ENV 字符串存储，为基础类型、数组和结构体提供更友好的读写 API。",
+      "source_paths": [
+        "easyflash/plugins/types/ef_types.c",
+        "easyflash/plugins/types/ef_types.h"
+      ],
+      "owns": [
+        "基础类型与字符串转换",
+        "数组 JSON 化和反解析",
+        "结构体 set 回调封装"
+      ],
+      "consumes": [
+        "ef_get_env、ef_set_env",
+        "cJSON",
+        "struct2json 内存 hook"
+      ],
+      "produces": [
+        "类型化 ENV API",
+        "JSON 字符串形式的数组或结构体 ENV 值"
+      ],
+      "does_not_own": [
+        "底层 ENV Flash 存储",
+        "结构体字段 schema",
+        "业务内存生命周期"
+      ],
+      "collaborates_with": [
+        {
+          "module_ref": "env_ng",
+          "relationship": "最终仍由 ENV API 保存字符串。"
+        },
+        {
+          "module_ref": "struct2json_bundle",
+          "relationship": "借助 cJSON/struct2json 处理 JSON。"
+        }
+      ],
+      "read_when": "希望把 ENV 用作类型化配置存储时。",
+      "notes": "源码和头文件中存在 ef_get_struct 文本，但符号索引未稳定识别该入口，生产使用前应以编译验证为准。"
+    },
+    {
+      "module_id": "struct2json_bundle",
+      "name": "struct2json 与 cJSON 依赖",
+      "layer_id": "plugin_layer",
+      "purpose": "为 Types 插件提供 JSON 对象、数组和结构体转换能力。",
+      "source_paths": [
+        "easyflash/plugins/types/struct2json"
+      ],
+      "owns": [
+        "cJSON 数据结构与 JSON 打印/解析",
+        "struct2json 宏和内存 hook"
+      ],
+      "consumes": [
+        "插件传入的 S2jHook",
+        "插件构造的 JSON 对象"
+      ],
+      "produces": [
+        "可保存到 ENV 的 JSON 字符串",
+        "从 JSON 恢复的结构体对象"
+      ],
+      "does_not_own": [
+        "ENV 键值命名",
+        "Flash 持久化提交"
+      ],
+      "collaborates_with": [
+        {
+          "module_ref": "types_plugin",
+          "relationship": "被类型插件直接调用。"
+        }
+      ],
+      "read_when": "调试 JSON 序列化或内存 hook 时。",
+      "notes": "首次阅读库核心时可以延后。"
+    }
+  ],
+  "boundary_notes": [
+    {
+      "topic": "核心和 port 的边界",
+      "note": "核心层永远不应该直接依赖某个 STM32 或 SFUD 函数；这些绑定属于 port 或 demo。"
+    },
+    {
+      "topic": "插件和核心的边界",
+      "note": "Types 插件只是 ENV API 的消费者，不能假设底层 Flash 布局，也不参与 easyflash_init。"
+    },
+    {
+      "topic": "legacy 文件的阅读顺序",
+      "note": "默认理解应以 ef_env.c 为主，legacy 文件用于兼容性和迁移背景。"
+    }
+  ],
+  "layer_diagram": {
+    "id": "module_layers",
+    "title": "模块分层",
+    "diagram_type": "flowchart",
+    "description": "EasyFlash 模块之间的主要调用方向。",
+    "source": "flowchart TD\n  demo[应用与示例层] --> api[公共契约层]\n  api --> init[初始化编排]\n  init --> env[新版 ENV 核心]\n  init --> iap[IAP 核心]\n  init --> log[日志核心]\n  env --> crc[CRC32 工具]\n  env --> port[平台适配层]\n  log --> port\n  iap --> port\n  plugin[Types 插件] --> api\n  plugin --> json[struct2json 与 cJSON]"
+  }
+}

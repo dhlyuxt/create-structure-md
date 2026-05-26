@@ -75,6 +75,44 @@ class V030RendererTests(unittest.TestCase):
             for text in expected:
                 self.assertIn(text, markdown)
 
+    def test_renderer_uses_tables_for_structured_repeated_content(self):
+        tmpdir, markdown = self.render_fixture()
+        with tmpdir:
+            expected_tables = [
+                "| 能力 | 描述 | 入口 | 备注 |",
+                "| 持久化读写 | 封装底层存储访问。 | src/storage.c::storage_init | 入口由应用调用。 |",
+                "| 顺序 | 主题 | 为什么读 | 推荐文件 | 目标收获 |",
+                "| 1 | 公共接口 | 先理解调用面。 | include/storage.h（声明主要接口。） | 知道应用如何进入库。 |",
+                "| 分组 | 职责 | 路径 | 阅读时机 | 备注 |",
+                "| 公共头文件 | 暴露应用集成接口。 | include | 开始集成前。 | 保持小而稳定。 |",
+                "| 层 | 角色 | 职责 | 路径 | 备注 |",
+                "| 接口层 | 接收应用调用。 | 稳定入口 | include | 不拥有存储细节。 |",
+                "| 层 | 模块 | 目的 | 源码路径 | 阅读时机 |",
+                "| 接口层 | 存储接口 | 提供应用入口。 | include/storage.h | 理解集成入口时。 |",
+                "#### 存储接口",
+                "| 负责 | 接口契约 |",
+                "| 消费 | 应用请求 |",
+                "| 产出 | 核心调用 |",
+                "| 不负责 | 平台驱动 |",
+                "| 备注 | 只描述职责，不列函数原型。 |",
+                "##### 协作",
+                "| 协作模块 | 关系 |",
+                "| 存储核心 | 调用核心实现。 |",
+                "| 序号 | 步骤 | 影响 | 模块 | 参考 |",
+                "| 1 | 应用调用公共入口。 | 进入库边界。 | 存储接口 | include/storage.h::storage_init |",
+                "| 序号 | 步骤 | 数据或状态 | 参考 | 备注 |",
+                "| 1 | 检查写入请求。 | 写入缓冲区。 | src/storage.c::storage_write | 这里只讲机制，不列 API 表。 |",
+                "| 名称 | 类型 | 说明 | 参考 |",
+                "| 写入缓冲区 | runtime_value | 调用方传入的数据。 | src/storage.c::storage_write |",
+                "| 名称 | 类型 | 用途 | 位置 | 要求 | 备注 |",
+                "| 存储大小 | macro | 定义可用存储空间。 | 配置头文件（include/storage_cfg.h） | 启用库时。 | 示例值不代表生产配置。 |",
+                "| 风险 | 影响 | 缓解 | 相关模块 | 相关机制 | 可信度 |",
+                "| 未执行目标硬件验证。 | 时序问题可能遗漏。 | 在目标板运行集成测试。 | 存储核心 | 持久化写入机制 | medium |",
+            ]
+            for table_fragment in expected_tables:
+                self.assertIn(table_fragment, markdown)
+            self.assertNotIn("| 模块 | 目的 | 源码路径 | 负责 | 消费 | 产出 | 不负责 | 协作 | 阅读时机 | 备注 |", markdown)
+
     def test_renders_directory_relationship_diagram_when_present(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             package = load_manifest_package(write_valid_package(tmpdir))
@@ -141,10 +179,10 @@ class V030RendererTests(unittest.TestCase):
             package.chapters["integration_boundaries"]["integration_paths"][0]["recommended_entry"].pop("source_ref")
             markdown = render_markdown(package)
         self.assertNotIn("（）", markdown)
-        self.assertIn("- 入口：storage_init，应用初始化入口。", markdown)
-        self.assertIn("位置：配置头文件。", markdown)
-        self.assertIn("位置：平台适配文件。", markdown)
-        self.assertIn("推荐入口：调用公共初始化接口。", markdown)
+        self.assertIn("| 入口 | storage_init | api | 应用初始化入口。 | - |", markdown)
+        self.assertIn("| 存储大小 | macro | 定义可用存储空间。 | 配置头文件 | 启用库时。 | 示例值不代表生产配置。 |", markdown)
+        self.assertIn("| 底层写入 | port_function | 把数据写入硬件。 | 存储核心。 | 平台适配文件 | 写入请求无法完成。 |", markdown)
+        self.assertIn("| 应用集成 | 应用初始化存储库。 | 调用公共初始化接口。 |", markdown)
 
     def test_empty_source_refs_do_not_render_empty_reference_punctuation(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -154,8 +192,8 @@ class V030RendererTests(unittest.TestCase):
             markdown = render_markdown(package)
         self.assertNotIn("参考：。", markdown)
         self.assertNotIn("，）", markdown)
-        self.assertIn("1. 检查写入请求。 数据/状态：写入缓冲区。这里只讲机制，不列 API 表。", markdown)
-        self.assertIn("- 写入缓冲区：调用方传入的数据。（runtime_value）", markdown)
+        self.assertIn("| 1 | 检查写入请求。 | 写入缓冲区。 | - | 这里只讲机制，不列 API 表。 |", markdown)
+        self.assertIn("| 写入缓冲区 | runtime_value | 调用方传入的数据。 | - |", markdown)
 
     def test_render_cli_writes_default_output_file_and_prints_path(self):
         with tempfile.TemporaryDirectory() as tmpdir:

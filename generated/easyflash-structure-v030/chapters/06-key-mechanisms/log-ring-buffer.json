@@ -1,0 +1,276 @@
+{
+  "section": {
+    "title": "Flash 日志环形区机制"
+  },
+  "why_it_matters": "日志模块展示了 EasyFlash 如何在只能按块擦除的 Flash 上实现追加写和覆盖旧数据。它与 ENV 共享 port 层，但拥有独立的区间、header 状态和索引映射。",
+  "reader_prerequisites": [
+    "先理解 EF_USING_LOG、LOG_AREA_SIZE、EF_ERASE_MIN_SIZE 的配置含义。",
+    "先知道 LOG 区在启用 ENV 时位于 ENV_AREA_SIZE 之后。",
+    "先读第 5 章日志追加主线。"
+  ],
+  "related_modules": [
+    "log_core",
+    "platform_port",
+    "public_api"
+  ],
+  "source_focus": [
+    {
+      "source_ref": {
+        "path": "easyflash/src/ef_log.c",
+        "symbol": "ef_log_init"
+      },
+      "reason": "初始化 LOG 区起始地址并定位当前日志起止。"
+    },
+    {
+      "source_ref": {
+        "path": "easyflash/src/ef_log.c",
+        "symbol": "find_start_and_end_addr"
+      },
+      "reason": "扫描 sector header，恢复 log_start_addr 和 log_end_addr。"
+    },
+    {
+      "source_ref": {
+        "path": "easyflash/src/ef_log.c",
+        "symbol": "ef_log_write"
+      },
+      "reason": "日志追加、跨 sector、擦除、状态推进和环形覆盖的核心入口。"
+    },
+    {
+      "source_ref": {
+        "path": "easyflash/src/ef_log.c",
+        "symbol": "ef_log_read"
+      },
+      "reason": "把逻辑 index 映射到环形区物理地址并处理绕回读取。"
+    },
+    {
+      "source_ref": {
+        "path": "easyflash/src/ef_log.c",
+        "symbol": "ef_log_clean"
+      },
+      "reason": "重置整个日志区并初始化 sector 状态。"
+    }
+  ],
+  "mechanism_overview": "LOG 区由若干 EF_ERASE_MIN_SIZE 大小的 sector 组成。每个 sector 前部有日志 header，状态可为 EMPTY、USING、FULL 或 header error。log_start_addr 指向最旧有效日志，log_end_addr 指向下一次写入位置。写入跨 sector 时会擦除下一个 sector、写入 header 状态并推进 end；如果即将覆盖 start，则 start 也前移，从而形成 Flash 上的环形缓冲。",
+  "flow": [
+    {
+      "order": 1,
+      "step": "ef_log_init 断言 LOG_AREA_SIZE 非零、擦除粒度有效、LOG 区大小至少两个 sector。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_log.c",
+          "symbol": "ef_log_init"
+        },
+        {
+          "path": "easyflash/inc/ef_cfg.h",
+          "symbol": "LOG_AREA_SIZE"
+        }
+      ],
+      "state_or_data": "LOG_AREA_SIZE、EF_ERASE_MIN_SIZE。",
+      "notes": "至少两个 sector 才能形成可覆盖的环。"
+    },
+    {
+      "order": 2,
+      "step": "初始化时根据是否启用 ENV 计算 log_area_start_addr；启用 ENV 时 LOG 区紧跟 ENV_AREA_SIZE。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_log.c",
+          "symbol": "ef_log_init"
+        },
+        {
+          "path": "easyflash/inc/ef_cfg.h",
+          "symbol": "EF_START_ADDR"
+        },
+        {
+          "path": "easyflash/inc/ef_cfg.h",
+          "symbol": "ENV_AREA_SIZE"
+        }
+      ],
+      "state_or_data": "log_area_start_addr。",
+      "notes": "LOG 区和 IAP 备份区的地址都依赖功能启用组合。"
+    },
+    {
+      "order": 3,
+      "step": "find_start_and_end_addr 扫描日志 sector header，确定现有日志的开始和结束位置；如果无法恢复则通过 ef_log_clean 初始化。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_log.c",
+          "symbol": "find_start_and_end_addr"
+        },
+        {
+          "path": "easyflash/src/ef_log.c",
+          "symbol": "ef_log_clean"
+        }
+      ],
+      "state_or_data": "log_start_addr、log_end_addr、SectorStatus。",
+      "notes": "这一阶段决定重启后继续追加的位置。"
+    },
+    {
+      "order": 4,
+      "step": "ef_log_write 要求 size 按 4 字节对齐，并拒绝未初始化状态。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_log.c",
+          "symbol": "ef_log_write"
+        }
+      ],
+      "state_or_data": "init_ok、写入 size。",
+      "notes": "公共 API 不负责重排非 word 对齐数据。"
+    },
+    {
+      "order": 5,
+      "step": "在当前 sector 为 USING 或 EMPTY 时，先尽量写完当前 sector 的剩余区域，写满后把该 sector 标为 FULL。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_log.c",
+          "symbol": "ef_log_write"
+        },
+        {
+          "path": "easyflash/src/ef_log.c",
+          "symbol": "write_sector_status"
+        }
+      ],
+      "state_or_data": "SECTOR_STATUS_USING、SECTOR_STATUS_EMPUT、SECTOR_STATUS_FULL。",
+      "notes": "源码中 EMPTY 状态宏拼写为 EMPUT，需要按现有代码理解。"
+    },
+    {
+      "order": 6,
+      "step": "剩余数据需要新 sector 时，通过 get_next_flash_sec_addr 计算下一个 sector；如果它正是 log_start_addr，则推进 start 以覆盖最旧日志。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_log.c",
+          "symbol": "get_next_flash_sec_addr"
+        },
+        {
+          "path": "easyflash/src/ef_log.c",
+          "symbol": "ef_log_write"
+        }
+      ],
+      "state_or_data": "log_start_addr、log_end_addr、log_area_start_addr。",
+      "notes": "覆盖是环形日志的预期行为，不是异常路径。"
+    },
+    {
+      "order": 7,
+      "step": "擦除目标 sector，写 EMPTY 和 USING 状态，再从 LOG_SECTOR_HEADER_SIZE 之后写入日志数据。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_log.c",
+          "symbol": "ef_log_write"
+        },
+        {
+          "path": "easyflash/port/ef_port.c",
+          "symbol": "ef_port_erase"
+        },
+        {
+          "path": "easyflash/port/ef_port.c",
+          "symbol": "ef_port_write"
+        }
+      ],
+      "state_or_data": "LOG_SECTOR_HEADER_SIZE、LOG_SECTOR_MAGIC。",
+      "notes": "每个 sector 的 header 开销会影响逻辑 index 到物理地址的换算。"
+    },
+    {
+      "order": 8,
+      "step": "ef_log_read 使用 ef_log_get_used_size、log_index2addr 和 log_seq_read 处理顺序读取和绕回读取。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_log.c",
+          "symbol": "ef_log_read"
+        },
+        {
+          "path": "easyflash/src/ef_log.c",
+          "symbol": "log_index2addr"
+        },
+        {
+          "path": "easyflash/src/ef_log.c",
+          "symbol": "log_seq_read"
+        }
+      ],
+      "state_or_data": "逻辑 index、log_start_addr、log_end_addr。",
+      "notes": "当 start 大于 end 时，读取可能拆成两段：尾部到区域末尾，再从区域起始读。"
+    }
+  ],
+  "key_states_or_data": [
+    {
+      "name": "log_start_addr",
+      "kind": "state",
+      "description": "指向最旧有效日志的地址，覆盖旧日志时会推进到下一个 sector。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_log.c",
+          "symbol": "log_start_addr"
+        }
+      ]
+    },
+    {
+      "name": "log_end_addr",
+      "kind": "state",
+      "description": "指向下一次写入的地址，写入成功后随数据量推进。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_log.c",
+          "symbol": "log_end_addr"
+        }
+      ]
+    },
+    {
+      "name": "log_area_start_addr",
+      "kind": "state",
+      "description": "LOG 区物理起始地址；启用 ENV 时等于 EF_START_ADDR + ENV_AREA_SIZE，否则等于 EF_START_ADDR。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_log.c",
+          "symbol": "ef_log_init"
+        }
+      ]
+    },
+    {
+      "name": "SectorStatus",
+      "kind": "enum",
+      "description": "日志 sector 的运行状态，包括 EMPTY、USING、FULL 和 header error。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_log.c",
+          "symbol": "SectorStatus"
+        }
+      ]
+    },
+    {
+      "name": "LOG_SECTOR_HEADER_SIZE",
+      "kind": "macro",
+      "description": "每个日志 sector 预留的 header 大小，读取 index 转地址时必须扣除这些 header 字节。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_log.c",
+          "symbol": "LOG_SECTOR_HEADER_SIZE"
+        }
+      ]
+    }
+  ],
+  "common_misunderstandings": [
+    {
+      "misunderstanding": "日志区写满后写入会失败。",
+      "correction": "日志区是环形区，写入跨回起点时会覆盖最旧日志。"
+    },
+    {
+      "misunderstanding": "ef_log_read 的 index 就是 Flash 物理偏移。",
+      "correction": "index 是逻辑日志偏移，必须通过 log_index2addr 加上 sector header 开销并处理绕回。"
+    },
+    {
+      "misunderstanding": "LOG 区总是从 EF_START_ADDR 开始。",
+      "correction": "启用 ENV 时 LOG 区从 EF_START_ADDR + ENV_AREA_SIZE 开始。"
+    }
+  ],
+  "validation_gaps": [
+    "未在真实 Flash 上验证日志写满、绕回和断电重启后的起止地址恢复。",
+    "未验证 EF_ERASE_MIN_SIZE 与 LOG_AREA_SIZE 组合不合规时的失败行为。",
+    "未对跨 sector 读取边界做自动化测试。"
+  ],
+  "confidence": "medium",
+  "diagram": {
+    "id": "log_ring_buffer",
+    "title": "日志环形区",
+    "diagram_type": "flowchart",
+    "description": "LOG 区写入和覆盖旧日志的循环关系。",
+    "source": "flowchart TD\n  init[ef_log_init] --> scan[恢复 start 和 end]\n  scan --> append[ef_log_write]\n  append --> current{当前 sector 可写}\n  current -->|是| write[写入并推进 end]\n  current -->|否| next[选择下一个 sector]\n  next --> cover{遇到 start}\n  cover -->|是| advance[推进 start]\n  cover -->|否| erase[擦除 sector]\n  advance --> erase\n  erase --> mark[写入 header 状态]\n  mark --> write\n  write --> read[ef_log_read 通过 index 映射]"
+  }
+}

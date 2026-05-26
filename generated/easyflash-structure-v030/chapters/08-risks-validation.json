@@ -1,0 +1,220 @@
+{
+  "chapter": {
+    "key": "risks_validation",
+    "title": "风险、假设与验证缺口"
+  },
+  "summary": "本次说明书以静态阅读为基础，结构判断可信度中等；真正的风险主要集中在 Flash 参数配置、掉电恢复、GC/IAP 实测和平台 port 行为。",
+  "risks": [
+    {
+      "risk_id": "flash_layout_overlap",
+      "description": "EF_START_ADDR、ENV_AREA_SIZE、LOG_AREA_SIZE 和 IAP 备份区可能与应用代码、bootloader 或其他存储区重叠。",
+      "impact": "轻则写入失败，重则破坏固件或启动区。",
+      "mitigation": "结合 linker script、Flash map 和启用功能组合画出产品级分区表，并在构建期断言大小。",
+      "related_modules": [
+        "public_api",
+        "iap_core",
+        "log_core",
+        "env_ng"
+      ],
+      "related_mechanisms": [
+        "iap-backup-copy",
+        "log-ring-buffer",
+        "env-ng-storage"
+      ],
+      "confidence": "medium"
+    },
+    {
+      "risk_id": "wrong_write_granularity",
+      "description": "EF_WRITE_GRAN 与目标 Flash 真实写粒度不一致。",
+      "impact": "ENV header、key、value 对齐写可能失败，CRC 校验和恢复逻辑会出现异常。",
+      "mitigation": "按芯片手册和驱动实现验证 1、8、32 bit 写粒度，并补充写后回读测试。",
+      "related_modules": [
+        "env_ng",
+        "platform_port"
+      ],
+      "related_mechanisms": [
+        "env-ng-storage"
+      ],
+      "confidence": "medium"
+    },
+    {
+      "risk_id": "power_loss_recovery_untested",
+      "description": "ENV 写入和 GC 依赖 ENV_PRE_DELETE、ENV_PRE_WRITE、SECTOR_DIRTY_GC 等状态恢复，但本次未做断电注入。",
+      "impact": "极端断电点可能导致最新值丢失、旧值恢复失败或 GC 重试异常。",
+      "mitigation": "在硬件或 Flash 仿真层按关键状态点注入复位，重启后检查 ENV 可读性和 GC 是否收敛。",
+      "related_modules": [
+        "env_ng"
+      ],
+      "related_mechanisms": [
+        "env-ng-storage"
+      ],
+      "confidence": "medium"
+    },
+    {
+      "risk_id": "port_template_not_production_ready",
+      "description": "easyflash/port/ef_port.c 是空模板，直接使用不会执行真实读擦写。",
+      "impact": "库 API 可能表面返回成功但没有数据落盘。",
+      "mitigation": "生产工程必须替换 port 实现，并参考 demo 的 STM32/SFUD port 做写后校验和错误码映射。",
+      "related_modules": [
+        "platform_port"
+      ],
+      "related_mechanisms": [
+        "env-ng-storage",
+        "log-ring-buffer",
+        "iap-backup-copy"
+      ],
+      "confidence": "high"
+    },
+    {
+      "risk_id": "iap_missing_security_policy",
+      "description": "IAP 模块只负责备份区擦写和复制，不提供镜像签名、版本回滚、防断电提交或启动切换策略。",
+      "impact": "未验证镜像可能被复制到运行区，或升级中断后系统不可启动。",
+      "mitigation": "在 bootloader 或应用层增加镜像校验、状态机、回滚标志和看门狗策略。",
+      "related_modules": [
+        "iap_core",
+        "demo_apps"
+      ],
+      "related_mechanisms": [
+        "iap-backup-copy"
+      ],
+      "confidence": "medium"
+    },
+    {
+      "risk_id": "types_plugin_memory_lifetime",
+      "description": "Types 插件依赖 cJSON/struct2json 和 S2jHook，数组和结构体路径会分配临时 JSON 字符串或结构体对象。",
+      "impact": "内存 hook 配置错误可能造成泄漏、野指针或堆不可用。",
+      "mitigation": "为 RTOS 平台传入明确的 malloc/free，给数组和结构体 API 增加内存压力测试。",
+      "related_modules": [
+        "types_plugin",
+        "struct2json_bundle"
+      ],
+      "related_mechanisms": [
+        "typed-env-plugin"
+      ],
+      "confidence": "medium"
+    }
+  ],
+  "assumptions": [
+    {
+      "assumption_id": "repo_root_scope",
+      "description": "本说明书把 /home/hyx/easyflash 作为仓库根，把 easyflash/ 作为库本体，把 demo/ 作为示例和平台参考。",
+      "rationale": "目录结构和核心文件分布都指向 easyflash/inc、easyflash/src、easyflash/port 和 demo。",
+      "validation_suggestion": "如果项目实际只关注 easyflash/ 子目录，可将 demo 内容降级为外部集成示例。",
+      "confidence": "high"
+    },
+    {
+      "assumption_id": "ng_env_default",
+      "description": "默认 ENV 模式为 ef_env.c 的 NG 模式，而非 ef_env_legacy.c 或 ef_env_legacy_wl.c。",
+      "rationale": "ef_cfg.h 注释说明 V4.0 起默认使用 NG 模式，legacy 已不推荐继续使用。",
+      "validation_suggestion": "检查项目构建宏是否定义 legacy 相关开关。",
+      "confidence": "medium"
+    },
+    {
+      "assumption_id": "public_api_stability",
+      "description": "easyflash/inc/easyflash.h 是外部使用者应依赖的稳定入口。",
+      "rationale": "该头文件集中声明 easyflash_init、ENV、IAP、LOG、CRC 和 port 函数。",
+      "validation_suggestion": "用 demo 工程或外部项目构建确认 include 路径和宏组合。",
+      "confidence": "high"
+    },
+    {
+      "assumption_id": "types_plugin_optional",
+      "description": "Types 插件是可选扩展，不属于 easyflash_init 默认拉起路径。",
+      "rationale": "插件位于 easyflash/plugins/types，源码通过 ef_get_env/ef_set_env 消费 ENV API。",
+      "validation_suggestion": "检查使用插件的应用是否显式加入插件源码并调用 ef_types_init。",
+      "confidence": "high"
+    }
+  ],
+  "validation_gaps": [
+    {
+      "gap_id": "no_build_validation",
+      "gap_type": "missing_build_validation",
+      "description": "未对库本体、Types 插件或 demo 工程执行编译。",
+      "why_it_matters": "条件编译宏、include 路径、旧式 C 语法和平台库依赖可能影响真实可用性。",
+      "suggested_validation": "选择一个 demo 工程和一个最小库集成工程执行构建，并记录启用宏组合。",
+      "related_chapters": [
+        "repository_overview",
+        "integration_boundaries"
+      ],
+      "confidence": "medium"
+    },
+    {
+      "gap_id": "no_hardware_flash_run",
+      "gap_type": "missing_runtime_validation",
+      "description": "未在目标板或 Flash 仿真上运行 ENV、LOG、IAP 流程。",
+      "why_it_matters": "Flash 擦写时序、对齐、写后回读和驱动错误码只能通过运行验证。",
+      "suggested_validation": "在 STM32 内部 Flash 和 SPI Flash 两类 demo 上分别执行初始化、ENV 写读、LOG 写读和 IAP 备份写入。",
+      "related_chapters": [
+        "repository_mainline",
+        "key_mechanisms"
+      ],
+      "confidence": "medium"
+    },
+    {
+      "gap_id": "no_power_loss_tests",
+      "gap_type": "missing_runtime_validation",
+      "description": "未验证 ENV 写入和 GC 中断后的恢复路径。",
+      "why_it_matters": "ENV 机制设计明显面向掉电恢复，静态阅读无法确认所有中断点都能恢复。",
+      "suggested_validation": "在 create_env_blob、del_env、move_env、format_sector 的关键写状态后注入复位并检查重启结果。",
+      "related_chapters": [
+        "key_mechanisms"
+      ],
+      "confidence": "medium"
+    },
+    {
+      "gap_id": "types_doc_encoding",
+      "gap_type": "analysis_gap",
+      "description": "easyflash/plugins/types/README.md 在当前终端显示为乱码。",
+      "why_it_matters": "插件使用说明中的细节可能无法从 README 直接核对。",
+      "suggested_validation": "用正确编码重新打开 README，或以源码和头文件作为插件行为依据。",
+      "related_chapters": [
+        "key_mechanisms",
+        "integration_boundaries"
+      ],
+      "confidence": "medium"
+    },
+    {
+      "gap_id": "iap_partition_validation",
+      "gap_type": "uncertain_behavior",
+      "description": "未核对 demo 或生产 linker script 中 IAP 备份区、用户应用区和 bootloader 区的实际边界。",
+      "why_it_matters": "IAP 复制和擦除的风险取决于真实 Flash 分区，而不是单个 C 文件。",
+      "suggested_validation": "为目标平台绘制 Flash map，并把 ef_cfg.h 宏、app_size、bl_size 与 linker script 对齐。",
+      "related_chapters": [
+        "key_mechanisms",
+        "integration_boundaries"
+      ],
+      "confidence": "medium"
+    }
+  ],
+  "low_confidence_items": [
+    {
+      "item_id": "legacy_mode_conditions",
+      "location": {
+        "kind": "manifest_path",
+        "path": "chapters/04-module-layers.json"
+      },
+      "description": "legacy 模式具体由哪些宏组合选择，本次没有完整展开预处理条件。",
+      "reason": "说明书重点放在默认 NG 模式，legacy 文件作为兼容边界处理。",
+      "needed_evidence": "检查构建脚本或预处理输出，确认 ef_env.c、ef_env_legacy.c、ef_env_legacy_wl.c 的互斥条件。"
+    },
+    {
+      "item_id": "types_get_struct_resolution",
+      "location": {
+        "kind": "manifest_path",
+        "path": "chapters/06-key-mechanisms/typed-env-plugin.json"
+      },
+      "description": "静态符号索引未稳定识别 ef_get_struct，但源码和头文件中存在相关文本。",
+      "reason": "可能受条件编译、源码形态或符号索引能力影响。",
+      "needed_evidence": "直接编译插件或人工检查 ef_types.c 第 199 行附近实现。"
+    },
+    {
+      "item_id": "demo_build_matrix",
+      "location": {
+        "kind": "chapter",
+        "chapter": "integration_boundaries"
+      },
+      "description": "demo 工程数量多，本次未区分每个工程的工具链、宏配置和可运行状态。",
+      "reason": "仓库包含大量第三方库和平台支持代码，本次只抽取与 EasyFlash 结构直接相关的路径。",
+      "needed_evidence": "逐个 demo 执行构建或读取工程文件生成构建矩阵。"
+    }
+  ]
+}

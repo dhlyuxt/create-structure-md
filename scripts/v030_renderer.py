@@ -35,6 +35,50 @@ def _with_parenthesized_source(text: str, source_ref: dict | None) -> str:
     return f"{text}（{source}）" if source else text
 
 
+def _table_cell(value) -> str:
+    if value is None:
+        return "-"
+    text = str(value).strip()
+    if not text:
+        return "-"
+    return text.replace("|", "\\|").replace("\n", "<br>")
+
+
+def _table(lines: list[str], headers: list[str], rows: list[list]) -> None:
+    if not rows:
+        return
+    _line(lines, "| " + " | ".join(_table_cell(header) for header in headers) + " |")
+    _line(lines, "| " + " | ".join("---" for _ in headers) + " |")
+    for row in rows:
+        _line(lines, "| " + " | ".join(_table_cell(value) for value in row) + " |")
+    _line(lines)
+
+
+def _list_cell(values) -> str:
+    return "<br>".join(str(value) for value in values if value) or "-"
+
+
+def _source_refs_cell(source_refs: list[dict]) -> str:
+    return _list_cell(_source_ref(source_ref) for source_ref in source_refs)
+
+
+def _location_text(location: dict) -> str:
+    return _with_parenthesized_source(location["description"], location.get("source_ref"))
+
+
+def _location_summary(location: dict) -> str:
+    if not location:
+        return "-"
+    kind = location.get("kind")
+    if kind == "manifest_path":
+        return location.get("path", "-")
+    if kind == "chapter":
+        return location.get("chapter", "-")
+    if location.get("path"):
+        return _source_ref(location)
+    return kind or "-"
+
+
 def _bullet(lines: list[str], text: str) -> None:
     if text:
         _line(lines, f"- {text}")
@@ -80,25 +124,36 @@ def _chapter1(lines: list[str], chapter: dict) -> None:
     confidence = chapter["confidence"]
     _line(lines, "## 1. 文档说明")
     _line(lines)
-    _bullet(lines, f"文档版本：{document['version']}")
-    _bullet(lines, f"状态：{document['status']}")
-    _bullet(lines, f"语言：{document['language']}")
-    _bullet(lines, f"生成时间：{document['generated_at']}")
-    _bullet(lines, f"仓库：{repository['name']}（{repository['root_display_path']}）")
-    _bullet(lines, f"仓库类型：{repository['kind']}")
-    _bullet(lines, f"主要语言：{_join(repository['primary_languages'])}")
-    _line(lines)
+    _table(
+        lines,
+        ["字段", "值"],
+        [
+            ["文档版本", document["version"]],
+            ["状态", document["status"]],
+            ["语言", document["language"]],
+            ["生成时间", document["generated_at"]],
+            ["仓库", f"{repository['name']}（{repository['root_display_path']}）"],
+            ["仓库类型", repository["kind"]],
+            ["主要语言", _join(repository["primary_languages"])],
+        ],
+    )
     _line(lines, "### 范围")
-    for item in scope["included"]:
-        _bullet(lines, f"包含 {item['area']}：{item['description']}")
-    for item in scope["excluded"]:
-        _bullet(lines, f"不包含 {item['area']}：{item['reason']}")
-    _line(lines)
+    _table(
+        lines,
+        ["类型", "范围", "说明"],
+        [["包含", item["area"], item["description"]] for item in scope["included"]]
+        + [["不包含", item["area"], item["reason"]] for item in scope["excluded"]],
+    )
     _line(lines, "### 可信度")
-    _bullet(lines, f"{confidence['level']}：{confidence['summary']}")
-    for gap in confidence["validation_gaps"]:
-        _bullet(lines, f"验证缺口：{gap}")
-    _line(lines)
+    _table(
+        lines,
+        ["项目", "内容"],
+        [
+            ["级别", confidence["level"]],
+            ["摘要", confidence["summary"]],
+            ["验证缺口", _list_cell(confidence["validation_gaps"])],
+        ],
+    )
 
 
 def _chapter2(lines: list[str], chapter: dict) -> None:
@@ -109,27 +164,55 @@ def _chapter2(lines: list[str], chapter: dict) -> None:
     _line(lines)
     _line(lines, overview["summary"])
     _line(lines)
-    _bullet(lines, f"问题域：{overview['problem_domain']}")
-    _bullet(lines, f"仓库目标：{overview['repository_purpose']}")
-    _bullet(lines, f"目标读者：{_join(overview['target_readers'])}")
-    _line(lines)
+    _table(
+        lines,
+        ["项目", "内容"],
+        [
+            ["问题域", overview["problem_domain"]],
+            ["仓库目标", overview["repository_purpose"]],
+            ["目标读者", _list_cell(overview["target_readers"])],
+        ],
+    )
     _line(lines, "### 核心能力")
-    for capability in chapter["core_capabilities"]:
-        entry_points = _source_refs(capability.get("entry_points", []))
-        _bullet(lines, f"{capability['name']}：{capability['description']}")
-        _bullet(lines, f"入口：{entry_points}")
-        _bullet(lines, capability.get("notes", ""))
-    _line(lines)
+    _table(
+        lines,
+        ["能力", "描述", "入口", "备注"],
+        [
+            [
+                capability["name"],
+                capability["description"],
+                _source_refs_cell(capability.get("entry_points", [])),
+                capability.get("notes", ""),
+            ]
+            for capability in chapter["core_capabilities"]
+        ],
+    )
     _line(lines, "### 阅读路线")
     _line(lines, route["summary"])
-    for step in route["steps"]:
-        files = _join(f"{item['path']}（{item['reason']}）" for item in step["recommended_files"])
-        _numbered(lines, step["order"], f"{step['title']}：{step['why_read_this']} 推荐阅读 {files}。目标收获：{step['expected_takeaway']}")
     _line(lines)
-    _bullet(lines, f"先读：{_join(orientation['read_first'])}")
-    _bullet(lines, f"后读：{_join(orientation['read_later'])}")
-    _bullet(lines, f"可暂跳过：{_join(orientation['can_skip_initially'])}")
-    _line(lines)
+    _table(
+        lines,
+        ["顺序", "主题", "为什么读", "推荐文件", "目标收获"],
+        [
+            [
+                step["order"],
+                step["title"],
+                step["why_read_this"],
+                _list_cell(f"{item['path']}（{item['reason']}）" for item in step["recommended_files"]),
+                step["expected_takeaway"],
+            ]
+            for step in route["steps"]
+        ],
+    )
+    _table(
+        lines,
+        ["阅读顺序", "内容"],
+        [
+            ["先读", _list_cell(orientation["read_first"])],
+            ["后读", _list_cell(orientation["read_later"])],
+            ["可暂跳过", _list_cell(orientation["can_skip_initially"])],
+        ],
+    )
 
 
 def _chapter3(lines: list[str], chapter: dict) -> None:
@@ -138,21 +221,30 @@ def _chapter3(lines: list[str], chapter: dict) -> None:
     _line(lines, chapter["summary"])
     _line(lines)
     _line(lines, "### 目录分组")
-    for group in chapter["directory_groups"]:
-        _bullet(lines, f"{group['name']}：{group['responsibility']} 路径：{_join(group['paths'])}。阅读时机：{group['read_when']} {group.get('notes', '')}")
-    _line(lines)
+    _table(
+        lines,
+        ["分组", "职责", "路径", "阅读时机", "备注"],
+        [
+            [group["name"], group["responsibility"], _list_cell(group["paths"]), group["read_when"], group.get("notes", "")]
+            for group in chapter["directory_groups"]
+        ],
+    )
     _line(lines, "### 重要文件")
-    for item in chapter["important_files"]:
-        _bullet(lines, f"{item['path']}：{item['role']}。{item['why_it_matters']}")
-    _line(lines)
+    _table(
+        lines,
+        ["文件", "角色", "重要性"],
+        [[item["path"], item["role"], item["why_it_matters"]] for item in chapter["important_files"]],
+    )
     relationships = chapter["directory_relationships"]
     _line(lines, relationships["summary"])
     if "diagram" in relationships:
         _line(lines)
         _diagram(lines, relationships["diagram"])
-    for note in chapter["boundary_notes"]:
-        _bullet(lines, f"{note['area']}：{note['note']}")
-    _line(lines)
+    else:
+        _line(lines)
+    if chapter["boundary_notes"]:
+        _line(lines, "### 边界说明")
+        _table(lines, ["区域", "说明"], [[note["area"], note["note"]] for note in chapter["boundary_notes"]])
 
 
 def _chapter4(lines: list[str], chapter: dict, module_names: dict[str, str]) -> None:
@@ -163,19 +255,58 @@ def _chapter4(lines: list[str], chapter: dict, module_names: dict[str, str]) -> 
     if "layer_diagram" in chapter:
         _diagram(lines, chapter["layer_diagram"])
     _line(lines, "### 分层")
-    for layer in chapter["layers"]:
-        _bullet(lines, f"{layer['name']}：{layer['role']} 职责：{_join(layer['responsibilities'])}。路径：{_join(layer['paths'])}。{layer.get('notes', '')}")
-    _line(lines)
+    _table(
+        lines,
+        ["层", "角色", "职责", "路径", "备注"],
+        [
+            [layer["name"], layer["role"], _list_cell(layer["responsibilities"]), _list_cell(layer["paths"]), layer.get("notes", "")]
+            for layer in chapter["layers"]
+        ],
+    )
     _line(lines, "### 模块职责")
+    layer_names = {layer["layer_id"]: layer["name"] for layer in chapter["layers"]}
+    _table(
+        lines,
+        ["层", "模块", "目的", "源码路径", "阅读时机"],
+        [
+            [
+                layer_names.get(module["layer_id"], "其他模块"),
+                module["name"],
+                module["purpose"],
+                _list_cell(module["source_paths"]),
+                module["read_when"],
+            ]
+            for module in chapter["modules"]
+        ],
+    )
     for module in chapter["modules"]:
-        collaborators = _join(f"{module_names.get(item['module_ref'], item['module_ref'])}（{item['relationship']}）" for item in module.get("collaborates_with", []))
-        _bullet(lines, f"{module['name']}：{module['purpose']} 负责 {_join(module['owns'])}；消费 {_join(module['consumes'])}；产出 {_join(module['produces'])}；不负责 {_join(module['does_not_own'])}。阅读时机：{module['read_when']} {module.get('notes', '')}")
-        if collaborators:
-            _bullet(lines, f"协作：{collaborators}")
-    _line(lines)
-    for note in chapter["boundary_notes"]:
-        _bullet(lines, f"{note['topic']}：{note['note']}")
-    _line(lines)
+        _line(lines, f"#### {module['name']}")
+        _line(lines)
+        _table(
+            lines,
+            ["项目", "内容"],
+            [
+                ["所在层", layer_names.get(module["layer_id"], "其他模块")],
+                ["负责", _list_cell(module["owns"])],
+                ["消费", _list_cell(module["consumes"])],
+                ["产出", _list_cell(module["produces"])],
+                ["不负责", _list_cell(module["does_not_own"])],
+                ["备注", module.get("notes", "")],
+            ],
+        )
+        if module.get("collaborates_with"):
+            _line(lines, "##### 协作")
+            _table(
+                lines,
+                ["协作模块", "关系"],
+                [
+                    [module_names.get(item["module_ref"], item["module_ref"]), item["relationship"]]
+                    for item in module.get("collaborates_with", [])
+                ],
+            )
+    if chapter["boundary_notes"]:
+        _line(lines, "### 边界说明")
+        _table(lines, ["主题", "说明"], [[note["topic"], note["note"]] for note in chapter["boundary_notes"]])
 
 
 def _chapter5(lines: list[str], chapter: dict, module_names: dict[str, str]) -> None:
@@ -190,23 +321,31 @@ def _chapter5(lines: list[str], chapter: dict, module_names: dict[str, str]) -> 
         _line(lines, mainline["purpose"])
         _line(lines)
         entry = mainline["entry"]
-        entry_text = _with_parenthesized_source(f"入口：{entry['name']}，{entry['description']}", entry.get("source_ref"))
-        _bullet(lines, entry_text)
-        for step in mainline["steps"]:
-            modules = _module_names(step.get("module_refs", []), module_names)
-            sources = _source_refs(step.get("source_refs", []))
-            suffix = f" 模块：{modules}。" if modules else ""
-            source_suffix = f" 参考：{sources}。" if sources else ""
-            _numbered(lines, step["order"], f"{step['step']} 影响：{step['effect']}。{suffix}{source_suffix}")
+        _table(
+            lines,
+            ["项目", "名称", "类型", "描述", "参考"],
+            [["入口", entry["name"], entry["kind"], entry["description"], _source_ref(entry.get("source_ref", {}))]],
+        )
+        _table(
+            lines,
+            ["序号", "步骤", "影响", "模块", "参考"],
+            [
+                [
+                    step["order"],
+                    step["step"],
+                    step["effect"],
+                    _module_names(step.get("module_refs", []), module_names),
+                    _source_refs_cell(step.get("source_refs", [])),
+                ]
+                for step in mainline["steps"]
+            ],
+        )
         if "detail_diagram" in mainline:
-            _line(lines)
             _diagram(lines, mainline["detail_diagram"], level=4)
-        _bullet(lines, f"结果：{mainline['result']}")
-        _bullet(lines, mainline.get("notes", ""))
-        _line(lines)
-    for note in chapter["cross_mainline_notes"]:
-        _bullet(lines, f"{note['topic']}：{note['note']}")
-    _line(lines)
+        _table(lines, ["项目", "内容"], [["结果", mainline["result"]], ["备注", mainline.get("notes", "")]])
+    if chapter["cross_mainline_notes"]:
+        _line(lines, "### 跨主线说明")
+        _table(lines, ["主题", "说明"], [[note["topic"], note["note"]] for note in chapter["cross_mainline_notes"]])
 
 
 def _chapter6(lines: list[str], package: ManifestPackage, module_names: dict[str, str]) -> None:
@@ -222,34 +361,56 @@ def _chapter6(lines: list[str], package: ManifestPackage, module_names: dict[str
         _line(lines)
         _line(lines, data["why_it_matters"])
         _line(lines)
-        _bullet(lines, f"阅读前提：{_join(data['reader_prerequisites'])}")
-        _bullet(lines, f"相关模块：{_module_names(data.get('related_modules', []), module_names)}")
-        for focus in data["source_focus"]:
-            _bullet(lines, f"源码焦点：{_source_ref(focus['source_ref'])}，{focus['reason']}")
-        _line(lines)
+        _table(
+            lines,
+            ["项目", "内容"],
+            [
+                ["阅读前提", _list_cell(data["reader_prerequisites"])],
+                ["相关模块", _module_names(data.get("related_modules", []), module_names)],
+            ],
+        )
+        _table(
+            lines,
+            ["源码焦点", "关注原因"],
+            [[_source_ref(focus["source_ref"]), focus["reason"]] for focus in data["source_focus"]],
+        )
         _line(lines, data["mechanism_overview"])
         _line(lines)
         if "diagram" in data:
             _diagram(lines, data["diagram"], level=4)
         _line(lines, "#### 流程")
-        for step in data["flow"]:
-            sources = _source_refs(step.get("source_refs", []))
-            source_text = f"参考：{sources}。" if sources else ""
-            _numbered(lines, step["order"], f"{step['step']} 数据/状态：{_sentence(step['state_or_data'])}{source_text}{step.get('notes', '')}")
-        _line(lines)
+        _table(
+            lines,
+            ["序号", "步骤", "数据或状态", "参考", "备注"],
+            [
+                [
+                    step["order"],
+                    step["step"],
+                    _sentence(step["state_or_data"]),
+                    _source_refs_cell(step.get("source_refs", [])),
+                    step.get("notes", ""),
+                ]
+                for step in data["flow"]
+            ],
+        )
         _line(lines, "#### 关键状态与数据")
-        for item in data["key_states_or_data"]:
-            sources = _source_refs(item.get("source_refs", []))
-            detail = f"{item['kind']}，{sources}" if sources else item["kind"]
-            _bullet(lines, f"{item['name']}：{item['description']}（{detail}）")
-        _line(lines)
+        _table(
+            lines,
+            ["名称", "类型", "说明", "参考"],
+            [
+                [item["name"], item["kind"], item["description"], _source_refs_cell(item.get("source_refs", []))]
+                for item in data["key_states_or_data"]
+            ],
+        )
         _line(lines, "#### 常见误解")
-        for item in data["common_misunderstandings"]:
-            _bullet(lines, f"{item['misunderstanding']} 更正：{item['correction']}")
-        for gap in data["validation_gaps"]:
-            _bullet(lines, f"验证缺口：{gap}")
-        _bullet(lines, f"可信度：{data['confidence']}")
-        _line(lines)
+        _table(
+            lines,
+            ["误解", "更正"],
+            [[item["misunderstanding"], item["correction"]] for item in data["common_misunderstandings"]],
+        )
+        _line(lines, "#### 验证缺口")
+        _table(lines, ["验证缺口"], [[gap] for gap in data["validation_gaps"]])
+        _table(lines, ["项目", "内容"], [["可信度", data["confidence"]]])
 
 
 def _chapter7(lines: list[str], chapter: dict) -> None:
@@ -258,29 +419,60 @@ def _chapter7(lines: list[str], chapter: dict) -> None:
     _line(lines, chapter["summary"])
     _line(lines)
     _line(lines, "### 必需配置")
-    for item in chapter["required_configuration"]:
-        location = item["location"]
-        location_text = _with_parenthesized_source(location["description"], location.get("source_ref"))
-        _bullet(lines, f"{item['name']}：{item['purpose']}。位置：{location_text}。要求：{item['required_when']} {item.get('notes', '')}")
-    _line(lines)
+    _table(
+        lines,
+        ["名称", "类型", "用途", "位置", "要求", "备注"],
+        [
+            [item["name"], item["kind"], item["purpose"], _location_text(item["location"]), item["required_when"], item.get("notes", "")]
+            for item in chapter["required_configuration"]
+        ],
+    )
     _line(lines, "### 必需适配")
-    for item in chapter["required_adaptations"]:
-        location = item["location"]
-        location_text = _with_parenthesized_source(location["description"], location.get("source_ref"))
-        _bullet(lines, f"{item['name']}：{item['responsibility']}。消费者：{item['caller_or_consumer']}。位置：{location_text}。缺失影响：{item['failure_if_missing']}")
-    _line(lines)
+    _table(
+        lines,
+        ["名称", "类型", "职责", "消费者", "位置", "缺失影响"],
+        [
+            [
+                item["name"],
+                item["kind"],
+                item["responsibility"],
+                item["caller_or_consumer"],
+                _location_text(item["location"]),
+                item["failure_if_missing"],
+            ]
+            for item in chapter["required_adaptations"]
+        ],
+    )
     _line(lines, "### 集成路径")
-    for path in chapter["integration_paths"]:
-        entry = path["recommended_entry"]
-        entry_text = _with_parenthesized_source(entry["description"], entry.get("source_ref"))
-        _bullet(lines, f"{path['name']}：{path['scenario']} 推荐入口：{entry_text}。步骤：{_join(path['steps'])}。示例：{_join(path['reference_examples'])}。{path.get('notes', '')}")
-    _line(lines)
+    _table(
+        lines,
+        ["路径", "场景", "推荐入口", "步骤", "示例", "备注"],
+        [
+            [
+                path["name"],
+                path["scenario"],
+                _with_parenthesized_source(path["recommended_entry"]["description"], path["recommended_entry"].get("source_ref")),
+                _list_cell(path["steps"]),
+                _list_cell(path["reference_examples"]),
+                path.get("notes", ""),
+            ]
+            for path in chapter["integration_paths"]
+        ],
+    )
     _line(lines, "### 外部依赖与边界")
-    for item in chapter["external_dependencies"]:
-        _bullet(lines, f"{item['name']}：{item['integration_role']}。用于：{item['used_by']}。{item.get('notes', '')}")
-    for item in chapter["out_of_scope_responsibilities"]:
-        _bullet(lines, f"{item['topic']} 由 {item['owner']} 负责：{item['reason']}")
-    _line(lines)
+    _table(
+        lines,
+        ["依赖", "类型", "用于", "集成角色", "备注"],
+        [
+            [item["name"], item["kind"], item["used_by"], item["integration_role"], item.get("notes", "")]
+            for item in chapter["external_dependencies"]
+        ],
+    )
+    _table(
+        lines,
+        ["主题", "责任方", "原因"],
+        [[item["topic"], item["owner"], item["reason"]] for item in chapter["out_of_scope_responsibilities"]],
+    )
 
 
 def _chapter8(lines: list[str], chapter: dict, module_names: dict[str, str], mechanism_names: dict[str, str]) -> None:
@@ -289,29 +481,61 @@ def _chapter8(lines: list[str], chapter: dict, module_names: dict[str, str], mec
     _line(lines, chapter["summary"])
     _line(lines)
     _line(lines, "### 风险")
-    for risk in chapter["risks"]:
-        modules = _module_names(risk.get("related_modules", []), module_names)
-        mechanisms = _mechanism_names(risk.get("related_mechanisms", []), mechanism_names)
-        suffixes = []
-        if modules:
-            suffixes.append(f"相关模块：{modules}")
-        if mechanisms:
-            suffixes.append(f"相关机制：{mechanisms}")
-        suffix = f"（{_join(suffixes)}）" if suffixes else ""
-        _bullet(lines, f"{risk['description']}：影响 {risk['impact']}；缓解 {risk['mitigation']}；可信度 {risk['confidence']}。{suffix}")
-    _line(lines)
+    _table(
+        lines,
+        ["风险", "影响", "缓解", "相关模块", "相关机制", "可信度"],
+        [
+            [
+                risk["description"],
+                risk["impact"],
+                risk["mitigation"],
+                _module_names(risk.get("related_modules", []), module_names),
+                _mechanism_names(risk.get("related_mechanisms", []), mechanism_names),
+                risk["confidence"],
+            ]
+            for risk in chapter["risks"]
+        ],
+    )
     _line(lines, "### 假设")
-    for assumption in chapter["assumptions"]:
-        _bullet(lines, f"{assumption['description']}：依据 {assumption['rationale']}；验证建议 {assumption['validation_suggestion']}；可信度 {assumption['confidence']}。")
-    _line(lines)
+    _table(
+        lines,
+        ["假设", "依据", "验证建议", "可信度"],
+        [
+            [assumption["description"], assumption["rationale"], assumption["validation_suggestion"], assumption["confidence"]]
+            for assumption in chapter["assumptions"]
+        ],
+    )
     _line(lines, "### 验证缺口")
-    for gap in chapter["validation_gaps"]:
-        _bullet(lines, f"{gap['description']}：{gap['why_it_matters']} 建议：{gap['suggested_validation']}。可信度 {gap['confidence']}。")
-    _line(lines)
+    _table(
+        lines,
+        ["缺口", "类型", "重要性", "建议验证", "相关章节", "可信度"],
+        [
+            [
+                gap["description"],
+                gap["gap_type"],
+                gap["why_it_matters"],
+                gap["suggested_validation"],
+                _list_cell(gap.get("related_chapters", [])),
+                gap["confidence"],
+            ]
+            for gap in chapter["validation_gaps"]
+        ],
+    )
     _line(lines, "### 低可信项")
-    for item in chapter["low_confidence_items"]:
-        _bullet(lines, f"{item['description']}：{item['reason']} 需要证据：{item['needed_evidence']}。")
-    _line(lines)
+    _table(
+        lines,
+        ["项目", "位置", "说明", "原因", "需要证据"],
+        [
+            [
+                item.get("item_id", ""),
+                _location_summary(item.get("location", {})),
+                item["description"],
+                item["reason"],
+                item["needed_evidence"],
+            ]
+            for item in chapter["low_confidence_items"]
+        ],
+    )
 
 
 def render_markdown(package: ManifestPackage) -> str:

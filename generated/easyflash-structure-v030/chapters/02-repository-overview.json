@@ -1,0 +1,222 @@
+{
+  "chapter": {
+    "key": "repository_overview",
+    "title": "仓库概述与阅读路线"
+  },
+  "overview": {
+    "summary": "EasyFlash 是一个嵌入式 Flash 存储库，以少量公共 API 封装 ENV 键值持久化、Flash 日志保存、IAP 备份升级和可选类型化 ENV 插件。仓库同时携带平台移植模板与多个 STM32 demo。",
+    "problem_domain": "资源受限 MCU 上的非易失化数据保存、日志落盘、固件备份区管理和跨平台 Flash 擦写适配。",
+    "repository_purpose": "把与芯片相关的 Flash 读、擦、写、锁和打印能力收敛到 port 层，让核心库用统一的地址布局、状态位和公共 API 处理上层持久化需求。",
+    "target_readers": [
+      "首次接入 EasyFlash 的嵌入式工程师",
+      "需要维护 ENV 存储或掉电恢复逻辑的库维护者",
+      "要移植到新 Flash/RTOS/裸机平台的集成者",
+      "评审 IAP、日志或类型插件边界的技术负责人"
+    ]
+  },
+  "core_capabilities": [
+    {
+      "name": "库级初始化与功能编排",
+      "description": "应用调用 easyflash_init 后，库先进入平台初始化，再按 EF_USING_ENV、EF_USING_IAP、EF_USING_LOG 宏决定是否初始化 ENV、IAP 和日志子系统。",
+      "entry_points": [
+        {
+          "path": "easyflash/inc/easyflash.h",
+          "symbol": "easyflash_init"
+        },
+        {
+          "path": "easyflash/src/easyflash.c",
+          "symbol": "easyflash_init"
+        }
+      ],
+      "notes": "easyflash_init 内部有 init_ok 防重入，初始化失败时不会置为成功。"
+    },
+    {
+      "name": "ENV 键值持久化",
+      "description": "新版 ENV 模式把键值节点追加写入 Flash sector，通过状态表、CRC、cache 和 GC 维持有效值集合；旧版 legacy 文件保留兼容路径。",
+      "entry_points": [
+        {
+          "path": "easyflash/inc/easyflash.h",
+          "symbol": "ef_set_env_blob"
+        },
+        {
+          "path": "easyflash/inc/easyflash.h",
+          "symbol": "ef_get_env_blob"
+        },
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "ef_env_init"
+        }
+      ],
+      "notes": "默认从 V4.0 起使用 NG 模式；ef_cfg.h 明确 legacy 已不推荐继续使用。"
+    },
+    {
+      "name": "Flash 日志环形区",
+      "description": "日志模块把 LOG_AREA_SIZE 分成若干擦除块，用 sector header 状态表示 EMPTY、USING、FULL，并用 log_start_addr/log_end_addr 管理环形写入和读取索引。",
+      "entry_points": [
+        {
+          "path": "easyflash/inc/easyflash.h",
+          "symbol": "ef_log_write"
+        },
+        {
+          "path": "easyflash/inc/easyflash.h",
+          "symbol": "ef_log_read"
+        },
+        {
+          "path": "easyflash/src/ef_log.c",
+          "symbol": "ef_log_init"
+        }
+      ],
+      "notes": "仅在 EF_USING_LOG 打开时编译使用，日志区位置会跟随 ENV 区之后。"
+    },
+    {
+      "name": "IAP 备份区操作",
+      "description": "IAP 模块按启用的 ENV/LOG 区域偏移计算备份应用起始地址，提供擦除备份区、写入下载片段、从备份区复制到用户应用或 bootloader 的接口。",
+      "entry_points": [
+        {
+          "path": "easyflash/inc/easyflash.h",
+          "symbol": "ef_write_data_to_bak"
+        },
+        {
+          "path": "easyflash/inc/easyflash.h",
+          "symbol": "ef_copy_spec_app_from_bak"
+        },
+        {
+          "path": "easyflash/src/ef_iap.c",
+          "symbol": "ef_iap_init"
+        }
+      ],
+      "notes": "IAP 数据区大小不由 EasyFlash 固定，调用方需要传入应用大小并保证地址规划安全。"
+    },
+    {
+      "name": "类型化 ENV 插件",
+      "description": "Types 插件把 ENV 字符串封装成 bool、整数、浮点、数组和结构体 JSON 序列化接口，复用底层 ef_get_env/ef_set_env。",
+      "entry_points": [
+        {
+          "path": "easyflash/plugins/types/ef_types.h",
+          "symbol": "ef_types_init"
+        },
+        {
+          "path": "easyflash/plugins/types/ef_types.c",
+          "symbol": "ef_set_struct"
+        }
+      ],
+      "notes": "结构体能力依赖 struct2json 和 cJSON，插件不改变底层 Flash 布局。"
+    }
+  ],
+  "reading_route": {
+    "summary": "先建立公共接口和配置边界，再读初始化主线，最后进入 ENV、LOG、IAP 与插件机制。",
+    "steps": [
+      {
+        "order": 1,
+        "title": "公共接口与配置",
+        "why_read_this": "先看应用能调用什么、哪些宏决定编译和地址布局。",
+        "recommended_files": [
+          {
+            "path": "easyflash/inc/easyflash.h",
+            "reason": "集中声明初始化、ENV、IAP、LOG、CRC 和 port 函数。"
+          },
+          {
+            "path": "easyflash/inc/ef_cfg.h",
+            "reason": "定义 EF_USING_*、EF_START_ADDR、ENV_AREA_SIZE、LOG_AREA_SIZE、EF_ERASE_MIN_SIZE、EF_WRITE_GRAN 等集成参数。"
+          },
+          {
+            "path": "easyflash/inc/ef_def.h",
+            "reason": "定义错误码、版本号、ENV 节点结构和状态枚举。"
+          }
+        ],
+        "expected_takeaway": "知道 EasyFlash 的功能开关、地址分区和公共调用面。"
+      },
+      {
+        "order": 2,
+        "title": "初始化主线",
+        "why_read_this": "理解所有功能如何从一个入口被串起来，以及 port 层如何提供默认 ENV 集合。",
+        "recommended_files": [
+          {
+            "path": "easyflash/src/easyflash.c",
+            "reason": "easyflash_init 的编排入口。"
+          },
+          {
+            "path": "easyflash/port/ef_port.c",
+            "reason": "平台移植模板，说明必须由项目补齐的函数。"
+          }
+        ],
+        "expected_takeaway": "掌握应用初始化到各功能子系统初始化的顺序。"
+      },
+      {
+        "order": 3,
+        "title": "ENV 新版存储机制",
+        "why_read_this": "ENV 是仓库最核心、最复杂的机制，包含状态位、追加写、cache、恢复和 GC。",
+        "recommended_files": [
+          {
+            "path": "easyflash/src/ef_env.c",
+            "reason": "默认 NG ENV 模式实现。"
+          },
+          {
+            "path": "easyflash/src/ef_env_legacy.c",
+            "reason": "旧版一次性保存模式，仅用于理解兼容边界。"
+          },
+          {
+            "path": "easyflash/src/ef_env_legacy_wl.c",
+            "reason": "带磨损均衡思想的旧版兼容实现。"
+          }
+        ],
+        "expected_takeaway": "理解 ENV 节点如何写入、提交、删除、恢复和搬迁。"
+      },
+      {
+        "order": 4,
+        "title": "可选功能",
+        "why_read_this": "LOG 和 IAP 都复用 port 层，但拥有独立地址规划和状态管理。",
+        "recommended_files": [
+          {
+            "path": "easyflash/src/ef_log.c",
+            "reason": "Flash 环形日志实现。"
+          },
+          {
+            "path": "easyflash/src/ef_iap.c",
+            "reason": "IAP 备份区读写与复制实现。"
+          }
+        ],
+        "expected_takeaway": "知道可选功能如何叠加在 ENV 区之后，以及它们怎样使用底层 Flash 操作。"
+      },
+      {
+        "order": 5,
+        "title": "插件与示例",
+        "why_read_this": "插件展示如何在 ENV 之上封装业务类型；demo 展示真实平台如何实现 port。",
+        "recommended_files": [
+          {
+            "path": "easyflash/plugins/types/ef_types.c",
+            "reason": "类型插件的封装逻辑。"
+          },
+          {
+            "path": "demo/env/stm32f10x/non_os/components/easyflash/port/ef_port.c",
+            "reason": "STM32 内部 Flash port 示例。"
+          },
+          {
+            "path": "demo/env/stm32f10x/non_os_spi_flash/components/easyflash/port/ef_port.c",
+            "reason": "SFUD SPI Flash port 示例。"
+          }
+        ],
+        "expected_takeaway": "知道集成者需要在哪里写平台代码，以及插件与核心库的关系。"
+      }
+    ]
+  },
+  "reader_orientation": {
+    "read_first": [
+      "easyflash/inc/easyflash.h",
+      "easyflash/inc/ef_cfg.h",
+      "easyflash/src/easyflash.c",
+      "easyflash/src/ef_env.c"
+    ],
+    "read_later": [
+      "easyflash/src/ef_log.c",
+      "easyflash/src/ef_iap.c",
+      "easyflash/plugins/types/ef_types.c",
+      "demo/env/stm32f10x/non_os/components/easyflash/port/ef_port.c"
+    ],
+    "can_skip_initially": [
+      "demo/env/*/Libraries",
+      "demo/env/*/RT-Thread-1.2.2",
+      "easyflash/plugins/types/struct2json/src/cJSON.c"
+    ]
+  }
+}

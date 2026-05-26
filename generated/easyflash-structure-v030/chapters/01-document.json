@@ -1,0 +1,66 @@
+{
+  "chapter": {
+    "key": "document",
+    "title": "文档说明"
+  },
+  "document": {
+    "title": "EasyFlash 仓库结构设计说明书",
+    "version": "0.3.0",
+    "status": "draft",
+    "language": "zh-CN",
+    "generated_at": "2026-05-16T20:37:55+08:00",
+    "output_file": "EasyFlash_STRUCTURE_DESIGN.md"
+  },
+  "repository": {
+    "name": "EasyFlash",
+    "root_display_path": "/home/hyx/easyflash",
+    "kind": "mixed",
+    "primary_languages": [
+      "C",
+      "Markdown"
+    ]
+  },
+  "scope": {
+    "included": [
+      {
+        "area": "easyflash/inc",
+        "description": "公共 API、配置宏、错误码、ENV 数据结构与外部调用契约。"
+      },
+      {
+        "area": "easyflash/src",
+        "description": "初始化编排、ENV 持久化、日志、IAP 和 CRC 工具的核心实现。"
+      },
+      {
+        "area": "easyflash/port",
+        "description": "平台移植模板，定义调用方必须实现或替换的 Flash、锁与日志接口。"
+      },
+      {
+        "area": "easyflash/plugins/types",
+        "description": "基于 EasyFlash ENV 的可选类型封装插件，含 struct2json/cJSON 依赖代码。"
+      },
+      {
+        "area": "demo",
+        "description": "STM32、RT-Thread、SPI Flash、日志和 IAP 集成示例，用于说明真实平台如何补齐 port 层。"
+      }
+    ],
+    "excluded": [
+      {
+        "area": "目标板运行结果",
+        "reason": "本次只做静态仓库阅读，未连接硬件、未执行擦写、断电恢复或升级流程。"
+      },
+      {
+        "area": "第三方库逐行设计",
+        "reason": "RT-Thread、STM32 标准外设库、SFUD、cJSON/struct2json 只作为集成依赖和边界说明。"
+      }
+    ]
+  },
+  "confidence": {
+    "level": "medium",
+    "summary": "结论基于静态符号快照、核心调用关系和关键源文件阅读；未做编译、单测或硬件实测。",
+    "validation_gaps": [
+      "未在 STM32 或 SPI Flash 目标板验证 EF_WRITE_GRAN、擦除粒度、掉电恢复与 GC 时序。",
+      "未针对每个 demo 工程执行构建验证。",
+      "Types 插件 README 存在编码显示问题，插件行为主要以源码为准。"
+    ]
+  }
+}

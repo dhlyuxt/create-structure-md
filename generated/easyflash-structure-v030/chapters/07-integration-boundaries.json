@@ -1,0 +1,409 @@
+{
+  "chapter": {
+    "key": "integration_boundaries",
+    "title": "配置、移植与集成边界"
+  },
+  "summary": "EasyFlash 的集成边界很清楚：应用选择功能宏和地址布局，port 层绑定真实 Flash 与同步/打印能力，核心库负责平台无关状态机。任何生产移植都必须先补齐 ef_cfg.h 和 ef_port.c。",
+  "required_configuration": [
+    {
+      "name": "EF_USING_ENV",
+      "kind": "macro",
+      "location": {
+        "description": "功能开关配置",
+        "source_ref": {
+          "path": "easyflash/inc/ef_cfg.h",
+          "symbol": "EF_USING_ENV"
+        }
+      },
+      "purpose": "决定是否编译并初始化 ENV 功能。",
+      "required_when": "需要键值持久化时。",
+      "notes": "模板默认打开 ENV。"
+    },
+    {
+      "name": "EF_USING_IAP",
+      "kind": "macro",
+      "location": {
+        "description": "功能开关配置",
+        "source_ref": {
+          "path": "easyflash/inc/ef_cfg.h",
+          "symbol": "EF_USING_IAP"
+        }
+      },
+      "purpose": "决定是否编译并初始化 IAP 备份区操作接口。",
+      "required_when": "需要固件备份区写入或复制能力时。",
+      "notes": "模板中默认注释关闭。"
+    },
+    {
+      "name": "EF_USING_LOG",
+      "kind": "macro",
+      "location": {
+        "description": "功能开关配置",
+        "source_ref": {
+          "path": "easyflash/inc/ef_cfg.h",
+          "symbol": "EF_USING_LOG"
+        }
+      },
+      "purpose": "决定是否编译并初始化 Flash 日志功能。",
+      "required_when": "需要把日志保存到 Flash 时。",
+      "notes": "启用后 LOG 区会参与 IAP 备份区起始地址计算。"
+    },
+    {
+      "name": "EF_START_ADDR",
+      "kind": "macro",
+      "location": {
+        "description": "Flash 备份区起始地址配置",
+        "source_ref": {
+          "path": "easyflash/inc/ef_cfg.h",
+          "symbol": "EF_START_ADDR"
+        }
+      },
+      "purpose": "定义 EasyFlash 管理区域的物理起点。",
+      "required_when": "启用任何 EasyFlash 存储能力时。",
+      "notes": "不能与应用代码、bootloader、文件系统或其他持久化区重叠。"
+    },
+    {
+      "name": "EF_ERASE_MIN_SIZE",
+      "kind": "macro",
+      "location": {
+        "description": "Flash 最小擦除粒度配置",
+        "source_ref": {
+          "path": "easyflash/inc/ef_cfg.h",
+          "symbol": "EF_ERASE_MIN_SIZE"
+        }
+      },
+      "purpose": "告诉 ENV 和 LOG 以多大粒度划分和擦除 sector。",
+      "required_when": "任何 Flash 操作都需要。",
+      "notes": "ENV_AREA_SIZE 与 LOG_AREA_SIZE 必须按它对齐。"
+    },
+    {
+      "name": "EF_WRITE_GRAN",
+      "kind": "macro",
+      "location": {
+        "description": "Flash 写粒度配置",
+        "source_ref": {
+          "path": "easyflash/inc/ef_cfg.h",
+          "symbol": "EF_WRITE_GRAN"
+        }
+      },
+      "purpose": "定义 ENV 写入对齐规则。",
+      "required_when": "启用 ENV 时。",
+      "notes": "源码注释只支持 1、8、32 bit，需要按 Flash 类型选择。"
+    },
+    {
+      "name": "ENV_AREA_SIZE",
+      "kind": "macro",
+      "location": {
+        "description": "ENV 区大小配置",
+        "source_ref": {
+          "path": "easyflash/inc/ef_cfg.h",
+          "symbol": "ENV_AREA_SIZE"
+        }
+      },
+      "purpose": "定义 ENV 存储可用空间。",
+      "required_when": "启用 EF_USING_ENV 时。",
+      "notes": "新版 ENV 至少需要两个擦除 sector，且要预留 GC 空间。"
+    },
+    {
+      "name": "LOG_AREA_SIZE",
+      "kind": "macro",
+      "location": {
+        "description": "LOG 区大小配置",
+        "source_ref": {
+          "path": "easyflash/inc/ef_cfg.h",
+          "symbol": "LOG_AREA_SIZE"
+        }
+      },
+      "purpose": "定义日志环形区可用空间。",
+      "required_when": "启用 EF_USING_LOG 时。",
+      "notes": "源码要求至少两个 EF_ERASE_MIN_SIZE。"
+    },
+    {
+      "name": "EF_ENV_VER_NUM",
+      "kind": "macro",
+      "location": {
+        "description": "默认 ENV 版本号",
+        "source_ref": {
+          "path": "easyflash/inc/ef_cfg.h",
+          "symbol": "EF_ENV_VER_NUM"
+        }
+      },
+      "purpose": "在默认 ENV 集合变化时配合 EF_ENV_AUTO_UPDATE 触发自动更新。",
+      "required_when": "启用 ENV 并需要自动同步新增默认 ENV 时。",
+      "notes": "ef_def.h 提供默认 0，但 ef_cfg.h 注释要求用户在增加默认 ENV 时主动调整。"
+    }
+  ],
+  "required_adaptations": [
+    {
+      "name": "ef_port_init",
+      "kind": "port_function",
+      "location": {
+        "description": "平台初始化和默认 ENV 集合提供者",
+        "source_ref": {
+          "path": "easyflash/port/ef_port.c",
+          "symbol": "ef_port_init"
+        }
+      },
+      "responsibility": "执行必要硬件初始化，并通过 default_env/default_env_size 返回默认 ENV 集合。",
+      "caller_or_consumer": "easyflash_init。",
+      "failure_if_missing": "库无法取得默认 ENV 集合，ENV 初始化没有基线数据。"
+    },
+    {
+      "name": "ef_port_read",
+      "kind": "port_function",
+      "location": {
+        "description": "Flash 读取接口",
+        "source_ref": {
+          "path": "easyflash/port/ef_port.c",
+          "symbol": "ef_port_read"
+        }
+      },
+      "responsibility": "从 Flash 指定地址读取 size 字节到 word 缓冲区。",
+      "caller_or_consumer": "ENV、LOG、IAP。",
+      "failure_if_missing": "启动扫描、日志读取、IAP 复制都无法工作。"
+    },
+    {
+      "name": "ef_port_erase",
+      "kind": "port_function",
+      "location": {
+        "description": "Flash 擦除接口",
+        "source_ref": {
+          "path": "easyflash/port/ef_port.c",
+          "symbol": "ef_port_erase"
+        }
+      },
+      "responsibility": "按平台擦除粒度擦除指定地址区间，并返回 EF_ERASE_ERR 或 EF_NO_ERR。",
+      "caller_or_consumer": "ENV GC、LOG 清空与跨 sector 写、IAP 擦除。",
+      "failure_if_missing": "空间回收和备份区准备不可用。"
+    },
+    {
+      "name": "ef_port_write",
+      "kind": "port_function",
+      "location": {
+        "description": "Flash 写入接口",
+        "source_ref": {
+          "path": "easyflash/port/ef_port.c",
+          "symbol": "ef_port_write"
+        }
+      },
+      "responsibility": "把 word 缓冲区写入 Flash，并按平台能力做必要校验。",
+      "caller_or_consumer": "ENV 节点写入、LOG 追加、IAP 备份区写入。",
+      "failure_if_missing": "核心持久化写入全部不可用。"
+    },
+    {
+      "name": "ef_port_env_lock 与 ef_port_env_unlock",
+      "kind": "platform_hook",
+      "location": {
+        "description": "ENV 临界区锁",
+        "source_ref": {
+          "path": "easyflash/port/ef_port.c",
+          "symbol": "ef_port_env_lock"
+        }
+      },
+      "responsibility": "保护 ENV cache、状态位写入和恢复过程不被并发打断。",
+      "caller_or_consumer": "ENV 写入、删除、加载恢复。",
+      "failure_if_missing": "多线程或中断环境下可能出现 cache 与 Flash 状态不一致。"
+    },
+    {
+      "name": "ef_log_debug、ef_log_info、ef_print",
+      "kind": "logging_hook",
+      "location": {
+        "description": "打印输出适配",
+        "source_ref": {
+          "path": "easyflash/port/ef_port.c",
+          "symbol": "ef_log_info"
+        }
+      },
+      "responsibility": "输出调试、常规日志和用户可见信息。",
+      "caller_or_consumer": "初始化、ENV、LOG、IAP 和断言。",
+      "failure_if_missing": "功能仍可能运行，但排错信息和断言定位不可用。"
+    }
+  ],
+  "integration_paths": [
+    {
+      "name": "最小 ENV 集成",
+      "scenario": "应用只需要配置持久化，不启用 LOG/IAP。",
+      "recommended_entry": {
+        "description": "在启动时调用 easyflash_init，然后使用 ef_get_env/ef_set_env 或 blob API。",
+        "source_ref": {
+          "path": "easyflash/inc/easyflash.h",
+          "symbol": "easyflash_init"
+        }
+      },
+      "steps": [
+        "在项目中加入 easyflash/inc、easyflash/src、easyflash/port。",
+        "在 ef_cfg.h 中打开 EF_USING_ENV，设置 EF_START_ADDR、ENV_AREA_SIZE、EF_ERASE_MIN_SIZE、EF_WRITE_GRAN。",
+        "实现 ef_port_init/read/erase/write/env_lock/env_unlock/log/print。",
+        "在 ef_port_init 中返回默认 ENV 集合。",
+        "启动时调用 easyflash_init，成功后再调用 ENV API。"
+      ],
+      "reference_examples": [
+        "demo/env/stm32f10x/non_os",
+        "demo/env/stm32f10x/non_os_spi_flash",
+        "demo/env/stm32f4xx"
+      ],
+      "notes": "生产配置应确认 ENV_AREA_SIZE 至少两个擦除块，并留有足够 GC 余量。"
+    },
+    {
+      "name": "SPI Flash 集成",
+      "scenario": "ENV 或 LOG 不写 MCU 内部 Flash，而是写外部 SPI Flash。",
+      "recommended_entry": {
+        "description": "把 port read/erase/write 绑定到 SFUD 或项目 SPI Flash 驱动。",
+        "source_ref": {
+          "path": "demo/env/stm32f10x/non_os_spi_flash/components/easyflash/port/ef_port.c",
+          "symbol": "ef_port_write"
+        }
+      },
+      "steps": [
+        "初始化外部 Flash 驱动，例如 demo 中的 sfud_init。",
+        "让 ef_port_read 调用外部 Flash 读函数。",
+        "让 ef_port_erase 调用外部 Flash 擦除函数并映射错误码。",
+        "让 ef_port_write 调用外部 Flash 写函数并映射错误码。",
+        "按外部 Flash 的 sector 和写粒度设置 EF_ERASE_MIN_SIZE、EF_WRITE_GRAN。"
+      ],
+      "reference_examples": [
+        "demo/env/stm32f10x/non_os_spi_flash/components/easyflash/port/ef_port.c",
+        "demo/env/stm32f10x/non_os_spi_flash/components/sfud"
+      ],
+      "notes": "外部 Flash 的地址通常是芯片内部偏移，不一定是 MCU 绝对地址。"
+    },
+    {
+      "name": "日志保存集成",
+      "scenario": "应用需要把运行日志保存到 Flash 并支持环形覆盖。",
+      "recommended_entry": {
+        "description": "启用 EF_USING_LOG，初始化后调用 ef_log_write 和 ef_log_read。",
+        "source_ref": {
+          "path": "easyflash/inc/easyflash.h",
+          "symbol": "ef_log_write"
+        }
+      },
+      "steps": [
+        "在 ef_cfg.h 中启用 EF_USING_LOG。",
+        "设置 LOG_AREA_SIZE，确保它至少包含两个 EF_ERASE_MIN_SIZE。",
+        "确认 LOG 区不会与 ENV 区和 IAP 备份区重叠。",
+        "写入日志时保证 size 按 4 字节对齐。",
+        "按业务保留策略接受环形覆盖最旧日志。"
+      ],
+      "reference_examples": [
+        "demo/log"
+      ],
+      "notes": "LOG 模块不定义日志记录格式，只处理二进制 word 流保存。"
+    },
+    {
+      "name": "IAP 备份区集成",
+      "scenario": "bootloader 或应用需要把下载镜像暂存到备份区，再复制到目标区。",
+      "recommended_entry": {
+        "description": "启用 EF_USING_IAP，使用 ef_erase_bak_app、ef_write_data_to_bak、ef_copy_app_from_bak。",
+        "source_ref": {
+          "path": "easyflash/inc/easyflash.h",
+          "symbol": "ef_write_data_to_bak"
+        }
+      },
+      "steps": [
+        "在 ef_cfg.h 中启用 EF_USING_IAP。",
+        "确认 EF_START_ADDR、ENV_AREA_SIZE、LOG_AREA_SIZE 之后的备份区足够容纳镜像。",
+        "下载前擦除备份区。",
+        "按数据包调用 ef_write_data_to_bak 并维护 cur_size。",
+        "复制前擦除目标应用区或 bootloader 区。",
+        "复制后由应用或 bootloader 执行完整性校验和重启切换。"
+      ],
+      "reference_examples": [
+        "demo/iap"
+      ],
+      "notes": "EasyFlash 不负责签名、回滚、断点续传或启动跳转策略。"
+    },
+    {
+      "name": "Types 插件集成",
+      "scenario": "业务希望用类型化 API 操作 ENV，而不是手写字符串转换。",
+      "recommended_entry": {
+        "description": "加入插件源文件和 include 路径，调用 ef_types_init 后使用 ef_set_int、ef_set_array、ef_set_struct 等接口。",
+        "source_ref": {
+          "path": "easyflash/plugins/types/ef_types.h",
+          "symbol": "ef_types_init"
+        }
+      },
+      "steps": [
+        "把 easyflash/plugins/types 和 easyflash/plugins/types/struct2json/inc 加入头文件路径。",
+        "把 ef_types.c、s2j.c、cJSON.c 加入构建。",
+        "在 RTOS 项目中通过 S2jHook 提供 malloc/free。",
+        "先调用 easyflash_init，再按需调用 ef_types_init。",
+        "用类型 API 保存值，并评估 JSON 字符串占用的 ENV 空间。"
+      ],
+      "reference_examples": [
+        "easyflash/plugins/types/README.md",
+        "easyflash/plugins/types/struct2json/readme.md"
+      ],
+      "notes": "插件 README 编码显示可能与当前终端不一致，行为判断以源码和头文件为准。"
+    }
+  ],
+  "external_dependencies": [
+    {
+      "name": "目标 Flash 硬件或驱动",
+      "kind": "hardware",
+      "used_by": "platform_port",
+      "integration_role": "提供实际读、擦、写能力。",
+      "notes": "内部 Flash、外部 SPI Flash 或其他 NVM 都必须映射为 ef_port_*。"
+    },
+    {
+      "name": "STM32 标准外设库",
+      "kind": "library",
+      "used_by": "demo/env/stm32f10x 和 demo/env/stm32f4xx",
+      "integration_role": "demo 中用于擦写内部 Flash、配置时钟和外设。",
+      "notes": "不是 EasyFlash 核心库依赖。"
+    },
+    {
+      "name": "RT-Thread",
+      "kind": "os",
+      "used_by": "部分 demo",
+      "integration_role": "提供线程、shell、串口和 YMODEM 场景。",
+      "notes": "裸机 demo 不需要它。"
+    },
+    {
+      "name": "SFUD",
+      "kind": "library",
+      "used_by": "SPI Flash demo port",
+      "integration_role": "提供外部 SPI Flash 的读擦写接口。",
+      "notes": "生产项目可替换为自己的 Flash 驱动。"
+    },
+    {
+      "name": "cJSON 与 struct2json",
+      "kind": "library",
+      "used_by": "Types 插件",
+      "integration_role": "提供 JSON 对象、数组、结构体序列化和内存 hook。",
+      "notes": "只在使用 Types 插件时需要。"
+    },
+    {
+      "name": "YMODEM 或其他下载协议",
+      "kind": "protocol",
+      "used_by": "IAP demo 或产品升级流程",
+      "integration_role": "把固件数据包交给 ef_write_data_to_bak。",
+      "notes": "EasyFlash 本体不实现协议栈。"
+    }
+  ],
+  "out_of_scope_responsibilities": [
+    {
+      "topic": "Flash 分区安全审查",
+      "owner": "application",
+      "reason": "EasyFlash 只按宏使用地址，无法知道产品 linker script、bootloader 和其他存储区是否冲突。"
+    },
+    {
+      "topic": "固件镜像签名、回滚和启动切换",
+      "owner": "application",
+      "reason": "IAP 模块只提供备份区擦写和复制，不提供升级安全策略。"
+    },
+    {
+      "topic": "Flash 寿命和磨损预算",
+      "owner": "platform",
+      "reason": "擦写寿命取决于硬件、业务写频率、ENV/LOG 区大小和 GC 触发。"
+    },
+    {
+      "topic": "多线程同步策略",
+      "owner": "platform",
+      "reason": "库只调用 ef_port_env_lock/unlock，具体用关中断、互斥锁还是调度锁由平台决定。"
+    },
+    {
+      "topic": "日志内容格式和保留策略",
+      "owner": "application",
+      "reason": "LOG 模块只保存 word 对齐字节流并按环形区覆盖旧数据。"
+    }
+  ]
+}

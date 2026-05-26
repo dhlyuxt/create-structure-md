@@ -1,0 +1,234 @@
+{
+  "section": {
+    "title": "Types 插件的类型化 ENV 封装机制"
+  },
+  "why_it_matters": "核心 ENV API 面向字符串和 blob，业务代码常常需要把整数、浮点、数组或结构体转换成字符串。Types 插件展示了在不修改 Flash 布局的前提下，如何把 ENV 作为更高层类型存储使用。",
+  "reader_prerequisites": [
+    "先理解 ENV 的基础 get/set API。",
+    "先确认项目是否把 easyflash/plugins/types 和 struct2json include 路径加入构建。",
+    "先理解 struct2json/cJSON 的内存 hook 由 ef_types_init 初始化。"
+  ],
+  "related_modules": [
+    "types_plugin",
+    "struct2json_bundle",
+    "env_ng",
+    "public_api"
+  ],
+  "source_focus": [
+    {
+      "source_ref": {
+        "path": "easyflash/plugins/types/ef_types.c",
+        "symbol": "ef_types_init"
+      },
+      "reason": "初始化 struct2json 的内存 hook。"
+    },
+    {
+      "source_ref": {
+        "path": "easyflash/plugins/types/ef_types.c",
+        "symbol": "ef_get_bool"
+      },
+      "reason": "基础类型读取的代表路径，先取字符串再转换。"
+    },
+    {
+      "source_ref": {
+        "path": "easyflash/plugins/types/ef_types.c",
+        "symbol": "ef_set_array"
+      },
+      "reason": "数组写入的内部通用函数，把 C 数组转成 JSON 字符串后保存。"
+    },
+    {
+      "source_ref": {
+        "path": "easyflash/plugins/types/ef_types.c",
+        "symbol": "ef_get_array"
+      },
+      "reason": "数组读取的内部通用函数，把 ENV 字符串解析成 cJSON 数组再回填 C 数组。"
+    },
+    {
+      "source_ref": {
+        "path": "easyflash/plugins/types/ef_types.c",
+        "symbol": "ef_set_struct"
+      },
+      "reason": "结构体写入路径，通过调用方 set_cb 得到 cJSON 对象并保存 JSON 字符串。"
+    }
+  ],
+  "mechanism_overview": "Types 插件不直接访问 Flash，也不拥有新的持久化布局。基础类型通过 ef_get_env/ef_set_env 做字符串和 C 类型互转；数组通过 cJSON 数组序列化为无格式 JSON 字符串；结构体通过调用方提供的回调在 struct 和 cJSON 之间转换，再把 JSON 字符串交给 ENV API 保存。",
+  "flow": [
+    {
+      "order": 1,
+      "step": "应用可调用 ef_types_init，把 S2jHook 交给 struct2json；如果传空或不调用，则使用 C 库 malloc/free 默认行为。",
+      "source_refs": [
+        {
+          "path": "easyflash/plugins/types/ef_types.c",
+          "symbol": "ef_types_init"
+        },
+        {
+          "path": "easyflash/plugins/types/struct2json/src/s2j.c",
+          "symbol": "s2j_init"
+        }
+      ],
+      "state_or_data": "S2jHook、s2jHook。",
+      "notes": "RTOS 项目通常需要传入自己的 malloc/free。"
+    },
+    {
+      "order": 2,
+      "step": "基础类型读取先调用 ef_get_env 拿到字符串，再用 atoi、atol、atof 等函数转换成 C 类型。",
+      "source_refs": [
+        {
+          "path": "easyflash/plugins/types/ef_types.c",
+          "symbol": "ef_get_bool"
+        },
+        {
+          "path": "easyflash/plugins/types/ef_types.c",
+          "symbol": "ef_get_long"
+        },
+        {
+          "path": "easyflash/plugins/types/ef_types.c",
+          "symbol": "ef_get_double"
+        }
+      ],
+      "state_or_data": "ENV 字符串值。",
+      "notes": "找不到 ENV 时插件打印提示并返回 0、false 或空值。"
+    },
+    {
+      "order": 3,
+      "step": "基础类型写入把数字格式化为字符串，再调用 ef_set_env 保存。",
+      "source_refs": [
+        {
+          "path": "easyflash/plugins/types/ef_types.c",
+          "symbol": "ef_set_double"
+        },
+        {
+          "path": "easyflash/plugins/types/ef_types.c",
+          "symbol": "ef_set_int"
+        }
+      ],
+      "state_or_data": "char_value 临时缓冲。",
+      "notes": "底层仍进入 ENV 的字符串写入主线。"
+    },
+    {
+      "order": 4,
+      "step": "数组写入由 ef_set_array 创建 cJSON 数组，按元素类型添加 item，再用 cJSON_PrintUnformatted 得到 JSON 字符串并保存到 ENV。",
+      "source_refs": [
+        {
+          "path": "easyflash/plugins/types/ef_types.c",
+          "symbol": "ef_set_array"
+        },
+        {
+          "path": "easyflash/plugins/types/struct2json/src/cJSON.c",
+          "symbol": "cJSON_CreateArray"
+        }
+      ],
+      "state_or_data": "ef_array_types、cJSON array、char_value。",
+      "notes": "JSON 字符串大小会直接影响 ENV 节点长度和 Flash 空间消耗。"
+    },
+    {
+      "order": 5,
+      "step": "数组读取由 ef_get_array 解析 ENV 字符串为 cJSON 数组，再按类型把每个 item 写回调用方缓冲区。",
+      "source_refs": [
+        {
+          "path": "easyflash/plugins/types/ef_types.c",
+          "symbol": "ef_get_array"
+        },
+        {
+          "path": "easyflash/plugins/types/struct2json/src/cJSON.c",
+          "symbol": "cJSON_Parse"
+        }
+      ],
+      "state_or_data": "调用方提供的数组缓冲区。",
+      "notes": "调用方需要保证输出缓冲区足够大。"
+    },
+    {
+      "order": 6,
+      "step": "结构体写入由调用方 set_cb 把结构体转成 cJSON 对象，ef_set_struct 将其打印为 JSON 字符串后调用 ef_set_env。",
+      "source_refs": [
+        {
+          "path": "easyflash/plugins/types/ef_types.c",
+          "symbol": "ef_set_struct"
+        },
+        {
+          "path": "easyflash/plugins/types/ef_types.h",
+          "symbol": "ef_types_set_cb"
+        }
+      ],
+      "state_or_data": "ef_types_set_cb、cJSON 对象、JSON 字符串。",
+      "notes": "结构体字段 schema 和 JSON 内容完全由调用方回调定义。"
+    }
+  ],
+  "key_states_or_data": [
+    {
+      "name": "ef_array_types",
+      "kind": "enum",
+      "description": "内部枚举区分 bool、char、short、int、long、float、double 和 string 数组。",
+      "source_refs": [
+        {
+          "path": "easyflash/plugins/types/ef_types.c",
+          "symbol": "ef_array_types"
+        }
+      ]
+    },
+    {
+      "name": "S2jHook",
+      "kind": "struct",
+      "description": "struct2json 的内存管理 hook，用于把 JSON/结构体对象分配释放接到项目自己的内存系统。",
+      "source_refs": [
+        {
+          "path": "easyflash/plugins/types/struct2json/inc/s2jdef.h",
+          "symbol": "S2jHook"
+        }
+      ]
+    },
+    {
+      "name": "ef_types_set_cb",
+      "kind": "runtime_value",
+      "description": "调用方提供的结构体转 cJSON 回调，ef_set_struct 依赖它获得可序列化对象。",
+      "source_refs": [
+        {
+          "path": "easyflash/plugins/types/ef_types.h",
+          "symbol": "ef_types_set_cb"
+        }
+      ]
+    },
+    {
+      "name": "JSON 字符串 ENV 值",
+      "kind": "runtime_value",
+      "description": "数组和结构体最终都被序列化为普通 ENV 字符串，因此受 ENV 名称长度、value 长度和 Flash 剩余空间约束。",
+      "source_refs": [
+        {
+          "path": "easyflash/plugins/types/ef_types.c",
+          "symbol": "ef_set_array"
+        },
+        {
+          "path": "easyflash/plugins/types/ef_types.c",
+          "symbol": "ef_set_struct"
+        }
+      ]
+    }
+  ],
+  "common_misunderstandings": [
+    {
+      "misunderstanding": "Types 插件会改变 ENV 的底层 Flash 格式。",
+      "correction": "插件只把值转换成字符串或 JSON 字符串，底层仍由 ENV 模块按同一节点格式保存。"
+    },
+    {
+      "misunderstanding": "数组读取会自动分配目标数组。",
+      "correction": "ef_get_array 家族把结果写入调用方传入的缓冲区，调用方负责容量。"
+    },
+    {
+      "misunderstanding": "结构体持久化不需要调用方定义序列化规则。",
+      "correction": "结构体转 JSON 和 JSON 转结构体依赖调用方提供的回调和 struct2json 宏。"
+    }
+  ],
+  "validation_gaps": [
+    "未编译验证 ef_get_struct 的头文件声明与源码实现是否能在当前构建配置下正常使用。",
+    "未测试 JSON 字符串过大时与 ENV 节点最大长度、GC 的交互。",
+    "未验证不同 C 库或 RTOS 内存 hook 下的 cJSON 分配释放行为。"
+  ],
+  "confidence": "medium",
+  "diagram": {
+    "id": "typed_env_plugin",
+    "title": "Types 插件封装路径",
+    "diagram_type": "flowchart",
+    "description": "类型化 API 到底层 ENV 的转换路径。",
+    "source": "flowchart TD\n  app[业务代码] --> basic[基础类型 API]\n  app --> array[数组 API]\n  app --> struct[结构体 API]\n  basic --> string[字符串转换]\n  array --> json[JSON 数组]\n  struct --> cb[调用方回调生成 JSON]\n  string --> env[ef_set_env 或 ef_get_env]\n  json --> env\n  cb --> env\n  env --> flash[ENV Flash 存储]"
+  }
+}

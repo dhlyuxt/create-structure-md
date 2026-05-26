@@ -1,0 +1,224 @@
+{
+  "chapter": {
+    "key": "directory_map",
+    "title": "目录地图"
+  },
+  "summary": "仓库顶层分为可移植 EasyFlash 库本体、插件和 demo。库本体的 inc/src/port 三段是维护主轴；demo 下的大量 RTOS、外设库和 BSP 文件用于平台示例，不应和库核心混读。",
+  "directory_groups": [
+    {
+      "name": "公共头文件",
+      "role": "public_headers",
+      "paths": [
+        "easyflash/inc"
+      ],
+      "responsibility": "定义应用可调用 API、配置宏、错误码、版本号和 ENV 元数据结构。",
+      "read_when": "开始任何移植、调试或功能评审前。",
+      "notes": "easyflash.h 是 API 入口；ef_cfg.h 是项目必须改写的配置模板；ef_def.h 是核心状态语义。"
+    },
+    {
+      "name": "核心实现",
+      "role": "main_source",
+      "paths": [
+        "easyflash/src"
+      ],
+      "responsibility": "实现初始化编排、ENV、LOG、IAP 和 CRC32。",
+      "read_when": "需要理解运行主线、状态机、Flash 布局或故障恢复时。",
+      "notes": "ef_env.c 是默认新版 ENV；ef_env_legacy*.c 是兼容旧模式。"
+    },
+    {
+      "name": "平台移植模板",
+      "role": "platform_port",
+      "paths": [
+        "easyflash/port"
+      ],
+      "responsibility": "提供 ef_port_init/read/erase/write/env_lock/env_unlock/log/print 的模板定义。",
+      "read_when": "把 EasyFlash 接到新芯片、新 Flash 或 RTOS 前。",
+      "notes": "模板中的读写函数留空，真实项目需要参考 demo port 实现。"
+    },
+    {
+      "name": "Types 插件",
+      "role": "plugin",
+      "paths": [
+        "easyflash/plugins/types"
+      ],
+      "responsibility": "在 ENV 字符串接口上提供基础类型、数组和结构体 JSON 序列化包装。",
+      "read_when": "业务希望少写字符串转换代码，或需要结构体持久化示例时。",
+      "notes": "插件依赖 struct2json/cJSON，属于可选层，不参与 easyflash_init。"
+    },
+    {
+      "name": "struct2json/cJSON 依赖",
+      "role": "third_party",
+      "paths": [
+        "easyflash/plugins/types/struct2json"
+      ],
+      "responsibility": "为 Types 插件提供 JSON 序列化、反序列化和内存 hook 支持。",
+      "read_when": "调试类型插件内存分配、JSON 解析或结构体转换问题时。",
+      "notes": "首次理解 EasyFlash 核心时可以跳过。"
+    },
+    {
+      "name": "平台与功能 demo",
+      "role": "demo",
+      "paths": [
+        "demo/env",
+        "demo/log",
+        "demo/iap"
+      ],
+      "responsibility": "展示 STM32F10x、STM32F4xx、RT-Thread、裸机、内部 Flash、SPI Flash、日志和 IAP 的集成方式。",
+      "read_when": "需要参考真实 ef_port.c、ef_cfg.h 或应用调用顺序时。",
+      "notes": "demo 携带大量平台库源码，阅读时优先看 app、components/easyflash、README。"
+    }
+  ],
+  "important_files": [
+    {
+      "path": "easyflash/inc/easyflash.h",
+      "role": "公共 API 汇总",
+      "why_it_matters": "所有外部入口和 port hook 声明集中在这里，是仓库阅读第一站。",
+      "related_chapters": [
+        "repository_overview",
+        "module_layers",
+        "integration_boundaries"
+      ]
+    },
+    {
+      "path": "easyflash/inc/ef_cfg.h",
+      "role": "配置模板",
+      "why_it_matters": "决定是否启用 ENV/IAP/LOG、Flash 起始地址、擦除粒度、写粒度和各功能区大小。",
+      "related_chapters": [
+        "repository_overview",
+        "integration_boundaries",
+        "risks_validation"
+      ]
+    },
+    {
+      "path": "easyflash/inc/ef_def.h",
+      "role": "公共类型与状态定义",
+      "why_it_matters": "定义 EF_SW_VERSION、EfErrCode、env_status_t、env_node_obj_t 等机制词汇。",
+      "related_chapters": [
+        "module_layers",
+        "key_mechanisms"
+      ]
+    },
+    {
+      "path": "easyflash/src/easyflash.c",
+      "role": "库初始化编排",
+      "why_it_matters": "easyflash_init 串联 port、ENV、IAP、LOG，是所有功能进入运行态的主线。",
+      "related_chapters": [
+        "repository_mainline",
+        "integration_boundaries"
+      ]
+    },
+    {
+      "path": "easyflash/src/ef_env.c",
+      "role": "新版 ENV 核心",
+      "why_it_matters": "包含 sector header、ENV header、cache、状态表、追加写、删除、恢复、GC 等核心机制。",
+      "related_chapters": [
+        "repository_mainline",
+        "key_mechanisms",
+        "risks_validation"
+      ]
+    },
+    {
+      "path": "easyflash/src/ef_env_legacy.c",
+      "role": "旧版 ENV 兼容实现",
+      "why_it_matters": "保留 V4.0 前的 legacy 行为，有助于区分默认 NG 模式和兼容模式。",
+      "related_chapters": [
+        "module_layers",
+        "integration_boundaries"
+      ]
+    },
+    {
+      "path": "easyflash/src/ef_env_legacy_wl.c",
+      "role": "旧版磨损均衡兼容实现",
+      "why_it_matters": "用另一个 legacy 变体处理 ENV 区数据页切换和保存，适合对比新版 GC 模型。",
+      "related_chapters": [
+        "module_layers",
+        "integration_boundaries"
+      ]
+    },
+    {
+      "path": "easyflash/src/ef_log.c",
+      "role": "Flash 日志实现",
+      "why_it_matters": "实现 LOG 区环形写入、读取索引转换、sector 状态和清空流程。",
+      "related_chapters": [
+        "repository_mainline",
+        "key_mechanisms"
+      ]
+    },
+    {
+      "path": "easyflash/src/ef_iap.c",
+      "role": "IAP 备份区实现",
+      "why_it_matters": "实现备份应用区地址计算、擦除、下载片段写入和从备份区复制到目标区。",
+      "related_chapters": [
+        "repository_overview",
+        "key_mechanisms",
+        "integration_boundaries"
+      ]
+    },
+    {
+      "path": "easyflash/src/ef_utils.c",
+      "role": "CRC32 工具",
+      "why_it_matters": "ENV 节点创建和读取依赖 CRC32 校验来判断节点是否有效。",
+      "related_chapters": [
+        "key_mechanisms"
+      ]
+    },
+    {
+      "path": "easyflash/port/ef_port.c",
+      "role": "移植模板",
+      "why_it_matters": "声明真实平台必须补齐的读、擦、写、锁和打印能力。",
+      "related_chapters": [
+        "module_layers",
+        "integration_boundaries"
+      ]
+    },
+    {
+      "path": "easyflash/plugins/types/ef_types.c",
+      "role": "类型化插件实现",
+      "why_it_matters": "展示如何在 ENV 字符串之上构建基础类型、数组和结构体持久化 API。",
+      "related_chapters": [
+        "module_layers",
+        "key_mechanisms"
+      ]
+    },
+    {
+      "path": "demo/env/stm32f10x/non_os/components/easyflash/port/ef_port.c",
+      "role": "STM32 内部 Flash port 示例",
+      "why_it_matters": "展示 ef_port_read/erase/write 如何落到 STM32 标准外设库，以及锁如何屏蔽中断。",
+      "related_chapters": [
+        "integration_boundaries"
+      ]
+    },
+    {
+      "path": "demo/env/stm32f10x/non_os_spi_flash/components/easyflash/port/ef_port.c",
+      "role": "SFUD SPI Flash port 示例",
+      "why_it_matters": "展示同一 port 契约如何绑定外部 SPI Flash 设备。",
+      "related_chapters": [
+        "integration_boundaries"
+      ]
+    }
+  ],
+  "directory_relationships": {
+    "summary": "应用从 easyflash.h 进入 easyflash.c；核心 src 模块只通过 ef_port_* 触达具体 Flash；demo 和插件位于核心库外侧，分别提供移植样例和可选封装。",
+    "diagram": {
+      "id": "directory_relationships",
+      "title": "目录关系",
+      "diagram_type": "flowchart",
+      "description": "EasyFlash 主要目录之间的依赖和阅读方向。",
+      "source": "flowchart TD\n  app[应用与 demo] --> api[公共头文件]\n  api --> core[核心实现]\n  core --> port[平台移植接口]\n  demo[demo 平台实现] --> port\n  plugin[Types 插件] --> api\n  plugin --> json[struct2json 与 cJSON]"
+    }
+  },
+  "boundary_notes": [
+    {
+      "area": "demo/env/*/Libraries",
+      "note": "这些目录是 STM32 标准外设库或 CMSIS 代码，不是 EasyFlash 设计核心。"
+    },
+    {
+      "area": "demo/env/*/RT-Thread-1.2.2",
+      "note": "RT-Thread 源码用于 demo 构建和运行环境，理解 EasyFlash 时只需关注其提供的线程、串口和 shell 集成。"
+    },
+    {
+      "area": "easyflash/plugins/types/struct2json",
+      "note": "这是插件依赖，不改变 EasyFlash 核心的 Flash 布局和初始化主线。"
+    }
+  ]
+}

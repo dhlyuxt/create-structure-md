@@ -1,0 +1,374 @@
+{
+  "section": {
+    "title": "新版 ENV 存储、恢复与 GC 机制"
+  },
+  "why_it_matters": "ENV 是 EasyFlash 最核心的持久化能力，也是仓库中状态、数据布局和调用关系最复杂的部分。理解它之后，配置、移植、掉电恢复和 Flash 寿命风险才有上下文。",
+  "reader_prerequisites": [
+    "先读 easyflash/inc/easyflash.h 中的 ENV API 声明。",
+    "先读 easyflash/inc/ef_cfg.h 中的 EF_START_ADDR、ENV_AREA_SIZE、EF_ERASE_MIN_SIZE、EF_WRITE_GRAN。",
+    "先理解第 5 章的初始化主线。"
+  ],
+  "related_modules": [
+    "env_ng",
+    "public_api",
+    "platform_port",
+    "crc_utils"
+  ],
+  "source_focus": [
+    {
+      "source_ref": {
+        "path": "easyflash/src/ef_env.c",
+        "symbol": "ef_env_init"
+      },
+      "reason": "新版 ENV 初始化入口，包含配置断言、cache 初始化、加载和自动更新。"
+    },
+    {
+      "source_ref": {
+        "path": "easyflash/src/ef_env.c",
+        "symbol": "ef_load_env"
+      },
+      "reason": "启动时扫描 sector、恢复 GC 和恢复异常 ENV 的入口。"
+    },
+    {
+      "source_ref": {
+        "path": "easyflash/src/ef_env.c",
+        "symbol": "ef_set_env_blob"
+      },
+      "reason": "公共写入入口，负责初始化检查和锁保护。"
+    },
+    {
+      "source_ref": {
+        "path": "easyflash/src/ef_env.c",
+        "symbol": "set_env"
+      },
+      "reason": "写入、旧值预删除、新值创建、旧值删除和 GC 的中心流程。"
+    },
+    {
+      "source_ref": {
+        "path": "easyflash/src/ef_env.c",
+        "symbol": "create_env_blob"
+      },
+      "reason": "ENV 节点物理写入、CRC 计算和状态提交。"
+    },
+    {
+      "source_ref": {
+        "path": "easyflash/src/ef_env.c",
+        "symbol": "gc_collect"
+      },
+      "reason": "sector 回收触发和执行逻辑。"
+    }
+  ],
+  "mechanism_overview": "新版 ENV 把 ENV_AREA_SIZE 划成多个 sector，每个 sector 有 store/dirty 状态和 magic，每个 ENV 节点有独立 header、CRC、name、value 和状态表。写入采用追加模式：先找空位，再把旧值标记为预删除，写入新节点并提交为 ENV_WRITE，最后把旧节点删除。sector 脏数据累积后由 GC 搬迁有效 ENV 并格式化旧 sector。",
+  "flow": [
+    {
+      "order": 1,
+      "step": "ef_env_init 校验默认 ENV 集合、ENV 区大小、擦除粒度、sector 数量和写粒度对齐要求。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "ef_env_init"
+        },
+        {
+          "path": "easyflash/inc/ef_cfg.h",
+          "symbol": "ENV_AREA_SIZE"
+        },
+        {
+          "path": "easyflash/inc/ef_cfg.h",
+          "symbol": "EF_WRITE_GRAN"
+        }
+      ],
+      "state_or_data": "ENV_AREA_SIZE、EF_ERASE_MIN_SIZE、EF_WRITE_GRAN、SECTOR_NUM。",
+      "notes": "ENV_AREA_SIZE 必须至少覆盖两个 sector，否则 GC 没有空 sector 可用。"
+    },
+    {
+      "order": 2,
+      "step": "初始化 cache 表后，设置 env_start_addr、default_env_set 和 default_env_set_size。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "ef_env_init"
+        },
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "env_cache_node_t"
+        },
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "sector_cache_node_t"
+        }
+      ],
+      "state_or_data": "env_start_addr、env_cache_table、sector_cache_table。",
+      "notes": "cache 只缓存查找加速信息，不是持久化真相。"
+    },
+    {
+      "order": 3,
+      "step": "ef_load_env 扫描所有 sector header；如果全部检查失败，则调用 ef_env_set_default 重新写入默认 ENV。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "ef_load_env"
+        },
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "sector_iterator"
+        },
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "ef_env_set_default"
+        }
+      ],
+      "state_or_data": "sector_hdr_data_t、sector_meta_data_t、SECTOR_STORE_UNUSED。",
+      "notes": "这是启动时容错入口之一。"
+    },
+    {
+      "order": 4,
+      "step": "加载期间进入 ENV cache 锁，检查上次未完成的 GC 和 ENV 写入；遇到 ENV_PRE_DELETE 可尝试 move_env 恢复旧值，遇到 ENV_PRE_WRITE 则标为错误头。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "check_and_recovery_gc_cb"
+        },
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "check_and_recovery_env_cb"
+        },
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "move_env"
+        }
+      ],
+      "state_or_data": "ENV_PRE_DELETE、ENV_PRE_WRITE、ENV_ERR_HDR、gc_request。",
+      "notes": "恢复逻辑用状态位把中断在不同阶段的写入区分开。"
+    },
+    {
+      "order": 5,
+      "step": "公共写入口 ef_set_env_blob 检查 init_ok 并锁定 ENV cache，然后进入 set_env。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "ef_set_env_blob"
+        },
+        {
+          "path": "easyflash/port/ef_port.c",
+          "symbol": "ef_port_env_lock"
+        }
+      ],
+      "state_or_data": "init_ok、port 锁。",
+      "notes": "裸机 demo 用关中断实现锁，RTOS 平台可替换为互斥或临界区。"
+    },
+    {
+      "order": 6,
+      "step": "set_env 调用 new_env_by_kv 计算新节点长度并寻找空位；空间不足时 new_env 可触发 gc_collect 后重试。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "set_env"
+        },
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "new_env_by_kv"
+        },
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "alloc_env"
+        },
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "gc_collect"
+        }
+      ],
+      "state_or_data": "ENV_HDR_DATA_SIZE、EF_WG_ALIGN、sector->empty_env、gc_request。",
+      "notes": "节点长度包含 header、按写粒度对齐后的 key 和 value。"
+    },
+    {
+      "order": 7,
+      "step": "如果 key 已存在，先调用 del_env 将旧节点写成 ENV_PRE_DELETE，而不是直接删除。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "find_env"
+        },
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "del_env"
+        }
+      ],
+      "state_or_data": "ENV_PRE_DELETE、ENV_DELETED、sector dirty 状态。",
+      "notes": "预删除提供了新值写失败后的恢复窗口。"
+    },
+    {
+      "order": 8,
+      "step": "create_env_blob 组装 env_hdr_data，计算 CRC32，写 header、key、value，最后用 write_status 提交 ENV_WRITE。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "create_env_blob"
+        },
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "write_env_hdr"
+        },
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "align_write"
+        },
+        {
+          "path": "easyflash/src/ef_utils.c",
+          "symbol": "ef_calc_crc32"
+        }
+      ],
+      "state_or_data": "env_hdr_data_t、ENV_MAGIC_WORD、ENV_WRITE、crc32。",
+      "notes": "最后提交状态是关键：只有状态和 CRC 都合格的节点才应被当作有效值。"
+    },
+    {
+      "order": 9,
+      "step": "新值成功后，set_env 再把旧节点完整删除；若 sector 变满或 gc_request 为真，则进行 GC。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "set_env"
+        },
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "update_sec_status"
+        },
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "gc_collect"
+        }
+      ],
+      "state_or_data": "SECTOR_STORE_USING、SECTOR_STORE_FULL、EF_SEC_REMAIN_THRESHOLD、EF_GC_EMPTY_SEC_THRESHOLD。",
+      "notes": "sector 满不等于立刻擦除；它会请求或触发 GC。"
+    },
+    {
+      "order": 10,
+      "step": "do_gc 遍历 dirty 或 GC 状态 sector，把仍有效的 ENV 搬到新空间，然后 format_sector 擦除并重建 sector header。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "do_gc"
+        },
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "move_env"
+        },
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "format_sector"
+        }
+      ],
+      "state_or_data": "SECTOR_DIRTY_TRUE、SECTOR_DIRTY_GC、SECTOR_MAGIC_WORD、SECTOR_NOT_COMBINED。",
+      "notes": "GC 本质是有效节点搬迁加旧 sector 格式化。"
+    }
+  ],
+  "key_states_or_data": [
+    {
+      "name": "sector_hdr_data_t",
+      "kind": "storage_layout",
+      "description": "sector 头部包含 store/dirty 状态表、magic、combined 和 reserved 字段，是判断 sector 是否可用、脏、满或待 GC 的依据。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "sector_hdr_data_t"
+        }
+      ]
+    },
+    {
+      "name": "sector_meta_data_t",
+      "kind": "struct",
+      "description": "运行时 sector 元数据，包含 check_ok、store/dirty 状态、sector 起始地址、剩余空间和下一个空 ENV 地址。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "sector_meta_data_t"
+        }
+      ]
+    },
+    {
+      "name": "env_hdr_data_t",
+      "kind": "storage_layout",
+      "description": "ENV 节点头部保存状态表、magic、总长度、CRC32、名称长度和值长度，后面跟随按写粒度对齐的 name/value。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "env_hdr_data_t"
+        }
+      ]
+    },
+    {
+      "name": "env_status_t",
+      "kind": "enum",
+      "description": "ENV_UNUSED、ENV_PRE_WRITE、ENV_WRITE、ENV_PRE_DELETE、ENV_DELETED、ENV_ERR_HDR 表示节点生命周期和恢复入口。",
+      "source_refs": [
+        {
+          "path": "easyflash/inc/ef_def.h",
+          "symbol": "env_status_t"
+        }
+      ]
+    },
+    {
+      "name": "env_node_obj_t",
+      "kind": "struct",
+      "description": "读取或遍历 ENV 时使用的运行时对象，含节点状态、CRC 是否有效、名称、长度和起始/value 地址。",
+      "source_refs": [
+        {
+          "path": "easyflash/inc/ef_def.h",
+          "symbol": "env_node_obj_t"
+        }
+      ]
+    },
+    {
+      "name": "EF_WRITE_GRAN",
+      "kind": "macro",
+      "description": "Flash 写粒度，源码注释只支持 1、8、32 bit。ENV 节点 name/value 和写入补齐都依赖它。",
+      "source_refs": [
+        {
+          "path": "easyflash/inc/ef_cfg.h",
+          "symbol": "EF_WRITE_GRAN"
+        }
+      ]
+    },
+    {
+      "name": "gc_request",
+      "kind": "state",
+      "description": "内部 GC 请求标记，空间不足、sector 满或恢复检查可触发它，gc_collect 完成后清除。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "gc_collect"
+        }
+      ]
+    }
+  ],
+  "common_misunderstandings": [
+    {
+      "misunderstanding": "ef_set_env 会原地覆盖旧值。",
+      "correction": "新版 ENV 追加写新节点，再把旧节点从预删除推进到删除，必要时由 GC 搬迁有效节点。"
+    },
+    {
+      "misunderstanding": "关闭 cache 会改变 Flash 上的数据格式。",
+      "correction": "cache 只影响查找加速；持久化布局由 sector header、ENV header、状态表和 name/value 决定。"
+    },
+    {
+      "misunderstanding": "sector 标为 FULL 后立刻擦除。",
+      "correction": "FULL 只表示不再继续追加；真正擦除发生在 GC 选择 dirty/GC sector 并搬迁有效 ENV 之后。"
+    },
+    {
+      "misunderstanding": "CRC 只校验 value。",
+      "correction": "create_env_blob 对 name_len、value_len、name、对齐填充和值共同计算 CRC32。"
+    }
+  ],
+  "validation_gaps": [
+    "未通过断电注入验证 ENV_PRE_DELETE、ENV_PRE_WRITE、SECTOR_DIRTY_GC 的恢复路径。",
+    "未在实际 Flash 上验证 EF_WRITE_GRAN 为 1、8、32 bit 时的对齐写行为。",
+    "未执行长时间写入测试来评估 GC 触发频率和 sector 磨损。"
+  ],
+  "confidence": "medium",
+  "diagram": {
+    "id": "env_ng_storage",
+    "title": "新版 ENV 状态流",
+    "diagram_type": "flowchart",
+    "description": "ENV 初始化、写入和 GC 的主要阶段。",
+    "source": "flowchart TD\n  init[ef_env_init] --> load[扫描并恢复 ENV]\n  load --> ready[ENV 可用]\n  ready --> write[ef_set_env_blob]\n  write --> alloc[寻找空闲位置]\n  alloc --> old[旧节点预删除]\n  old --> create[写入新节点]\n  create --> commit[提交 ENV_WRITE]\n  commit --> del[旧节点删除]\n  del --> needgc{需要 GC}\n  needgc -->|是| move[搬迁有效节点]\n  move --> format[格式化脏 sector]\n  needgc -->|否| ready\n  format --> ready"
+  }
+}

@@ -1,0 +1,446 @@
+{
+  "chapter": {
+    "key": "repository_mainline",
+    "title": "仓库主线"
+  },
+  "summary": "仓库主线围绕三个行为展开：应用初始化库、写入或更新 ENV、向 Flash 日志区追加数据。IAP 与 Types 插件是重要能力，但更适合在第六章按机制深读。",
+  "mainline_overview_diagram": {
+    "id": "mainline_overview",
+    "title": "仓库主线总览",
+    "diagram_type": "flowchart",
+    "description": "应用进入 EasyFlash 后的主要功能路径。",
+    "source": "flowchart TD\n  app[应用或 demo] --> init[easyflash_init]\n  init --> port[平台初始化]\n  init --> env[ENV 初始化]\n  init --> iap[IAP 初始化]\n  init --> log[日志初始化]\n  app --> env_write[ENV 写入更新]\n  env_write --> env_store[追加写与 GC]\n  app --> log_write[日志追加]\n  log_write --> log_ring[Flash 环形区]"
+  },
+  "mainlines": [
+    {
+      "mainline_id": "init",
+      "name": "库初始化主线",
+      "purpose": "把平台依赖和被启用的功能模块拉到可用状态。",
+      "entry": {
+        "kind": "api",
+        "name": "easyflash_init",
+        "description": "应用或 demo 调用的库级初始化入口。",
+        "source_ref": {
+          "path": "easyflash/src/easyflash.c",
+          "symbol": "easyflash_init"
+        }
+      },
+      "steps": [
+        {
+          "order": 1,
+          "step": "调用方进入 easyflash_init；若 init_ok 已经为真，直接返回 EF_NO_ERR。",
+          "module_refs": [
+            "bootstrap_init",
+            "public_api"
+          ],
+          "source_refs": [
+            {
+              "path": "easyflash/src/easyflash.c",
+              "symbol": "easyflash_init"
+            }
+          ],
+          "effect": "防止重复初始化破坏模块状态。"
+        },
+        {
+          "order": 2,
+          "step": "easyflash_init 先调用 ef_port_init，port 层返回 default_env_set 和 default_env_set_size。",
+          "module_refs": [
+            "bootstrap_init",
+            "platform_port"
+          ],
+          "source_refs": [
+            {
+              "path": "easyflash/src/easyflash.c",
+              "symbol": "easyflash_init"
+            },
+            {
+              "path": "easyflash/port/ef_port.c",
+              "symbol": "ef_port_init"
+            }
+          ],
+          "effect": "核心库获得平台初始化结果和默认 ENV 集合。"
+        },
+        {
+          "order": 3,
+          "step": "如果 EF_USING_ENV 打开且前一步成功，调用 ef_env_init 加载 ENV 区并检查恢复。",
+          "module_refs": [
+            "bootstrap_init",
+            "env_ng"
+          ],
+          "source_refs": [
+            {
+              "path": "easyflash/src/easyflash.c",
+              "symbol": "easyflash_init"
+            },
+            {
+              "path": "easyflash/src/ef_env.c",
+              "symbol": "ef_env_init"
+            }
+          ],
+          "effect": "ENV 模块建立起有效键值视图。"
+        },
+        {
+          "order": 4,
+          "step": "如果 EF_USING_IAP 打开且前一步成功，调用 ef_iap_init 计算备份应用区起始地址。",
+          "module_refs": [
+            "bootstrap_init",
+            "iap_core"
+          ],
+          "source_refs": [
+            {
+              "path": "easyflash/src/easyflash.c",
+              "symbol": "easyflash_init"
+            },
+            {
+              "path": "easyflash/src/ef_iap.c",
+              "symbol": "ef_iap_init"
+            }
+          ],
+          "effect": "IAP 模块知道备份区位于 ENV/LOG 区之后的偏移。"
+        },
+        {
+          "order": 5,
+          "step": "如果 EF_USING_LOG 打开且前一步成功，调用 ef_log_init 定位日志环形区起止位置。",
+          "module_refs": [
+            "bootstrap_init",
+            "log_core"
+          ],
+          "source_refs": [
+            {
+              "path": "easyflash/src/easyflash.c",
+              "symbol": "easyflash_init"
+            },
+            {
+              "path": "easyflash/src/ef_log.c",
+              "symbol": "ef_log_init"
+            }
+          ],
+          "effect": "日志模块可进行读写和清空。"
+        },
+        {
+          "order": 6,
+          "step": "所有启用模块都成功后，easyflash_init 设置 init_ok 并打印初始化结果。",
+          "module_refs": [
+            "bootstrap_init",
+            "platform_port"
+          ],
+          "source_refs": [
+            {
+              "path": "easyflash/src/easyflash.c",
+              "symbol": "easyflash_init"
+            },
+            {
+              "path": "easyflash/port/ef_port.c",
+              "symbol": "ef_log_info"
+            }
+          ],
+          "effect": "库进入可用状态；失败时保持未初始化。"
+        }
+      ],
+      "result": "应用可以继续调用 ENV、LOG 或 IAP API；哪些 API 可用取决于编译宏。",
+      "detail_diagram": {
+        "id": "init_detail",
+        "title": "初始化顺序",
+        "diagram_type": "flowchart",
+        "description": "easyflash_init 内部的模块初始化顺序。",
+        "source": "flowchart TD\n  start[easyflash_init] --> once{已初始化}\n  once -->|是| ok[返回成功]\n  once -->|否| port[ef_port_init]\n  port --> env[可选 ef_env_init]\n  env --> iap[可选 ef_iap_init]\n  iap --> log[可选 ef_log_init]\n  log --> mark[设置 init_ok]"
+      },
+      "notes": "源码使用 extern 在函数内声明模块初始化函数；静态调用分析对 ef_env_init 和 ef_port_init 未完全解析，需要结合源码上下文阅读。"
+    },
+    {
+      "mainline_id": "env_update",
+      "name": "ENV 写入与更新主线",
+      "purpose": "把一个 key/value 保存为新的 Flash ENV 节点，并处理旧值删除与 GC。",
+      "entry": {
+        "kind": "api",
+        "name": "ef_set_env_blob",
+        "description": "新版 ENV 的 blob 写入入口；ef_set_env 和 ef_set_and_save_env 最终也会进入该路径。",
+        "source_ref": {
+          "path": "easyflash/src/ef_env.c",
+          "symbol": "ef_set_env_blob"
+        }
+      },
+      "steps": [
+        {
+          "order": 1,
+          "step": "ef_set_env_blob 检查 ENV 是否初始化，未初始化时返回 EF_ENV_INIT_FAILED。",
+          "module_refs": [
+            "env_ng"
+          ],
+          "source_refs": [
+            {
+              "path": "easyflash/src/ef_env.c",
+              "symbol": "ef_set_env_blob"
+            }
+          ],
+          "effect": "避免在 ENV 区尚未建立有效视图时写入。"
+        },
+        {
+          "order": 2,
+          "step": "进入 port 锁保护，然后调用内部 set_env。",
+          "module_refs": [
+            "env_ng",
+            "platform_port"
+          ],
+          "source_refs": [
+            {
+              "path": "easyflash/src/ef_env.c",
+              "symbol": "ef_set_env_blob"
+            },
+            {
+              "path": "easyflash/port/ef_port.c",
+              "symbol": "ef_port_env_lock"
+            }
+          ],
+          "effect": "保护 ENV cache 和 Flash 状态更新的临界区。"
+        },
+        {
+          "order": 3,
+          "step": "set_env 先通过 new_env_by_kv/new_env/alloc_env 确认可容纳新节点；空间不足时触发 GC 后重试。",
+          "module_refs": [
+            "env_ng"
+          ],
+          "source_refs": [
+            {
+              "path": "easyflash/src/ef_env.c",
+              "symbol": "set_env"
+            },
+            {
+              "path": "easyflash/src/ef_env.c",
+              "symbol": "new_env_by_kv"
+            },
+            {
+              "path": "easyflash/src/ef_env.c",
+              "symbol": "gc_collect"
+            }
+          ],
+          "effect": "决定新 ENV 节点可以写到哪个 sector 的空闲位置。"
+        },
+        {
+          "order": 4,
+          "step": "如果旧 key 已存在，先把旧节点标记为 ENV_PRE_DELETE，随后创建新节点。",
+          "module_refs": [
+            "env_ng"
+          ],
+          "source_refs": [
+            {
+              "path": "easyflash/src/ef_env.c",
+              "symbol": "find_env"
+            },
+            {
+              "path": "easyflash/src/ef_env.c",
+              "symbol": "del_env"
+            },
+            {
+              "path": "easyflash/src/ef_env.c",
+              "symbol": "create_env_blob"
+            }
+          ],
+          "effect": "在新值写成功前，旧值仍可被恢复。"
+        },
+        {
+          "order": 5,
+          "step": "create_env_blob 写 ENV header、key、value，计算 CRC32，最后把节点状态提交为 ENV_WRITE。",
+          "module_refs": [
+            "env_ng",
+            "crc_utils",
+            "platform_port"
+          ],
+          "source_refs": [
+            {
+              "path": "easyflash/src/ef_env.c",
+              "symbol": "create_env_blob"
+            },
+            {
+              "path": "easyflash/src/ef_utils.c",
+              "symbol": "ef_calc_crc32"
+            },
+            {
+              "path": "easyflash/src/ef_env.c",
+              "symbol": "write_status"
+            }
+          ],
+          "effect": "新节点变成可被查找和读取的有效 ENV。"
+        },
+        {
+          "order": 6,
+          "step": "新节点写入成功后，再把旧节点标记为 ENV_DELETED，并在 sector 满或 gc_request 时做 GC。",
+          "module_refs": [
+            "env_ng"
+          ],
+          "source_refs": [
+            {
+              "path": "easyflash/src/ef_env.c",
+              "symbol": "del_env"
+            },
+            {
+              "path": "easyflash/src/ef_env.c",
+              "symbol": "gc_collect"
+            }
+          ],
+          "effect": "提交更新并回收脏 sector。"
+        },
+        {
+          "order": 7,
+          "step": "ef_set_env_blob 解锁并返回错误码。",
+          "module_refs": [
+            "env_ng",
+            "platform_port"
+          ],
+          "source_refs": [
+            {
+              "path": "easyflash/src/ef_env.c",
+              "symbol": "ef_set_env_blob"
+            },
+            {
+              "path": "easyflash/port/ef_port.c",
+              "symbol": "ef_port_env_unlock"
+            }
+          ],
+          "effect": "调用方获得写入结果。"
+        }
+      ],
+      "result": "成功时 Flash 上新增一个 ENV_WRITE 节点，旧节点被删除或等待 GC；失败时通过 PRE_DELETE/恢复逻辑尽量保持旧值可恢复。",
+      "detail_diagram": {
+        "id": "env_update_detail",
+        "title": "ENV 更新路径",
+        "diagram_type": "flowchart",
+        "description": "新版 ENV 写入时的主要状态转换。",
+        "source": "flowchart TD\n  api[ef_set_env_blob] --> lock[锁定 ENV]\n  lock --> space[寻找空闲节点位置]\n  space --> old{旧值存在}\n  old -->|是| predelete[旧节点标记预删除]\n  old -->|否| create[创建新节点]\n  predelete --> create\n  create --> crc[计算 CRC 并写入数据]\n  crc --> commit[新节点提交为已写]\n  commit --> delold[旧节点标记已删除]\n  delold --> gc[按需 GC]\n  gc --> unlock[解锁 ENV]"
+      },
+      "notes": "新版 ENV 里的 ef_save_env 与 ef_set_and_save_env 主要保留旧版本兼容语义。"
+    },
+    {
+      "mainline_id": "log_append",
+      "name": "日志追加主线",
+      "purpose": "把应用日志追加写入 Flash 环形区，在空间到达 sector 边界时擦除并推进起止地址。",
+      "entry": {
+        "kind": "api",
+        "name": "ef_log_write",
+        "description": "应用传入按 4 字节对齐的日志缓冲区。",
+        "source_ref": {
+          "path": "easyflash/src/ef_log.c",
+          "symbol": "ef_log_write"
+        }
+      },
+      "steps": [
+        {
+          "order": 1,
+          "step": "ef_log_write 断言写入 size 按 4 字节对齐，并检查日志模块 init_ok。",
+          "module_refs": [
+            "log_core"
+          ],
+          "source_refs": [
+            {
+              "path": "easyflash/src/ef_log.c",
+              "symbol": "ef_log_write"
+            }
+          ],
+          "effect": "过滤未初始化和非 word 对齐的写入。"
+        },
+        {
+          "order": 2,
+          "step": "读取 log_end_addr 所在 sector 状态，若状态异常则返回 EF_WRITE_ERR。",
+          "module_refs": [
+            "log_core",
+            "platform_port"
+          ],
+          "source_refs": [
+            {
+              "path": "easyflash/src/ef_log.c",
+              "symbol": "get_sector_status"
+            },
+            {
+              "path": "easyflash/port/ef_port.c",
+              "symbol": "ef_port_read"
+            }
+          ],
+          "effect": "确认当前写入位置所在 sector 可继续处理。"
+        },
+        {
+          "order": 3,
+          "step": "若当前 sector 仍有空间，直接写入；若写满，则把 sector 标记为 FULL。",
+          "module_refs": [
+            "log_core",
+            "platform_port"
+          ],
+          "source_refs": [
+            {
+              "path": "easyflash/src/ef_log.c",
+              "symbol": "ef_log_write"
+            },
+            {
+              "path": "easyflash/src/ef_log.c",
+              "symbol": "write_sector_status"
+            }
+          ],
+          "effect": "追加日志并维护当前 sector 状态。"
+        },
+        {
+          "order": 4,
+          "step": "剩余数据跨 sector 时，计算下一个 sector；若覆盖到 log_start_addr，则推进 log_start_addr。",
+          "module_refs": [
+            "log_core"
+          ],
+          "source_refs": [
+            {
+              "path": "easyflash/src/ef_log.c",
+              "symbol": "get_next_flash_sec_addr"
+            },
+            {
+              "path": "easyflash/src/ef_log.c",
+              "symbol": "ef_log_write"
+            }
+          ],
+          "effect": "环形区覆盖最旧日志，保证新日志可继续写入。"
+        },
+        {
+          "order": 5,
+          "step": "擦除目标 sector，依次写 EMPTY、USING 状态，再写入数据和更新 log_end_addr。",
+          "module_refs": [
+            "log_core",
+            "platform_port"
+          ],
+          "source_refs": [
+            {
+              "path": "easyflash/src/ef_log.c",
+              "symbol": "ef_log_write"
+            },
+            {
+              "path": "easyflash/port/ef_port.c",
+              "symbol": "ef_port_erase"
+            },
+            {
+              "path": "easyflash/port/ef_port.c",
+              "symbol": "ef_port_write"
+            }
+          ],
+          "effect": "让 Flash 日志环继续前进。"
+        }
+      ],
+      "result": "日志数据被追加到 LOG 区；当空间绕回时，旧日志被覆盖，读取路径通过 log_index2addr 映射用户 index。",
+      "detail_diagram": {
+        "id": "log_append_detail",
+        "title": "日志追加路径",
+        "diagram_type": "flowchart",
+        "description": "日志写入时的环形区推进方式。",
+        "source": "flowchart TD\n  write[ef_log_write] --> status[读取当前 sector 状态]\n  status --> room{当前 sector 有空间}\n  room -->|是| direct[直接写入]\n  room -->|否| next[计算下一个 sector]\n  next --> wrap{覆盖起点}\n  wrap -->|是| advance[推进 log_start_addr]\n  wrap -->|否| erase[擦除下一个 sector]\n  advance --> erase\n  erase --> mark[标记 EMPTY 再 USING]\n  mark --> fill[写入日志并更新 log_end_addr]"
+      },
+      "notes": "读取路径同样需要理解环形绕回：ef_log_read 根据 index 和 header 开销把逻辑位置转换为物理地址。"
+    }
+  ],
+  "cross_mainline_notes": [
+    {
+      "topic": "配置宏决定主线长度",
+      "note": "EF_USING_ENV、EF_USING_IAP、EF_USING_LOG 均为编译期宏，关闭后对应模块不会被 easyflash_init 拉起。"
+    },
+    {
+      "topic": "所有 Flash 访问都通过 port",
+      "note": "ENV、LOG、IAP 都不直接调用 STM32/SFUD 驱动；真实读擦写必须由平台实现 ef_port_*。"
+    },
+    {
+      "topic": "错误码沿主线返回",
+      "note": "初始化和写入主线都以 EfErrCode 表示结果，但具体硬件失败细节取决于 port 层。"
+    }
+  ]
+}

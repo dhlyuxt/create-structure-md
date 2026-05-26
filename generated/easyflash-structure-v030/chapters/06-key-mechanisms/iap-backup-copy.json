@@ -1,0 +1,230 @@
+{
+  "section": {
+    "title": "IAP 备份区写入与复制机制"
+  },
+  "why_it_matters": "IAP 模块让 EasyFlash 不只保存配置和日志，还能参与固件升级数据的临时存放与复制。它直接操作大段 Flash，地址规划和错误处理风险高，必须清楚边界。",
+  "reader_prerequisites": [
+    "先确认 EF_USING_IAP 是否启用。",
+    "先理解 EF_START_ADDR、ENV_AREA_SIZE、LOG_AREA_SIZE 对备份区起始地址的影响。",
+    "先知道 ef_port_write/erase/read 的平台实现是否支持目标区。"
+  ],
+  "related_modules": [
+    "iap_core",
+    "platform_port",
+    "demo_apps",
+    "public_api"
+  ],
+  "source_focus": [
+    {
+      "source_ref": {
+        "path": "easyflash/src/ef_iap.c",
+        "symbol": "ef_iap_init"
+      },
+      "reason": "计算 bak_app_start_addr。"
+    },
+    {
+      "source_ref": {
+        "path": "easyflash/src/ef_iap.c",
+        "symbol": "ef_write_data_to_bak"
+      },
+      "reason": "把下载片段写入备份应用区。"
+    },
+    {
+      "source_ref": {
+        "path": "easyflash/src/ef_iap.c",
+        "symbol": "ef_copy_spec_app_from_bak"
+      },
+      "reason": "从备份区读出并调用指定写函数复制到用户应用区。"
+    },
+    {
+      "source_ref": {
+        "path": "easyflash/src/ef_iap.c",
+        "symbol": "ef_copy_bl_from_bak"
+      },
+      "reason": "从备份区复制 bootloader 数据。"
+    },
+    {
+      "source_ref": {
+        "path": "demo/iap/ymodem+rtt.c",
+        "symbol": "ymodem_on_data"
+      },
+      "reason": "demo 中下载数据写入备份区的调用场景。"
+    }
+  ],
+  "mechanism_overview": "IAP 初始化从 EF_START_ADDR 开始，根据是否启用 ENV 和 LOG 累加 ENV_AREA_SIZE、LOG_AREA_SIZE，得到 bak_app_start_addr。下载过程可先擦除备份区，再用 ef_write_data_to_bak 按片段写入；复制阶段用 ef_copy_spec_app_from_bak 从备份区按 32 word 缓冲读出，并调用默认 ef_port_write 或调用方传入的 app_write 写到目标地址。",
+  "flow": [
+    {
+      "order": 1,
+      "step": "ef_iap_init 以 EF_START_ADDR 为基础，若启用 ENV 则跳过 ENV_AREA_SIZE，若启用 LOG 则再跳过 LOG_AREA_SIZE。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_iap.c",
+          "symbol": "ef_iap_init"
+        },
+        {
+          "path": "easyflash/inc/ef_cfg.h",
+          "symbol": "EF_START_ADDR"
+        },
+        {
+          "path": "easyflash/inc/ef_cfg.h",
+          "symbol": "ENV_AREA_SIZE"
+        },
+        {
+          "path": "easyflash/inc/ef_cfg.h",
+          "symbol": "LOG_AREA_SIZE"
+        }
+      ],
+      "state_or_data": "bak_app_start_addr。",
+      "notes": "IAP 备份区默认排在 EasyFlash 管理的 ENV/LOG 区之后。"
+    },
+    {
+      "order": 2,
+      "step": "ef_erase_bak_app 使用 ef_get_bak_app_start_addr 和 app_size 擦除备份应用区。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_iap.c",
+          "symbol": "ef_erase_bak_app"
+        },
+        {
+          "path": "easyflash/src/ef_iap.c",
+          "symbol": "ef_get_bak_app_start_addr"
+        },
+        {
+          "path": "easyflash/port/ef_port.c",
+          "symbol": "ef_port_erase"
+        }
+      ],
+      "state_or_data": "app_size、备份区地址。",
+      "notes": "擦除不可逆，调用方必须保证 app_size 不越界。"
+    },
+    {
+      "order": 3,
+      "step": "ef_write_data_to_bak 接收一段下载数据、当前写入大小和总大小，必要时裁剪最后一包避免越过 total_size。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_iap.c",
+          "symbol": "ef_write_data_to_bak"
+        }
+      ],
+      "state_or_data": "data、size、cur_size、total_size。",
+      "notes": "函数只按 total_size 裁剪，不验证镜像签名或包序。"
+    },
+    {
+      "order": 4,
+      "step": "写入备份区时调用 ef_port_write，成功后增加 cur_size，失败则返回 EF_WRITE_ERR。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_iap.c",
+          "symbol": "ef_write_data_to_bak"
+        },
+        {
+          "path": "easyflash/port/ef_port.c",
+          "symbol": "ef_port_write"
+        }
+      ],
+      "state_or_data": "bak_app_start_addr + cur_size。",
+      "notes": "port 层决定写入是否需要对齐、是否校验写后内容。"
+    },
+    {
+      "order": 5,
+      "step": "ef_copy_spec_app_from_bak 按 32 word 缓冲从备份区读取数据，再调用 app_write 写到 user_app_addr + cur_size。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_iap.c",
+          "symbol": "ef_copy_spec_app_from_bak"
+        },
+        {
+          "path": "easyflash/port/ef_port.c",
+          "symbol": "ef_port_read"
+        }
+      ],
+      "state_or_data": "buff[32]、user_app_addr、app_size、app_write 回调。",
+      "notes": "ef_copy_app_from_bak 只是把 app_write 设为默认 ef_port_write 的便捷包装。"
+    },
+    {
+      "order": 6,
+      "step": "ef_copy_bl_from_bak 类似复制 bootloader 区，但目标地址和大小由调用方提供。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_iap.c",
+          "symbol": "ef_copy_bl_from_bak"
+        }
+      ],
+      "state_or_data": "bl_addr、bl_size。",
+      "notes": "bootloader 区擦写比普通应用区风险更高，必须由平台启动链路额外保护。"
+    }
+  ],
+  "key_states_or_data": [
+    {
+      "name": "bak_app_start_addr",
+      "kind": "state",
+      "description": "IAP 备份应用区起始地址，由 EF_START_ADDR 加上启用的 ENV/LOG 区大小得到。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_iap.c",
+          "symbol": "ef_iap_init"
+        }
+      ]
+    },
+    {
+      "name": "cur_size",
+      "kind": "runtime_value",
+      "description": "下载或复制过程中的当前进度，ef_write_data_to_bak 会在写入成功后递增它。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_iap.c",
+          "symbol": "ef_write_data_to_bak"
+        }
+      ]
+    },
+    {
+      "name": "app_write",
+      "kind": "runtime_value",
+      "description": "复制到用户应用区时可由调用方提供的写函数，用于替换默认 ef_port_write。",
+      "source_refs": [
+        {
+          "path": "easyflash/src/ef_iap.c",
+          "symbol": "ef_copy_spec_app_from_bak"
+        }
+      ]
+    },
+    {
+      "name": "IAP 下载 demo",
+      "kind": "artifact",
+      "description": "demo/iap 目录用 YMODEM + RT-Thread 场景展示下载数据进入备份区的使用方式。",
+      "source_refs": [
+        {
+          "path": "demo/iap/ymodem+rtt.c",
+          "symbol": "ymodem_on_data"
+        }
+      ]
+    }
+  ],
+  "common_misunderstandings": [
+    {
+      "misunderstanding": "EasyFlash IAP 模块包含完整 OTA 协议。",
+      "correction": "IAP 模块只提供 Flash 备份区擦写和复制工具；下载协议、校验、签名、回滚策略由应用或 bootloader 负责。"
+    },
+    {
+      "misunderstanding": "备份区起始地址固定为 EF_START_ADDR。",
+      "correction": "启用 ENV 或 LOG 后，备份区会顺延到这些区域之后。"
+    },
+    {
+      "misunderstanding": "ef_copy_app_from_bak 会先擦除目标应用区。",
+      "correction": "擦除目标区应由调用方显式调用 ef_erase_user_app 或 ef_erase_spec_user_app 后再复制。"
+    }
+  ],
+  "validation_gaps": [
+    "未验证备份区、应用区、bootloader 区是否在具体 demo linker script 中无重叠。",
+    "未验证下载中断后 cur_size 和备份区内容的一致性策略。",
+    "未验证从备份区复制到运行中应用区时的中断、看门狗和重启策略。"
+  ],
+  "confidence": "medium",
+  "diagram": {
+    "id": "iap_backup_copy",
+    "title": "IAP 备份复制路径",
+    "diagram_type": "flowchart",
+    "description": "IAP 模块从地址计算到备份写入再到复制的主要流程。",
+    "source": "flowchart TD\n  init[ef_iap_init] --> addr[计算备份区起始地址]\n  addr --> erase[擦除备份区]\n  erase --> recv[接收下载数据]\n  recv --> write[写入备份区]\n  write --> done{下载完成}\n  done -->|否| recv\n  done -->|是| target[擦除目标应用区]\n  target --> copy[从备份区复制]\n  copy --> app[用户应用或 bootloader]"
+  }
+}
