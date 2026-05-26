@@ -81,7 +81,7 @@ def load_manifest_package(manifest_path) -> ManifestPackage:
 
     root_dir = manifest_path.parent
     chapters = {}
-    for key, relative_path in manifest.items():
+    for key, relative_path in FIXED_MANIFEST.items():
         chapters[key] = _read_json_file(root_dir / relative_path, key)
 
     return ManifestPackage(
