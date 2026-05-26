@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/create-structure-md/v0.4.0/structure.manifest.schema.json",
+  "title": "create-structure-md 0.4.0 Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "document",
+    "overview",
+    "quick_start",
+    "architecture_overview",
+    "main_flows",
+    "module_details"
+  ],
+  "properties": {
+    "document": {
+      "const": "chapters/00-document.json"
+    },
+    "overview": {
+      "const": "chapters/01-overview.json"
+    },
+    "quick_start": {
+      "const": "chapters/02-quick-start.json"
+    },
+    "architecture_overview": {
+      "const": "chapters/03-architecture-overview.json"
+    },
+    "main_flows": {
+      "const": "chapters/04-main-flows.json"
+    },
+    "module_details": {
+      "const": "chapters/05-module-details.json"
+    }
+  }
+}
