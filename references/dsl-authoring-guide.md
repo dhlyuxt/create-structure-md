@@ -28,6 +28,8 @@ List block 的 `items` 值只能是字符串数组，不能混入对象、数字
 
 概述回答“这个仓库是什么、解决什么问题、读者接下来该怎么看”。它可以点出核心用途、主要读者、输入输出和阅读地图。
 
+`overview.core_components` 以 `component_table` 开始，后面可以追加可选 `blocks`。`component_table.rows` 表达核心组件对照，每行使用 `component`、`role` 和 `location` 三类信息。
+
 概述不要写安装步骤、模块内部机制、函数调用链或完整目录列表。细节应进入快速开始、架构概述、主线流程或模块详解。
 
 ## 快速开始怎么写
