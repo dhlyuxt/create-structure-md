@@ -102,7 +102,8 @@ Accept DSL only when:
 - It follows create-structure-md 0.4.0.
 - `structure.manifest.json` and child JSON files are the authoritative deliverables.
 - `structure.manifest.json` has exactly these six keys: `document`, `overview`, `quick_start`, `architecture_overview`, `main_flows`, and `module_details`.
-- Every manifest value points to the intended child JSON file, and all six fixed sections exist.
+- `structure.manifest.json` uses exactly these values: `document` is `chapters/00-document.json`, `overview` is `chapters/01-overview.json`, `quick_start` is `chapters/02-quick-start.json`, `architecture_overview` is `chapters/03-architecture-overview.json`, `main_flows` is `chapters/04-main-flows.json`, and `module_details` is `chapters/05-module-details.json`.
+- All six fixed child files and fixed sections exist; arbitrary child filenames are invalid.
 - Neither the manifest nor payload JSON files include `dsl_version`.
 - Required fixed table structures are present: `overview.core_components.component_table.rows`, `architecture_overview.layers.layer_table.rows`, and `architecture_overview.module_map.module_table.rows`.
 - Fixed sections omit renderer-owned `key` or `title` fields where the spec forbids them.

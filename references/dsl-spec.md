@@ -19,7 +19,7 @@ Example `structure.manifest.json`:
 }
 ```
 
-The manifest has exactly these six keys: `document`, `overview`, `quick_start`, `architecture_overview`, `main_flows`, and `module_details`.
+The manifest has exactly these six keys and exactly the path values shown above. Arbitrary child filenames are invalid.
 
 ## Document Metadata
 
@@ -116,6 +116,8 @@ For code blocks, `title` is optional. List block `items` values are string array
 
 The overview child file contains fixed subsections for the rendered `### 概述` section. Fixed sections are renderer-owned and do not carry `key` or `title`.
 
+`overview.core_components.component_table` is a semantic fixed-table object, not a generic free block table. `component_table.rows[]` objects contain exactly `component`, `role`, and `location`.
+
 Example `chapters/01-overview.json`:
 
 ```json
@@ -153,11 +155,22 @@ Example `chapters/01-overview.json`:
     },
     "core_components": {
       "component_table": {
-        "columns": ["组件", "职责", "主要路径"],
         "rows": [
-          ["Manifest", "声明六个固定 child JSON files", "structure.manifest.json"],
-          ["Chapters", "保存各章节源内容", "chapters/*.json"],
-          ["Renderer", "生成 Markdown", "scripts/render_markdown.py"]
+          {
+            "component": "Manifest",
+            "role": "声明六个固定 child JSON files",
+            "location": "structure.manifest.json"
+          },
+          {
+            "component": "Chapters",
+            "role": "保存各章节源内容",
+            "location": "chapters/*.json"
+          },
+          {
+            "component": "Renderer",
+            "role": "生成 Markdown",
+            "location": "scripts/render_markdown.py"
+          }
         ]
       },
       "blocks": [
@@ -266,7 +279,9 @@ Example `chapters/02-quick-start.json`:
 
 ## Architecture Overview
 
-The architecture overview child file contains fixed subsections for the rendered `### 架构概述` section. Required table structures are `layers.layer_table.rows` and `module_map.module_table.rows`.
+The architecture overview child file contains fixed subsections for the rendered `### 架构概述` section. Required table structures are `layers.layer_table.rows` and `module_map.module_table.rows`. These are semantic fixed-table objects, not generic free block tables.
+
+`layers.layer_table.rows[]` objects contain exactly `layer`, `role`, and `location`. `module_map.module_table.rows[]` objects contain exactly `module`, `role`, `layer`, and `location`.
 
 Example `chapters/03-architecture-overview.json`:
 
@@ -289,11 +304,22 @@ Example `chapters/03-architecture-overview.json`:
     },
     "layers": {
       "layer_table": {
-        "columns": ["层", "职责", "代表路径"],
         "rows": [
-          ["Source package", "保存 manifest 和章节 JSON", "package/"],
-          ["Validation", "检查 DSL contract", "scripts/validate_structure.py"],
-          ["Rendering", "生成 Markdown", "scripts/render_markdown.py"]
+          {
+            "layer": "Source package",
+            "role": "保存 manifest 和章节 JSON",
+            "location": "package/"
+          },
+          {
+            "layer": "Validation",
+            "role": "检查 DSL contract",
+            "location": "scripts/validate_structure.py"
+          },
+          {
+            "layer": "Rendering",
+            "role": "生成 Markdown",
+            "location": "scripts/render_markdown.py"
+          }
         ]
       },
       "blocks": [
@@ -305,10 +331,19 @@ Example `chapters/03-architecture-overview.json`:
     },
     "module_map": {
       "module_table": {
-        "columns": ["模块", "职责", "位置"],
         "rows": [
-          ["Validator", "拒绝无效 DSL", "scripts/validate_structure.py"],
-          ["Renderer", "输出 Markdown", "scripts/render_markdown.py"]
+          {
+            "module": "Validator",
+            "role": "拒绝无效 DSL",
+            "layer": "Validation",
+            "location": "scripts/validate_structure.py"
+          },
+          {
+            "module": "Renderer",
+            "role": "输出 Markdown",
+            "layer": "Rendering",
+            "location": "scripts/render_markdown.py"
+          }
         ]
       },
       "blocks": []
@@ -459,13 +494,17 @@ Extra subsections render after fixed content in array order at the level where t
 Validation rejects:
 
 - manifests that do not have exactly the six fixed keys;
+- manifests that do not use the exact fixed path values shown in Package Shape;
 - any manifest or payload JSON file containing `dsl_version`;
 - missing fixed sections;
 - unsupported block shapes or wrong block fields;
 - list block `items` values that are not string arrays;
 - missing `overview.core_components.component_table.rows`;
+- `overview.core_components.component_table.rows[]` objects without exactly `component`, `role`, and `location`;
 - missing `architecture_overview.layers.layer_table.rows`;
+- `architecture_overview.layers.layer_table.rows[]` objects without exactly `layer`, `role`, and `location`;
 - missing `architecture_overview.module_map.module_table.rows`;
+- `architecture_overview.module_map.module_table.rows[]` objects without exactly `module`, `role`, `layer`, and `location`;
 - empty `quick_start.first_run.steps`;
 - empty `main_flows.flows`;
 - any `main_flows.flows[]` entry with `steps`;
