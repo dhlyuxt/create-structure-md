@@ -260,7 +260,7 @@ Example `chapters/02-quick-start.json`:
         {
           "type": "code",
           "language": "json",
-          "content": "{\"document\":\"chapters/00-document.json\"}"
+          "content": "{\n  \"document\": \"chapters/00-document.json\",\n  \"overview\": \"chapters/01-overview.json\",\n  \"quick_start\": \"chapters/02-quick-start.json\",\n  \"architecture_overview\": \"chapters/03-architecture-overview.json\",\n  \"main_flows\": \"chapters/04-main-flows.json\",\n  \"module_details\": \"chapters/05-module-details.json\"\n}"
         }
       ]
     },
