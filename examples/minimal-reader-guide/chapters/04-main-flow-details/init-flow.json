@@ -1,0 +1,16 @@
+{
+  "title": "初始化主线",
+  "purpose": "准备示例仓库能力并写入初始状态。",
+  "reader_goal": "读者想知道调用初始化入口后仓库内部发生什么。",
+  "entry": {
+    "name": "example_init",
+    "location": "src/api/init.py"
+  },
+  "blocks": [
+    {
+      "type": "text",
+      "content": "初始化入口协调读取配置和追加写入。"
+    }
+  ],
+  "extra_subsections": []
+}

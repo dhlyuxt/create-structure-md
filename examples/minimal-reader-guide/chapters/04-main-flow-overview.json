@@ -1,0 +1,16 @@
+{
+  "main_flow_overview": {
+    "intro": "本章按读者最常遇到的行为路径说明仓库如何工作。",
+    "flow_table": {
+      "rows": [
+        {
+          "flow": "初始化主线",
+          "purpose": "准备示例仓库能力并写入初始状态。",
+          "entry": "example_init",
+          "location": "src/api/init.py",
+          "anchor": "初始化主线"
+        }
+      ]
+    }
+  }
+}

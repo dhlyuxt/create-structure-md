@@ -1,0 +1,15 @@
+{
+  "module_overview": {
+    "intro": "本章按责任单元说明仓库的关键模块。",
+    "module_table": {
+      "rows": [
+        {
+          "module": "存储模块",
+          "purpose": "保存初始化流程产生的示例状态。",
+          "location": "src/storage.py",
+          "anchor": "存储模块"
+        }
+      ]
+    }
+  }
+}
