@@ -111,6 +111,57 @@ class V040RendererTests(unittest.TestCase):
         self.assertIn("```bash\npython -m example.init\n```", markdown)
         self.assertNotIn("None", markdown)
 
+    def test_code_and_mermaid_fences_are_longer_than_content_backtick_runs(self):
+        def mutate(root):
+            quick_start = _read(root / "chapters/02-quick-start.json")
+            quick_start["quick_start"]["setup"]["blocks"] = [
+                {
+                    "type": "code",
+                    "language": "markdown",
+                    "content": "before\n```python\nprint('inside')\n```\nafter",
+                }
+            ]
+            write_json(root / "chapters/02-quick-start.json", quick_start)
+
+            overview = _read(root / "chapters/01-overview.json")
+            overview["overview"]["repository_intro"]["blocks"].append(
+                {
+                    "type": "mermaid",
+                    "title": "包含围栏的图",
+                    "diagram_type": "flowchart",
+                    "source": "flowchart LR\n  A[```] --> B[done]",
+                }
+            )
+            write_json(root / "chapters/01-overview.json", overview)
+
+        markdown = self.render_package(mutate)
+        self.assertIn("````markdown\nbefore\n```python\nprint('inside')\n```\nafter\n````", markdown)
+        self.assertIn("````mermaid\nflowchart LR\n  A[```] --> B[done]\n````", markdown)
+
+    def test_table_cells_escape_pipes_and_normalize_newlines(self):
+        def mutate(root):
+            architecture = _read(root / "chapters/03-architecture-overview.json")
+            architecture["architecture_overview"]["repository_layout"]["blocks"] = [
+                {
+                    "type": "table",
+                    "columns": ["路径|名称", "角色\n描述"],
+                    "rows": [["src/api|v1", "公共\r\nAPI\n入口"]],
+                }
+            ]
+            architecture["architecture_overview"]["layers"]["layer_table"]["rows"] = [
+                {
+                    "layer": "接口|层",
+                    "role": "接收\r调用\n并转换为应用命令。",
+                    "location": "src/api|public",
+                }
+            ]
+            write_json(root / "chapters/03-architecture-overview.json", architecture)
+
+        markdown = self.render_package(mutate)
+        self.assertIn("| 路径\\|名称 | 角色 描述 |", markdown)
+        self.assertIn("| src/api\\|v1 | 公共 API 入口 |", markdown)
+        self.assertIn("| 接口\\|层 | 接收 调用 并转换为应用命令。 | src/api\\|public |", markdown)
+
     def test_extra_subsections_render_in_order_with_titles_and_hidden_keys(self):
         def mutate(root):
             overview = _read(root / "chapters/01-overview.json")

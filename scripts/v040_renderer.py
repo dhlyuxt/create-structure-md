@@ -1,3 +1,6 @@
+import re
+
+
 def render_markdown(package) -> str:
     document = package.chapters["document"]["document"]
     overview = package.chapters["overview"]["overview"]
@@ -116,19 +119,21 @@ class _MarkdownRenderer:
         elif block_type == "code":
             if block.get("title"):
                 self.paragraph(block["title"])
-            self._parts.append(f'```{block["language"]}\n{block["content"]}\n```')
+            self._parts.append(_fenced_code(block["language"], block["content"]))
         elif block_type == "mermaid":
             if block.get("title"):
                 self.paragraph(block["title"])
-            self._parts.append(f'```mermaid\n{block["source"]}\n```')
+            self._parts.append(_fenced_code("mermaid", block["source"]))
 
     def table(self, columns, rows):
+        escaped_columns = [_escape_table_cell(column) for column in columns]
         lines = [
-            "| " + " | ".join(columns) + " |",
+            "| " + " | ".join(escaped_columns) + " |",
             "| " + " | ".join("---" for _ in columns) + " |",
         ]
         for row in rows:
-            lines.append("| " + " | ".join(row) + " |")
+            escaped_row = [_escape_table_cell(cell) for cell in row]
+            lines.append("| " + " | ".join(escaped_row) + " |")
         self._parts.append("\n".join(lines))
 
     def fixed_table(self, columns, rows, keys):
@@ -139,3 +144,18 @@ class _MarkdownRenderer:
         for subsection in subsections:
             self.heading(level, subsection["title"])
             self.blocks(subsection.get("blocks", []))
+
+
+def _fenced_code(language, content):
+    fence = "`" * _safe_backtick_fence_length(content)
+    return f"{fence}{language}\n{content}\n{fence}"
+
+
+def _safe_backtick_fence_length(content):
+    runs = [len(match.group(0)) for match in re.finditer(r"`+", content)]
+    return max(3, max(runs, default=0) + 1)
+
+
+def _escape_table_cell(value):
+    text = str(value).replace("\r\n", " ").replace("\r", " ").replace("\n", " ")
+    return text.replace("|", r"\|")
