@@ -132,6 +132,30 @@ class V040ManifestTests(unittest.TestCase):
             set(mermaid_blocks[0].keys()),
         )
 
+    def test_valid_package_fixture_writes_all_manifest_detail_files(self):
+        original_main_flow_details = FIXED_MANIFEST["main_flow_details"]
+        original_module_details = FIXED_MANIFEST["module_details"]
+        try:
+            FIXED_MANIFEST["main_flow_details"] = [
+                *original_main_flow_details,
+                "chapters/04-main-flow-details/retry-flow.json",
+            ]
+            FIXED_MANIFEST["module_details"] = [
+                *original_module_details,
+                "chapters/05-module-details/cache.json",
+            ]
+            with tempfile.TemporaryDirectory() as tmpdir:
+                write_valid_package(tmpdir)
+                root = Path(tmpdir)
+
+                for relative_path in FIXED_MANIFEST["main_flow_details"]:
+                    self.assertTrue((root / relative_path).is_file(), relative_path)
+                for relative_path in FIXED_MANIFEST["module_details"]:
+                    self.assertTrue((root / relative_path).is_file(), relative_path)
+        finally:
+            FIXED_MANIFEST["main_flow_details"] = original_main_flow_details
+            FIXED_MANIFEST["module_details"] = original_module_details
+
     def test_loads_static_chapters_in_fixed_manifest_order_when_json_order_is_reversed(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest_path = write_valid_package(tmpdir)

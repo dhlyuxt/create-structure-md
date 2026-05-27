@@ -275,7 +275,9 @@ def write_valid_package(root, *, include_mermaid=False):
     write_json(root / FIXED_MANIFEST["quick_start"], QUICK_START)
     write_json(root / FIXED_MANIFEST["architecture_overview"], ARCHITECTURE_OVERVIEW)
     write_json(root / FIXED_MANIFEST["main_flow_overview"], MAIN_FLOW_OVERVIEW)
-    write_json(root / FIXED_MANIFEST["main_flow_details"][0], MAIN_FLOW_DETAIL)
+    for relative_path in FIXED_MANIFEST["main_flow_details"]:
+        write_json(root / relative_path, copy.deepcopy(MAIN_FLOW_DETAIL))
     write_json(root / FIXED_MANIFEST["module_overview"], MODULE_OVERVIEW)
-    write_json(root / FIXED_MANIFEST["module_details"][0], MODULE_DETAIL)
+    for relative_path in FIXED_MANIFEST["module_details"]:
+        write_json(root / relative_path, copy.deepcopy(MODULE_DETAIL))
     return root / "structure.manifest.json"
