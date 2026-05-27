@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from scripts.v040_package import load_manifest_package, manifest_shape_errors
-from tests.helpers_v040 import FIXED_MANIFEST, write_valid_package
+from tests.helpers_v040 import FIXED_MANIFEST, MAIN_FLOW_DETAIL, write_json, write_valid_package
 
 
 def find_blocks(value, block_type):
@@ -98,24 +98,28 @@ class V040ManifestTests(unittest.TestCase):
             self.assertIn("blocks", architecture[key])
         self.assertIn("extra_subsections", architecture)
 
-        main_flows = package.chapters["main_flows"]["main_flows"]
-        self.assertIn("blocks", main_flows["flow_overview"])
-        self.assertEqual("初始化主线", main_flows["flows"][0]["title"])
-        self.assertIn("purpose", main_flows["flows"][0])
-        self.assertEqual("example_init", main_flows["flows"][0]["entry"]["name"])
-        self.assertIn("blocks", main_flows["flows"][0])
-        self.assertNotIn("steps", main_flows["flows"][0])
-        self.assertIn("extra_subsections", main_flows)
+        main_flow_overview = package.chapters["main_flow_overview"]["main_flow_overview"]
+        self.assertIn("flow_table", main_flow_overview)
+        self.assertEqual("初始化主线", main_flow_overview["flow_table"]["rows"][0]["flow"])
+        self.assertEqual("example_init", main_flow_overview["flow_table"]["rows"][0]["entry"])
+        main_flow_detail = package.main_flow_details[0].data
+        self.assertEqual("初始化主线", main_flow_detail["title"])
+        self.assertIn("purpose", main_flow_detail)
+        self.assertEqual("example_init", main_flow_detail["entry"]["name"])
+        self.assertIn("blocks", main_flow_detail)
+        self.assertNotIn("steps", main_flow_detail)
+        self.assertIn("extra_subsections", main_flow_detail)
 
-        module_details = package.chapters["module_details"]["module_details"]
-        self.assertEqual([], module_details["intro_blocks"])
-        module = module_details["modules"][0]
-        self.assertEqual("存储模块", module["name"])
+        module_overview = package.chapters["module_overview"]["module_overview"]
+        self.assertIn("module_table", module_overview)
+        self.assertEqual("存储模块", module_overview["module_table"]["rows"][0]["module"])
+        module_detail = package.module_details[0].data
+        self.assertEqual("存储模块", module_detail["name"])
         for key in ["location", "purpose", "blocks", "extra_subsections"]:
-            self.assertIn(key, module)
-        self.assertEqual("追加写入", module["mechanisms"][0]["title"])
-        self.assertIn("blocks", module["mechanisms"][0])
-        self.assertIn("extra_subsections", module_details)
+            self.assertIn(key, module_detail)
+        self.assertEqual(["保存初始化结果", "提供追加写入机制"], module_detail["responsibilities"])
+        self.assertEqual("追加写入", module_detail["mechanisms"][0]["title"])
+        self.assertIn("blocks", module_detail["mechanisms"][0])
         self.assertEqual([], find_blocks(package.chapters, "mermaid"))
 
     def test_valid_package_fixture_adds_one_mermaid_block_on_request(self):
@@ -128,7 +132,7 @@ class V040ManifestTests(unittest.TestCase):
             set(mermaid_blocks[0].keys()),
         )
 
-    def test_loads_chapters_in_fixed_manifest_order_when_json_order_is_reversed(self):
+    def test_loads_static_chapters_in_fixed_manifest_order_when_json_order_is_reversed(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest_path = write_valid_package(tmpdir)
             reversed_manifest = dict(reversed(list(FIXED_MANIFEST.items())))
@@ -137,7 +141,159 @@ class V040ManifestTests(unittest.TestCase):
                 encoding="utf-8",
             )
             package = load_manifest_package(manifest_path)
-        self.assertEqual(list(FIXED_MANIFEST.keys()), list(package.chapters.keys()))
+
+        self.assertEqual(
+            [
+                "document",
+                "overview",
+                "quick_start",
+                "architecture_overview",
+                "main_flow_overview",
+                "module_overview",
+            ],
+            list(package.chapters.keys()),
+        )
+        self.assertEqual(["init-flow"], [detail.key for detail in package.main_flow_details])
+        self.assertEqual(["storage"], [detail.key for detail in package.module_details])
+
+    def test_loads_upgraded_manifest_with_detail_lists(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package = load_manifest_package(write_valid_package(tmpdir))
+
+        self.assertEqual(set(FIXED_MANIFEST.keys()), set(package.manifest.keys()))
+        self.assertEqual(
+            {
+                "document",
+                "overview",
+                "quick_start",
+                "architecture_overview",
+                "main_flow_overview",
+                "module_overview",
+            },
+            set(package.chapters.keys()),
+        )
+        self.assertIn("flow_table", package.chapters["main_flow_overview"]["main_flow_overview"])
+        self.assertIn("module_table", package.chapters["module_overview"]["module_overview"])
+        self.assertEqual(["init-flow"], [detail.key for detail in package.main_flow_details])
+        self.assertEqual(["storage"], [detail.key for detail in package.module_details])
+        self.assertEqual("初始化主线", package.main_flow_details[0].data["title"])
+        self.assertEqual("example_init", package.main_flow_details[0].data["entry"]["name"])
+        self.assertEqual("存储模块", package.module_details[0].data["name"])
+        self.assertEqual(["保存初始化结果", "提供追加写入机制"], package.module_details[0].data["responsibilities"])
+
+    def test_rejects_old_active_v040_aggregate_manifest(self):
+        old_manifest = {
+            "document": "chapters/00-document.json",
+            "overview": "chapters/01-overview.json",
+            "quick_start": "chapters/02-quick-start.json",
+            "architecture_overview": "chapters/03-architecture-overview.json",
+            "main_flows": "chapters/04-main-flows.json",
+            "module_details": "chapters/05-module-details.json",
+        }
+
+        issues = manifest_shape_errors(old_manifest)
+
+        self.assertHasIssue(
+            issues,
+            code="manifest.keys",
+            path="$",
+            message="active 0.4.0 manifest must use main_flow_overview",
+        )
+
+    def test_rejects_empty_detail_arrays(self):
+        for key in ["main_flow_details", "module_details"]:
+            with self.subTest(key=key):
+                manifest = dict(FIXED_MANIFEST)
+                manifest[key] = []
+                issues = manifest_shape_errors(manifest)
+                self.assertHasIssue(
+                    issues,
+                    code="manifest.detail_array",
+                    path=f"$.{key}",
+                    message="must be a non-empty array",
+                )
+
+    def test_rejects_forbidden_aggregate_detail_paths(self):
+        cases = [
+            ("main_flow_details", ["chapters/04-main-flows.json"]),
+            ("module_details", ["chapters/05-module-details.json"]),
+        ]
+        for key, value in cases:
+            with self.subTest(key=key):
+                manifest = dict(FIXED_MANIFEST)
+                manifest[key] = value
+                issues = manifest_shape_errors(manifest)
+                self.assertHasIssue(
+                    issues,
+                    code="manifest.forbidden_path",
+                    path=f"$.{key}[0]",
+                    message="old aggregate path is invalid",
+                )
+
+    def test_rejects_invalid_detail_stems(self):
+        manifest = dict(FIXED_MANIFEST)
+        manifest["main_flow_details"] = ["chapters/04-main-flow-details/Bad-Key.json"]
+
+        issues = manifest_shape_errors(manifest)
+
+        self.assertHasIssue(
+            issues,
+            code="manifest.detail_key",
+            path="$.main_flow_details[0]",
+            message="file stem must match",
+        )
+
+    def test_rejects_duplicate_manifest_paths(self):
+        manifest = dict(FIXED_MANIFEST)
+        manifest["module_details"] = ["chapters/04-main-flow-details/init-flow.json"]
+
+        issues = manifest_shape_errors(manifest)
+
+        self.assertHasIssue(
+            issues,
+            code="manifest.path_duplicate",
+            path="$",
+            message="manifest paths must be unique",
+        )
+
+    def test_rejects_unsafe_manifest_paths(self):
+        cases = [
+            ("main_flow_details", ["/tmp/init-flow.json"]),
+            ("main_flow_details", ["chapters/../init-flow.json"]),
+            ("main_flow_details", ["chapters\\init-flow.json"]),
+            ("main_flow_details", ["chapters//init-flow.json"]),
+            ("main_flow_details", ["chapters/04-main-flow-details/init-flow.txt"]),
+        ]
+        for key, value in cases:
+            with self.subTest(value=value):
+                manifest = dict(FIXED_MANIFEST)
+                manifest[key] = value
+                issues = manifest_shape_errors(manifest)
+                self.assertHasIssue(
+                    issues,
+                    code="manifest.path",
+                    path=f"$.{key}[0]",
+                    message="relative POSIX .json path",
+                )
+
+    def test_load_rejects_detail_path_that_resolves_outside_package_root(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package_root = Path(tmpdir) / "package"
+            outside_root = Path(tmpdir) / "outside"
+            manifest_path = write_valid_package(package_root)
+            outside_root.mkdir()
+            escaped = outside_root / "escaped.json"
+            escaped.write_text(
+                json.dumps(MAIN_FLOW_DETAIL, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            (package_root / "chapters/04-main-flow-details/escaped.json").symlink_to(escaped)
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["main_flow_details"] = ["chapters/04-main-flow-details/escaped.json"]
+            write_json(manifest_path, manifest)
+
+            with self.assertRaisesRegex(ValueError, "resolves outside package root"):
+                load_manifest_package(manifest_path)
 
     def test_manifest_rejects_extra_metadata(self):
         manifest = dict(FIXED_MANIFEST)

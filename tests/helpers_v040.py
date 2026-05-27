@@ -8,8 +8,10 @@ FIXED_MANIFEST = {
     "overview": "chapters/01-overview.json",
     "quick_start": "chapters/02-quick-start.json",
     "architecture_overview": "chapters/03-architecture-overview.json",
-    "main_flows": "chapters/04-main-flows.json",
-    "module_details": "chapters/05-module-details.json",
+    "main_flow_overview": "chapters/04-main-flow-overview.json",
+    "main_flow_details": ["chapters/04-main-flow-details/init-flow.json"],
+    "module_overview": "chapters/05-module-overview.json",
+    "module_details": ["chapters/05-module-details/storage.json"],
 }
 
 
@@ -187,67 +189,64 @@ ARCHITECTURE_OVERVIEW = {
 }
 
 
-MAIN_FLOWS = {
-    "main_flows": {
-        "flow_overview": {
-            "blocks": [
+MAIN_FLOW_OVERVIEW = {
+    "main_flow_overview": {
+        "intro": "本章按读者最常遇到的行为路径说明仓库如何工作。",
+        "flow_table": {
+            "rows": [
                 {
-                    "type": "text",
-                    "content": "主线流程描述初始化如何从入口到存储模块完成。",
+                    "flow": "初始化主线",
+                    "purpose": "准备示例仓库能力并写入初始状态。",
+                    "entry": "example_init",
+                    "location": "src/api/init.py",
+                    "anchor": "初始化主线",
                 }
             ]
         },
-        "flows": [
-            {
-                "title": "初始化主线",
-                "purpose": "准备示例仓库能力并写入初始状态。",
-                "entry": {
-                    "name": "example_init",
-                    "location": "src/api/init.py",
-                },
-                "blocks": [
-                    {
-                        "type": "text",
-                        "content": "初始化入口协调读取配置和追加写入。",
-                    }
-                ],
-            }
-        ],
-        "extra_subsections": [],
     }
 }
 
 
-MODULE_DETAILS = {
-    "module_details": {
-        "intro_blocks": [],
-        "modules": [
-            {
-                "name": "存储模块",
-                "location": "src/storage.py",
-                "purpose": "保存初始化流程产生的示例状态。",
-                "blocks": [
-                    {
-                        "type": "text",
-                        "content": "存储模块负责把初始化结果持久化到本地状态。",
-                    }
-                ],
-                "mechanisms": [
-                    {
-                        "title": "追加写入",
-                        "blocks": [
-                            {
-                                "type": "text",
-                                "content": "追加写入保留已有记录并写入新的初始化结果。",
-                            }
-                        ],
-                    }
-                ],
-                "extra_subsections": [],
-            }
-        ],
-        "extra_subsections": [],
+MAIN_FLOW_DETAIL = {
+    "title": "初始化主线",
+    "purpose": "准备示例仓库能力并写入初始状态。",
+    "reader_goal": "读者想知道调用初始化入口后仓库内部发生什么。",
+    "entry": {"name": "example_init", "location": "src/api/init.py"},
+    "blocks": [{"type": "text", "content": "初始化入口协调读取配置和追加写入。"}],
+    "extra_subsections": [],
+}
+
+
+MODULE_OVERVIEW = {
+    "module_overview": {
+        "intro": "本章按责任单元说明仓库的关键模块。",
+        "module_table": {
+            "rows": [
+                {
+                    "module": "存储模块",
+                    "purpose": "保存初始化流程产生的示例状态。",
+                    "location": "src/storage.py",
+                    "anchor": "存储模块",
+                }
+            ]
+        },
     }
+}
+
+
+MODULE_DETAIL = {
+    "name": "存储模块",
+    "location": "src/storage.py",
+    "purpose": "保存初始化流程产生的示例状态。",
+    "responsibilities": ["保存初始化结果", "提供追加写入机制"],
+    "blocks": [{"type": "text", "content": "存储模块负责把初始化结果持久化到本地状态。"}],
+    "mechanisms": [
+        {
+            "title": "追加写入",
+            "blocks": [{"type": "text", "content": "追加写入保留已有记录并写入新的初始化结果。"}],
+        }
+    ],
+    "extra_subsections": [],
 }
 
 
@@ -260,6 +259,7 @@ def write_json(path, data):
 def write_valid_package(root, *, include_mermaid=False):
     root = Path(root)
     write_json(root / "structure.manifest.json", FIXED_MANIFEST)
+
     overview = copy.deepcopy(OVERVIEW)
     if include_mermaid:
         overview["overview"]["repository_intro"]["blocks"].append(
@@ -274,6 +274,8 @@ def write_valid_package(root, *, include_mermaid=False):
     write_json(root / FIXED_MANIFEST["overview"], overview)
     write_json(root / FIXED_MANIFEST["quick_start"], QUICK_START)
     write_json(root / FIXED_MANIFEST["architecture_overview"], ARCHITECTURE_OVERVIEW)
-    write_json(root / FIXED_MANIFEST["main_flows"], MAIN_FLOWS)
-    write_json(root / FIXED_MANIFEST["module_details"], MODULE_DETAILS)
+    write_json(root / FIXED_MANIFEST["main_flow_overview"], MAIN_FLOW_OVERVIEW)
+    write_json(root / FIXED_MANIFEST["main_flow_details"][0], MAIN_FLOW_DETAIL)
+    write_json(root / FIXED_MANIFEST["module_overview"], MODULE_OVERVIEW)
+    write_json(root / FIXED_MANIFEST["module_details"][0], MODULE_DETAIL)
     return root / "structure.manifest.json"

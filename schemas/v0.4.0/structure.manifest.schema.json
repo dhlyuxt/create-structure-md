@@ -1,7 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.com/create-structure-md/v0.4.0/structure.manifest.schema.json",
-  "title": "create-structure-md 0.4.0 Manifest",
+  "$id": "https://create-structure-md.local/schemas/v0.4.0/structure.manifest.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -9,27 +8,35 @@
     "overview",
     "quick_start",
     "architecture_overview",
-    "main_flows",
+    "main_flow_overview",
+    "main_flow_details",
+    "module_overview",
     "module_details"
   ],
   "properties": {
-    "document": {
-      "const": "chapters/00-document.json"
+    "document": {"const": "chapters/00-document.json"},
+    "overview": {"const": "chapters/01-overview.json"},
+    "quick_start": {"const": "chapters/02-quick-start.json"},
+    "architecture_overview": {"const": "chapters/03-architecture-overview.json"},
+    "main_flow_overview": {"const": "chapters/04-main-flow-overview.json"},
+    "main_flow_details": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "pattern": "^chapters/04-main-flow-details/[a-z0-9][a-z0-9_-]*\\.json$",
+        "not": {"const": "chapters/04-main-flows.json"}
+      }
     },
-    "overview": {
-      "const": "chapters/01-overview.json"
-    },
-    "quick_start": {
-      "const": "chapters/02-quick-start.json"
-    },
-    "architecture_overview": {
-      "const": "chapters/03-architecture-overview.json"
-    },
-    "main_flows": {
-      "const": "chapters/04-main-flows.json"
-    },
+    "module_overview": {"const": "chapters/05-module-overview.json"},
     "module_details": {
-      "const": "chapters/05-module-details.json"
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "pattern": "^chapters/05-module-details/[a-z0-9][a-z0-9_-]*\\.json$",
+        "not": {"const": "chapters/05-module-details.json"}
+      }
     }
   }
 }
