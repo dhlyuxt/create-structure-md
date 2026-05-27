@@ -28,12 +28,37 @@ class V040SemanticTests(unittest.TestCase):
 
     def test_warns_when_more_than_three_main_flows_are_selected(self):
         def mutate(root):
-            data = _read(root / "chapters/04-main-flows.json")
-            flow = data["main_flows"]["flows"][0]
-            data["main_flows"]["flows"] = [
-                {**flow, "title": f"主线 {index}"} for index in range(4)
-            ]
-            write_json(root / "chapters/04-main-flows.json", data)
+            manifest = _read(root / "structure.manifest.json")
+            rows = _read(root / "chapters/04-main-flow-overview.json")
+            for index in range(1, 4):
+                path = f"chapters/04-main-flow-details/flow-{index}.json"
+                manifest["main_flow_details"].append(path)
+                title = f"主线 {index}"
+                write_json(
+                    root / path,
+                    {
+                        "title": title,
+                        "purpose": f"说明主线 {index}。",
+                        "reader_goal": f"读者想理解主线 {index}。",
+                        "entry": {
+                            "name": f"flow_{index}",
+                            "location": f"src/flow_{index}.py",
+                        },
+                        "blocks": [],
+                        "extra_subsections": [],
+                    },
+                )
+                rows["main_flow_overview"]["flow_table"]["rows"].append(
+                    {
+                        "flow": title,
+                        "purpose": f"说明主线 {index}。",
+                        "entry": f"flow_{index}",
+                        "location": f"src/flow_{index}.py",
+                        "anchor": title,
+                    }
+                )
+            write_json(root / "structure.manifest.json", manifest)
+            write_json(root / "chapters/04-main-flow-overview.json", rows)
 
         result = self.validate(mutate)
 
@@ -41,13 +66,68 @@ class V040SemanticTests(unittest.TestCase):
         self.assertWarningPath(
             result,
             "semantics.main_flows.too_many",
-            "$.main_flows.main_flows.flows",
+            "$.main_flow_details",
         )
+
+    def test_errors_when_flow_overview_rows_do_not_match_details(self):
+        def mutate(root):
+            data = _read(root / "chapters/04-main-flow-overview.json")
+            data["main_flow_overview"]["flow_table"]["rows"][0]["flow"] = "错误主线"
+            write_json(root / "chapters/04-main-flow-overview.json", data)
+
+        result = self.validate(mutate)
+
+        self.assertErrorCode(result, "semantics.main_flow_overview.mismatch")
+
+    def test_errors_when_module_overview_rows_do_not_match_details(self):
+        def mutate(root):
+            data = _read(root / "chapters/05-module-overview.json")
+            data["module_overview"]["module_table"]["rows"][0]["anchor"] = "错误模块"
+            write_json(root / "chapters/05-module-overview.json", data)
+
+        result = self.validate(mutate)
+
+        self.assertErrorCode(result, "semantics.module_overview.mismatch")
+
+    def test_warns_when_more_than_three_main_flow_detail_files_are_selected(self):
+        def mutate(root):
+            manifest = _read(root / "structure.manifest.json")
+            rows = _read(root / "chapters/04-main-flow-overview.json")
+            for index in range(1, 4):
+                path = f"chapters/04-main-flow-details/flow-{index}.json"
+                manifest["main_flow_details"].append(path)
+                title = f"主线 {index}"
+                write_json(
+                    root / path,
+                    {
+                        "title": title,
+                        "purpose": f"说明主线 {index}。",
+                        "reader_goal": f"读者想理解主线 {index}。",
+                        "entry": {"name": f"flow_{index}", "location": f"src/flow_{index}.py"},
+                        "blocks": [],
+                        "extra_subsections": [],
+                    },
+                )
+                rows["main_flow_overview"]["flow_table"]["rows"].append(
+                    {
+                        "flow": title,
+                        "purpose": f"说明主线 {index}。",
+                        "entry": f"flow_{index}",
+                        "location": f"src/flow_{index}.py",
+                        "anchor": title,
+                    }
+                )
+            write_json(root / "structure.manifest.json", manifest)
+            write_json(root / "chapters/04-main-flow-overview.json", rows)
+
+        result = self.validate(mutate)
+
+        self.assertWarningPath(result, "semantics.main_flows.too_many", "$.main_flow_details")
 
     def test_warns_when_module_entry_looks_like_file_only_listing(self):
         def mutate(root):
-            data = _read(root / "chapters/05-module-details.json")
-            data["module_details"]["modules"][0].update(
+            data = _read(root / "chapters/05-module-details/storage.json")
+            data.update(
                 {
                     "name": "src/storage.py",
                     "purpose": "src/storage.py",
@@ -55,7 +135,7 @@ class V040SemanticTests(unittest.TestCase):
                     "mechanisms": [],
                 }
             )
-            write_json(root / "chapters/05-module-details.json", data)
+            write_json(root / "chapters/05-module-details/storage.json", data)
 
         result = self.validate(mutate)
 
@@ -63,13 +143,13 @@ class V040SemanticTests(unittest.TestCase):
         self.assertWarningPath(
             result,
             "semantics.module.file_only",
-            "$.module_details.module_details.modules[0]",
+            "$.module_details[0]",
         )
 
     def test_warns_when_file_named_module_has_file_only_purpose_with_blocks(self):
         def mutate(root):
-            data = _read(root / "chapters/05-module-details.json")
-            data["module_details"]["modules"][0].update(
+            data = _read(root / "chapters/05-module-details/storage.json")
+            data.update(
                 {
                     "name": "storage.py",
                     "purpose": "这个文件包含初始化函数。",
@@ -82,7 +162,7 @@ class V040SemanticTests(unittest.TestCase):
                     ],
                 }
             )
-            write_json(root / "chapters/05-module-details.json", data)
+            write_json(root / "chapters/05-module-details/storage.json", data)
 
         result = self.validate(mutate)
 
@@ -136,20 +216,14 @@ class V040SemanticTests(unittest.TestCase):
             ] = "执行记录"
             write_json(root / "chapters/02-quick-start.json", quick_start)
 
-            main_flows = _read(root / "chapters/04-main-flows.json")
-            main_flows["main_flows"]["flows"][0][
-                "purpose"
-            ] = "command transcript should not appear"
-            write_json(root / "chapters/04-main-flows.json", main_flows)
+            main_flow = _read(root / "chapters/04-main-flow-details/init-flow.json")
+            main_flow["purpose"] = "command transcript should not appear"
+            write_json(root / "chapters/04-main-flow-details/init-flow.json", main_flow)
 
-            module_details = _read(root / "chapters/05-module-details.json")
-            module_details["module_details"]["modules"][0][
-                "purpose"
-            ] = "subagent report should not appear"
-            module_details["module_details"]["modules"][0]["mechanisms"][0][
-                "title"
-            ] = "rejected draft"
-            write_json(root / "chapters/05-module-details.json", module_details)
+            module_detail = _read(root / "chapters/05-module-details/storage.json")
+            module_detail["purpose"] = "subagent report should not appear"
+            module_detail["mechanisms"][0]["title"] = "rejected draft"
+            write_json(root / "chapters/05-module-details/storage.json", module_detail)
 
         result = self.validate(mutate)
 
@@ -163,9 +237,9 @@ class V040SemanticTests(unittest.TestCase):
                 "$.document.document.summary",
                 "$.quick_start.quick_start.setup.blocks[1].title",
                 "$.quick_start.quick_start.first_run.steps[0].title",
-                "$.main_flows.main_flows.flows[0].purpose",
-                "$.module_details.module_details.modules[0].purpose",
-                "$.module_details.module_details.modules[0].mechanisms[0].title",
+                "$.main_flow_details[0].purpose",
+                "$.module_details[0].purpose",
+                "$.module_details[0].mechanisms[0].title",
             }.issubset(error_paths),
             [issue.format() for issue in result.errors],
         )
@@ -229,8 +303,10 @@ class V040SemanticTests(unittest.TestCase):
                 "$.overview.overview.core_components.component_table.rows[0].location",
                 "$.architecture_overview.architecture_overview.layers.layer_table.rows[0].location",
                 "$.architecture_overview.architecture_overview.module_map.module_table.rows[0].location",
-                "$.main_flows.main_flows.flows[0].entry.location",
-                "$.module_details.module_details.modules[0].location",
+                "$.main_flow_overview.main_flow_overview.flow_table.rows[0].location",
+                "$.main_flow_details[0].entry.location",
+                "$.module_overview.module_overview.module_table.rows[0].location",
+                "$.module_details[0].location",
             },
             missing_location_paths,
         )

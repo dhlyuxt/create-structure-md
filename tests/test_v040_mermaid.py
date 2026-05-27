@@ -1,3 +1,4 @@
+import json
 import sys
 import subprocess
 import tempfile
@@ -10,7 +11,7 @@ sys.path.insert(0, str(ROOT))
 
 from scripts.v040_package import load_manifest_package
 from scripts.v040_mermaid import mermaid_validation_result
-from tests.helpers_v040 import write_valid_package
+from tests.helpers_v040 import write_json, write_valid_package
 
 
 class V040MermaidTests(unittest.TestCase):
@@ -69,6 +70,49 @@ class V040MermaidTests(unittest.TestCase):
         )
         locate_mermaid_cli.assert_called_once_with()
         subprocess_run.assert_not_called()
+
+    def test_traverses_mermaid_blocks_in_main_flow_details(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest = write_valid_package(tmpdir)
+            data = _read(Path(tmpdir) / "chapters/04-main-flow-details/init-flow.json")
+            data["blocks"].append(
+                {
+                    "type": "mermaid",
+                    "title": "初始化流程",
+                    "diagram_type": "flowchart",
+                    "source": "flowchart LR\n  api[API] --> storage[存储]",
+                }
+            )
+            write_json(Path(tmpdir) / "chapters/04-main-flow-details/init-flow.json", data)
+            package = load_manifest_package(manifest)
+
+            with mock.patch("scripts.v040_mermaid._locate_mermaid_cli", return_value=None):
+                result = mermaid_validation_result(package)
+
+        self.assertEqual("mermaid.cli_missing", result.errors[0].code)
+
+    def test_mermaid_error_path_mentions_detail_index(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest = write_valid_package(tmpdir)
+            data = _read(Path(tmpdir) / "chapters/05-module-details/storage.json")
+            data["blocks"].append(
+                {
+                    "type": "mermaid",
+                    "title": "模块关系",
+                    "diagram_type": "flowchart",
+                    "source": "flowchart LR\n  A --> B",
+                }
+            )
+            write_json(Path(tmpdir) / "chapters/05-module-details/storage.json", data)
+            package = load_manifest_package(manifest)
+
+            with mock.patch("scripts.v040_mermaid._locate_mermaid_cli", return_value="/bin/false"):
+                result = mermaid_validation_result(package)
+
+        self.assertTrue(
+            any("$.module_details[0].blocks[1]" in issue.path for issue in result.errors),
+            [issue.format() for issue in result.errors],
+        )
 
     @mock.patch("scripts.v040_mermaid.subprocess.run")
     @mock.patch("scripts.v040_mermaid._locate_mermaid_cli", return_value="/usr/bin/mmdc")
@@ -141,6 +185,10 @@ class V040MermaidTests(unittest.TestCase):
             ),
             [issue.format() for issue in result.errors],
         )
+
+
+def _read(path):
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

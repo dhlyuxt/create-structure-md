@@ -29,6 +29,26 @@ def mermaid_validation_result(package) -> ValidationResult:
     return result
 
 
+def mermaid_detail_validation_result(kind: str, index: int, data: dict) -> ValidationResult:
+    result = ValidationResult()
+    blocks = list(_iter_mermaid_blocks_from_payload(data, f"$.{kind}[{index}]"))
+    if not blocks:
+        return result
+
+    mmdc = _locate_mermaid_cli()
+    if mmdc is None:
+        result.error(
+            "mermaid.cli_missing",
+            f"$.{kind}[{index}]",
+            "Mermaid blocks require the mmdc CLI for strict rendering validation",
+        )
+        return result
+
+    for path, block in blocks:
+        _validate_mermaid_block(mmdc, path, block, result)
+    return result
+
+
 def _locate_mermaid_cli() -> str | None:
     return shutil.which("mmdc")
 
@@ -81,10 +101,23 @@ def _validate_mermaid_block(mmdc, path, block, result):
 
 
 def _iter_mermaid_blocks(package):
+    for base_path, payload in _iter_payloads(package):
+        yield from _iter_mermaid_blocks_from_payload(payload, base_path)
+
+
+def _iter_payloads(package):
     for chapter_key, chapter in package.chapters.items():
-        for path, value in _walk(chapter, f"$.{chapter_key}"):
-            if isinstance(value, dict) and value.get("type") == "mermaid":
-                yield path, value
+        yield f"$.{chapter_key}", chapter
+    for index, detail in enumerate(package.main_flow_details):
+        yield f"$.main_flow_details[{index}]", detail.data
+    for index, detail in enumerate(package.module_details):
+        yield f"$.module_details[{index}]", detail.data
+
+
+def _iter_mermaid_blocks_from_payload(payload, base_path):
+    for path, value in _walk(payload, base_path):
+        if isinstance(value, dict) and value.get("type") == "mermaid":
+            yield path, value
 
 
 def _walk(value, path):
