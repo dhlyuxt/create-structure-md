@@ -108,6 +108,29 @@ class V040SemanticTests(unittest.TestCase):
 
         self.assertWarningCode(result, "semantics.mermaid.internal_label")
 
+    def test_warns_when_source_like_locations_are_missing_under_repo_root(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest_path = write_valid_package(tmpdir)
+            package = load_manifest_package(manifest_path)
+
+            result = semantic_validation_result(package, repo_root=tmpdir)
+
+        missing_location_paths = {
+            issue.path
+            for issue in result.warnings
+            if issue.code == "semantics.location.missing"
+        }
+        self.assertEqual(
+            {
+                "$.overview.overview.core_components.component_table.rows[0].location",
+                "$.architecture_overview.architecture_overview.layers.layer_table.rows[0].location",
+                "$.architecture_overview.architecture_overview.module_map.module_table.rows[0].location",
+                "$.main_flows.main_flows.flows[0].entry.location",
+                "$.module_details.module_details.modules[0].location",
+            },
+            missing_location_paths,
+        )
+
     def assertErrorCode(self, result, code):
         self.assertTrue(
             any(issue.code == code for issue in result.errors),
