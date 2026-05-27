@@ -11,7 +11,7 @@ sys.path.insert(0, str(ROOT))
 
 from scripts import render_markdown as render_cli
 from scripts import validate_structure as validate_cli
-from tests.helpers_v040 import write_valid_package
+from tests.helpers_v040 import write_json, write_valid_package
 
 
 class V040CliTests(unittest.TestCase):
@@ -38,6 +38,30 @@ class V040CliTests(unittest.TestCase):
         self.assertEqual(2, code)
         self.assertIn("Mermaid CLI is required", stderr.getvalue())
 
+    def test_validate_cli_reports_manifest_directory_without_traceback(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stderr = io.StringIO()
+
+            with contextlib.redirect_stderr(stderr):
+                code = validate_cli.main([tmpdir, "--strict"])
+
+        self.assertEqual(2, code)
+        self.assertIn("manifest JSON could not be read", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
+
+    def test_validate_cli_reports_invalid_json_without_traceback(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest = Path(tmpdir) / "structure.manifest.json"
+            manifest.write_text("{", encoding="utf-8")
+            stderr = io.StringIO()
+
+            with contextlib.redirect_stderr(stderr):
+                code = validate_cli.main([str(manifest), "--strict"])
+
+        self.assertEqual(2, code)
+        self.assertIn("manifest JSON parse failed", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
+
     def test_render_cli_writes_default_output(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest = write_valid_package(tmpdir, include_mermaid=False)
@@ -50,6 +74,38 @@ class V040CliTests(unittest.TestCase):
             self.assertEqual(0, code)
             self.assertTrue(output.exists())
             self.assertIn("Document written:", stdout.getvalue())
+
+    def test_render_cli_reports_output_directory_without_traceback(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest = write_valid_package(tmpdir, include_mermaid=False)
+            stderr = io.StringIO()
+
+            with contextlib.redirect_stderr(stderr):
+                code = render_cli.main([str(manifest), "--output", tmpdir])
+
+        self.assertEqual(2, code)
+        self.assertIn("Markdown output could not be written", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
+
+    def test_render_cli_rejects_unsafe_default_output_path(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest = write_valid_package(tmpdir, include_mermaid=False)
+            document_path = Path(tmpdir) / "chapters/00-document.json"
+            document = {
+                "document": {
+                    "repository_name": "示例仓库",
+                    "output_file": "../unsafe.md",
+                    "summary": "用于验证 0.4.0 reader guide package 的示例仓库。",
+                }
+            }
+            write_json(document_path, document)
+            stderr = io.StringIO()
+
+            with contextlib.redirect_stderr(stderr):
+                code = render_cli.main([str(manifest)])
+
+        self.assertEqual(2, code)
+        self.assertIn("default output_file must be relative", stderr.getvalue())
 
 
 if __name__ == "__main__":

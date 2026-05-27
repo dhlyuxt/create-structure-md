@@ -32,8 +32,22 @@ def main(argv=None):
         _print_issues(output_errors, sys.stderr)
         return 2
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(render_package_markdown(package), encoding="utf-8")
+    try:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(render_package_markdown(package), encoding="utf-8")
+    except OSError as exc:
+        _print_issues(
+            [
+                ValidationIssue(
+                    "render.write",
+                    "$.output",
+                    f"Markdown output could not be written: {output_path}: {exc}",
+                )
+            ],
+            sys.stderr,
+        )
+        return 2
+
     print(f"Document written: {output_path}")
     return 0
 

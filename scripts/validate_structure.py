@@ -77,6 +77,14 @@ def _read_manifest_json(manifest_path, errors):
                 f"manifest JSON parse failed at line {exc.lineno}, column {exc.colno}: {path}",
             )
         )
+    except OSError as exc:
+        errors.append(
+            ValidationIssue(
+                "manifest.read",
+                "$",
+                f"manifest JSON could not be read: {path}: {exc}",
+            )
+        )
     return None
 
 
