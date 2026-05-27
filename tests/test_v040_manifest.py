@@ -300,6 +300,23 @@ class V040ManifestTests(unittest.TestCase):
                     message="relative POSIX .json path",
                 )
 
+    def test_rejects_nested_detail_paths(self):
+        cases = [
+            ("main_flow_details", "chapters/04-main-flow-details/nested/init-flow.json"),
+            ("module_details", "chapters/05-module-details/nested/storage.json"),
+        ]
+        for key, nested_path in cases:
+            with self.subTest(key=key):
+                manifest = dict(FIXED_MANIFEST)
+                manifest[key] = [nested_path]
+                issues = manifest_shape_errors(manifest)
+                self.assertHasIssue(
+                    issues,
+                    code="manifest.path",
+                    path=f"$.{key}[0]",
+                    message="direct child path",
+                )
+
     def test_load_rejects_detail_path_that_resolves_outside_package_root(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             package_root = Path(tmpdir) / "package"

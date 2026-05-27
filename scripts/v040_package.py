@@ -130,6 +130,14 @@ def manifest_shape_errors(manifest) -> list[ValidationIssue]:
                                 message=f"{key} path must start with {prefix}",
                             )
                         )
+                    elif "/" in relative_path.removeprefix(prefix):
+                        issues.append(
+                            ValidationIssue(
+                                code="manifest.path",
+                                path=issue_path,
+                                message=f"{key} must use direct child path {prefix}<key>.json",
+                            )
+                        )
                     elif valid_path and _detail_key(relative_path) is None:
                         issues.append(
                             ValidationIssue(
