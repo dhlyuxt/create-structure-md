@@ -1,0 +1,49 @@
+{
+  "overview": {
+    "repository_intro": {
+      "blocks": [
+        {
+          "type": "text",
+          "content": "这是一个用于验证结构文档渲染流程的示例仓库。"
+        }
+      ]
+    },
+    "problems_solved": {
+      "blocks": [
+        {
+          "type": "text",
+          "content": "帮助读者用最小上下文理解仓库结构。"
+        }
+      ]
+    },
+    "main_capabilities": {
+      "blocks": [
+        {
+          "type": "unordered_list",
+          "items": [
+            "初始化示例仓库能力",
+            "展示固定章节 DSL 形状"
+          ]
+        }
+      ]
+    },
+    "core_components": {
+      "component_table": {
+        "rows": [
+          {
+            "component": "公共 API",
+            "role": "对外提供仓库能力入口",
+            "location": "src/api"
+          }
+        ]
+      },
+      "blocks": [
+        {
+          "type": "text",
+          "content": "公共 API 是最小调用入口。"
+        }
+      ]
+    },
+    "extra_subsections": []
+  }
+}

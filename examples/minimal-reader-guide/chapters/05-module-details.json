@@ -1,0 +1,31 @@
+{
+  "module_details": {
+    "intro_blocks": [],
+    "modules": [
+      {
+        "name": "存储模块",
+        "location": "src/storage.py",
+        "purpose": "保存初始化流程产生的示例状态。",
+        "blocks": [
+          {
+            "type": "text",
+            "content": "存储模块负责把初始化结果持久化到本地状态。"
+          }
+        ],
+        "mechanisms": [
+          {
+            "title": "追加写入",
+            "blocks": [
+              {
+                "type": "text",
+                "content": "追加写入保留已有记录并写入新的初始化结果。"
+              }
+            ]
+          }
+        ],
+        "extra_subsections": []
+      }
+    ],
+    "extra_subsections": []
+  }
+}

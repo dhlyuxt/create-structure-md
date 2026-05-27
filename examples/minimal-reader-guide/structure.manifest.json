@@ -1,0 +1,8 @@
+{
+  "document": "chapters/00-document.json",
+  "overview": "chapters/01-overview.json",
+  "quick_start": "chapters/02-quick-start.json",
+  "architecture_overview": "chapters/03-architecture-overview.json",
+  "main_flows": "chapters/04-main-flows.json",
+  "module_details": "chapters/05-module-details.json"
+}

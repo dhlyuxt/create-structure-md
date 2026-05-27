@@ -1,0 +1,61 @@
+{
+  "quick_start": {
+    "usage_scenarios": {
+      "blocks": [
+        {
+          "type": "unordered_list",
+          "items": [
+            "首次验证仓库能力",
+            "检查 reader guide 输出"
+          ]
+        }
+      ]
+    },
+    "setup": {
+      "blocks": [
+        {
+          "type": "code",
+          "language": "bash",
+          "content": "python -m example.init"
+        }
+      ]
+    },
+    "first_run": {
+      "steps": [
+        {
+          "title": "初始化仓库能力",
+          "blocks": [
+            {
+              "type": "text",
+              "content": "调用初始化入口。"
+            }
+          ]
+        }
+      ],
+      "blocks": [
+        {
+          "type": "text",
+          "content": "初始化后即可执行最小验证。"
+        }
+      ]
+    },
+    "minimal_example": {
+      "blocks": [
+        {
+          "type": "code",
+          "language": "python",
+          "content": "example_init()"
+        }
+      ]
+    },
+    "expected_result": {
+      "blocks": [
+        {
+          "type": "text",
+          "content": "示例仓库能力完成初始化。"
+        }
+      ]
+    },
+    "extra_subsections": []
+  }
+}

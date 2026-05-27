@@ -1,0 +1,60 @@
+{
+  "architecture_overview": {
+    "architecture_summary": {
+      "blocks": [
+        {
+          "type": "text",
+          "content": "仓库以公共 API 为入口组织初始化能力。"
+        }
+      ]
+    },
+    "layers": {
+      "layer_table": {
+        "rows": [
+          {
+            "layer": "接口层",
+            "role": "接收调用并转换为应用命令。",
+            "location": "src/api"
+          }
+        ]
+      },
+      "blocks": [
+        {
+          "type": "text",
+          "content": "接口层隔离外部调用和内部模块。"
+        }
+      ]
+    },
+    "module_map": {
+      "module_table": {
+        "rows": [
+          {
+            "module": "reader",
+            "role": "读取输入并构建领域对象。",
+            "layer": "接口层",
+            "location": "src/reader.py"
+          }
+        ]
+      },
+      "blocks": []
+    },
+    "repository_layout": {
+      "blocks": [
+        {
+          "type": "table",
+          "columns": [
+            "路径",
+            "角色"
+          ],
+          "rows": [
+            [
+              "src/api",
+              "公共 API 入口"
+            ]
+          ]
+        }
+      ]
+    },
+    "extra_subsections": []
+  }
+}

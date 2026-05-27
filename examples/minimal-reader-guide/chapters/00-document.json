@@ -1,0 +1,7 @@
+{
+  "document": {
+    "repository_name": "示例仓库",
+    "output_file": "Example_STRUCTURE_DESIGN.md",
+    "summary": "用于验证 0.4.0 reader guide package 的示例仓库。"
+  }
+}
