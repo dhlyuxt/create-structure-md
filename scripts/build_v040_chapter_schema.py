@@ -110,7 +110,7 @@ defs["DocumentChapter"] = obj(
     ["document"],
     {
         "document": obj(
-            ["repository_name", "output_file", "summary"],
+            ["repository_name", "output_file"],
             {
                 "repository_name": string(),
                 "output_file": string(),

@@ -34,6 +34,14 @@ class V040ChapterSchemaTests(unittest.TestCase):
     def test_valid_fixture_passes_schema(self):
         self.assertValid(self.validate_package())
 
+    def test_document_summary_is_optional(self):
+        def mutate(root):
+            data = _read(root / "chapters/00-document.json")
+            del data["document"]["summary"]
+            write_json(root / "chapters/00-document.json", data)
+
+        self.assertValid(self.validate_package(mutate))
+
     def test_unknown_block_type_details_is_rejected(self):
         def mutate(root):
             data = _read(root / "chapters/01-overview.json")

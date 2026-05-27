@@ -66,6 +66,28 @@ class V040SemanticTests(unittest.TestCase):
             "$.module_details.module_details.modules[0]",
         )
 
+    def test_warns_when_file_named_module_has_file_only_purpose_with_blocks(self):
+        def mutate(root):
+            data = _read(root / "chapters/05-module-details.json")
+            data["module_details"]["modules"][0].update(
+                {
+                    "name": "storage.py",
+                    "purpose": "这个文件包含初始化函数。",
+                    "blocks": [{"type": "text", "content": "有额外说明。"}],
+                    "mechanisms": [
+                        {
+                            "title": "初始化",
+                            "blocks": [{"type": "text", "content": "初始化细节。"}],
+                        }
+                    ],
+                }
+            )
+            write_json(root / "chapters/05-module-details.json", data)
+
+        result = self.validate(mutate)
+
+        self.assertWarningCode(result, "semantics.module.file_only")
+
     def test_errors_when_process_metadata_appears_in_text_content(self):
         def mutate(root):
             data = _read(root / "chapters/01-overview.json")
@@ -117,6 +139,24 @@ class V040SemanticTests(unittest.TestCase):
         result = self.validate(mutate, include_mermaid=True)
 
         self.assertWarningCode(result, "semantics.mermaid.internal_label")
+
+    def test_warns_when_mermaid_visible_label_is_snake_or_kebab_case(self):
+        cases = [
+            ("flowchart LR\n  api[storage_core] --> ui[用户界面]", "storage_core"),
+            ("flowchart LR\n  api[init-flow] --> ui[用户界面]", "init-flow"),
+        ]
+        for source, label in cases:
+            with self.subTest(label=label):
+                def mutate(root, source=source):
+                    data = _read(root / "chapters/01-overview.json")
+                    data["overview"]["repository_intro"]["blocks"][-1][
+                        "source"
+                    ] = source
+                    write_json(root / "chapters/01-overview.json", data)
+
+                result = self.validate(mutate, include_mermaid=True)
+
+                self.assertWarningCode(result, "semantics.mermaid.internal_label")
 
     def test_warns_when_source_like_locations_are_missing_under_repo_root(self):
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -106,6 +106,41 @@ class V040RendererTests(unittest.TestCase):
         markdown = self.render_package(include_mermaid=True)
         self.assertIn("```mermaid\nflowchart LR\n  app[应用] --> api[公共 API]\n```", markdown)
 
+    def test_code_and_mermaid_block_titles_render_as_nested_headings(self):
+        def mutate(root):
+            quick_start = _read(root / "chapters/02-quick-start.json")
+            quick_start["quick_start"]["setup"]["blocks"] = [
+                {
+                    "type": "code",
+                    "title": "安装命令",
+                    "language": "bash",
+                    "content": "python -m example.init",
+                }
+            ]
+            write_json(root / "chapters/02-quick-start.json", quick_start)
+
+            overview = _read(root / "chapters/01-overview.json")
+            overview["overview"]["repository_intro"]["blocks"].append(
+                {
+                    "type": "mermaid",
+                    "title": "组件关系",
+                    "diagram_type": "flowchart",
+                    "source": "flowchart LR\n  app[应用] --> api[公共 API]",
+                }
+            )
+            write_json(root / "chapters/01-overview.json", overview)
+
+        markdown = self.render_package(mutate)
+
+        self.assertIn(
+            "##### 安装命令\n\n```bash\npython -m example.init\n```",
+            markdown,
+        )
+        self.assertIn(
+            "##### 组件关系\n\n```mermaid\nflowchart LR\n  app[应用] --> api[公共 API]\n```",
+            markdown,
+        )
+
     def test_code_block_without_title_renders_fence_without_none(self):
         markdown = self.render_package()
         self.assertIn("```bash\npython -m example.init\n```", markdown)

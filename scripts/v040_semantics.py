@@ -13,7 +13,12 @@ PROCESS_METADATA_TERMS = (
     "执行记录",
 )
 
-INTERNAL_LABEL_RE = re.compile(r"\b([A-Za-z][A-Za-z0-9_]*)\s*\[\s*\1\s*\]")
+INTERNAL_VISIBLE_LABEL_RE = re.compile(
+    r"^[A-Za-z][A-Za-z0-9]*(?:[_-][A-Za-z0-9]+)+$"
+)
+MERMAID_BRACKET_LABEL_RE = re.compile(r"\[\s*([^\]\n]+?)\s*\]")
+SOURCE_FILE_NAME_RE = re.compile(r"\.(?:c|h|py|js|ts|java|go|rs)$", re.IGNORECASE)
+FILE_ONLY_TERMS = ("file", "contains", "文件", "包含")
 
 
 def semantic_validation_result(package, repo_root=None) -> ValidationResult:
@@ -54,9 +59,7 @@ def _check_modules(package, result):
         purpose = str(module.get("purpose", ""))
         blocks = module.get("blocks", [])
         mechanisms = module.get("mechanisms", [])
-        if (_looks_source_like(name) or _looks_source_like(purpose)) and not (
-            blocks or mechanisms
-        ):
+        if _is_file_only_module(name, purpose, blocks, mechanisms):
             result.warning(
                 "semantics.module.file_only",
                 f"$.module_details.module_details.modules[{index}]",
@@ -89,12 +92,12 @@ def _check_mermaid_readability(package, result):
                 f"{path}.source",
                 "Mermaid source should use flowchart instead of legacy graph syntax",
             )
-        match = INTERNAL_LABEL_RE.search(source)
-        if match:
+        internal_label = _internal_visible_label(source)
+        if internal_label:
             result.warning(
                 "semantics.mermaid.internal_label",
                 f"{path}.source",
-                f"Mermaid visible label exposes internal id: {match.group(1)}",
+                f"Mermaid visible label exposes internal id: {internal_label}",
             )
 
 
@@ -144,6 +147,31 @@ def _process_metadata_term(value):
     for term in PROCESS_METADATA_TERMS:
         if term.casefold() in lower_value:
             return term
+    return None
+
+
+def _is_file_only_module(name, purpose, blocks, mechanisms):
+    if _looks_source_file_name(name) and _has_file_only_wording(purpose):
+        return True
+    return (_looks_source_like(name) or _looks_source_like(purpose)) and not (
+        blocks or mechanisms
+    )
+
+
+def _looks_source_file_name(value):
+    return bool(SOURCE_FILE_NAME_RE.search(value.strip()))
+
+
+def _has_file_only_wording(value):
+    lower_value = value.casefold()
+    return any(term.casefold() in lower_value for term in FILE_ONLY_TERMS)
+
+
+def _internal_visible_label(source):
+    for match in MERMAID_BRACKET_LABEL_RE.finditer(source):
+        label = match.group(1).strip()
+        if INTERNAL_VISIBLE_LABEL_RE.fullmatch(label):
+            return label
     return None
 
 
