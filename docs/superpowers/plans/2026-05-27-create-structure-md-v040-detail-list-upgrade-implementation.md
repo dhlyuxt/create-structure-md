@@ -75,7 +75,6 @@ Modify:
 - `tests/test_v040_mermaid.py`: Mermaid traversal tests.
 - `tests/test_v040_renderer.py`: renderer tests.
 - `tests/test_v040_cli.py`: root CLI and single-detail validator tests.
-- `tests/test_v040_docs.py`: reference/skill contract checks, updated after docs review.
 - `tests/test_v040_e2e.py`: upgraded minimal package validation and render.
 - `examples/minimal-reader-guide/structure.manifest.json`: upgraded manifest.
 - `examples/minimal-reader-guide/chapters/04-main-flow-overview.json`: new Chapter 4 overview file.
@@ -357,7 +356,34 @@ MODULE_DETAIL = {
 }
 ```
 
-Update `write_valid_package()` so it writes static chapters, both overview files, and all detail files from the manifest arrays.
+Replace `write_valid_package()` with this implementation so fixtures write static chapters, both overview files, and all detail files from the manifest arrays:
+
+```python
+def write_valid_package(root, *, include_mermaid=False):
+    root = Path(root)
+    write_json(root / "structure.manifest.json", FIXED_MANIFEST)
+
+    overview = copy.deepcopy(OVERVIEW)
+    if include_mermaid:
+        overview["overview"]["repository_intro"]["blocks"].append(
+            {
+                "type": "mermaid",
+                "title": "调用关系",
+                "diagram_type": "flowchart",
+                "source": "flowchart LR\n  app[应用] --> api[公共 API]",
+            }
+        )
+
+    write_json(root / FIXED_MANIFEST["document"], DOCUMENT)
+    write_json(root / FIXED_MANIFEST["overview"], overview)
+    write_json(root / FIXED_MANIFEST["quick_start"], QUICK_START)
+    write_json(root / FIXED_MANIFEST["architecture_overview"], ARCHITECTURE_OVERVIEW)
+    write_json(root / FIXED_MANIFEST["main_flow_overview"], MAIN_FLOW_OVERVIEW)
+    write_json(root / FIXED_MANIFEST["main_flow_details"][0], MAIN_FLOW_DETAIL)
+    write_json(root / FIXED_MANIFEST["module_overview"], MODULE_OVERVIEW)
+    write_json(root / FIXED_MANIFEST["module_details"][0], MODULE_DETAIL)
+    return root / "structure.manifest.json"
+```
 
 In `tests/test_v040_manifest.py`, replace old aggregate expectations with:
 
@@ -466,6 +492,25 @@ def test_rejects_unsafe_manifest_paths(self):
                 path=f"$.{key}[0]",
                 message="relative POSIX .json path",
             )
+
+def test_load_rejects_detail_path_that_resolves_outside_package_root(self):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        package_root = Path(tmpdir) / "package"
+        outside_root = Path(tmpdir) / "outside"
+        manifest_path = write_valid_package(package_root)
+        outside_root.mkdir()
+        escaped = outside_root / "escaped.json"
+        escaped.write_text(
+            json.dumps(MAIN_FLOW_DETAIL, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        (package_root / "chapters/04-main-flow-details/escaped.json").symlink_to(escaped)
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["main_flow_details"] = ["chapters/04-main-flow-details/escaped.json"]
+        write_json(manifest_path, manifest)
+
+        with self.assertRaisesRegex(ValueError, "resolves outside package root"):
+            load_manifest_package(manifest_path)
 ```
 
 - [ ] **Step 2: Run manifest tests and confirm failure**
@@ -498,6 +543,11 @@ STATIC_MANIFEST = {
 }
 
 DETAIL_MANIFEST_KEYS = ("main_flow_details", "module_details")
+
+DETAIL_PREFIXES = {
+    "main_flow_details": "chapters/04-main-flow-details/",
+    "module_details": "chapters/05-module-details/",
+}
 
 FORBIDDEN_AGGREGATE_PATHS = {
     "chapters/04-main-flows.json",
@@ -573,22 +623,143 @@ def _detail_key(value):
     return stem
 ```
 
-In `manifest_shape_errors()`:
-
-- Require `set(manifest.keys()) == set(STATIC_MANIFEST) | {"main_flow_details", "module_details"}`.
-- Produce `manifest.keys` with a message containing `active 0.4.0 manifest must use main_flow_overview, main_flow_details, module_overview, and module_details`.
-- Require static paths to equal `STATIC_MANIFEST`.
-- Require detail arrays to be non-empty lists.
-- Run `_validate_manifest_path()` for every manifest path.
-- Reject duplicate relative paths with `manifest.path_duplicate`.
-- Reject invalid detail stems with `manifest.detail_key`.
-
-In `load_manifest_package()`, load static chapters into `chapters`, then load detail arrays:
+Replace `manifest_shape_errors()` with:
 
 ```python
+def manifest_shape_errors(manifest) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+
+    if not isinstance(manifest, dict):
+        return [
+            ValidationIssue(
+                code="manifest.root_type",
+                path="$",
+                message="0.4.0 manifest root must be an object",
+            )
+        ]
+
+    if "dsl_version" in manifest:
+        issues.append(
+            ValidationIssue(
+                code="manifest.dsl_version",
+                path="$.dsl_version",
+                message="0.4.0 manifest must not contain dsl_version",
+            )
+        )
+
+    expected_keys = set(STATIC_MANIFEST) | set(DETAIL_MANIFEST_KEYS)
+    actual_keys = set(manifest)
+    if actual_keys != expected_keys:
+        expected = ", ".join(
+            [
+                "document",
+                "overview",
+                "quick_start",
+                "architecture_overview",
+                "main_flow_overview",
+                "main_flow_details",
+                "module_overview",
+                "module_details",
+            ]
+        )
+        issues.append(
+            ValidationIssue(
+                code="manifest.keys",
+                path="$",
+                message=(
+                    "active 0.4.0 manifest must use main_flow_overview, "
+                    f"main_flow_details, module_overview, and module_details; expected keys: {expected}"
+                ),
+            )
+        )
+
+    seen_paths: list[str] = []
+    for key, expected_path in STATIC_MANIFEST.items():
+        if key not in manifest:
+            continue
+        relative_path = _validate_manifest_path(manifest[key], f"$.{key}", issues)
+        if relative_path is not None:
+            seen_paths.append(relative_path)
+        if manifest[key] != expected_path:
+            issues.append(
+                ValidationIssue(
+                    code="manifest.path",
+                    path=f"$.{key}",
+                    message=f"{key} must equal {expected_path}",
+                )
+            )
+
+    for key in DETAIL_MANIFEST_KEYS:
+        value = manifest.get(key)
+        if not isinstance(value, list) or not value:
+            issues.append(
+                ValidationIssue(
+                    code="manifest.detail_array",
+                    path=f"$.{key}",
+                    message=f"{key} must be a non-empty array",
+                )
+            )
+            continue
+        for index, item in enumerate(value):
+            path = f"$.{key}[{index}]"
+            relative_path = _validate_manifest_path(item, path, issues)
+            if relative_path is None:
+                continue
+            seen_paths.append(relative_path)
+            if not relative_path.startswith(DETAIL_PREFIXES[key]):
+                issues.append(
+                    ValidationIssue(
+                        code="manifest.path",
+                        path=path,
+                        message=f"{key} entries must be under {DETAIL_PREFIXES[key]}",
+                    )
+                )
+            if _detail_key(relative_path) is None:
+                issues.append(
+                    ValidationIssue(
+                        code="manifest.detail_key",
+                        path=path,
+                        message="detail file stem must match ^[a-z0-9][a-z0-9_-]*$",
+                    )
+                )
+
+    if len(seen_paths) != len(set(seen_paths)):
+        issues.append(
+            ValidationIssue(
+                code="manifest.path_duplicate",
+                path="$",
+                message="manifest paths must be unique",
+            )
+        )
+
+    return issues
+```
+
+In `load_manifest_package()`, load static chapters through the package-root safety helper, then load detail arrays:
+
+```python
+root_dir = manifest_path.parent
+chapters = {}
+for key, relative_path in STATIC_MANIFEST.items():
+    chapters[key] = _read_package_json_file(root_dir, relative_path, key)
 main_flow_details = _load_detail_files(root_dir, manifest, "main_flow_details")
 module_details = _load_detail_files(root_dir, manifest, "module_details")
 return ManifestPackage(root_dir, manifest_path, manifest, chapters, main_flow_details, module_details)
+```
+
+Add package-root safety helpers:
+
+```python
+def _safe_package_path(root_dir: Path, relative_path: str) -> Path:
+    candidate = root_dir / relative_path
+    try:
+        candidate.resolve().relative_to(root_dir.resolve())
+    except ValueError as exc:
+        raise ValueError(f"manifest path resolves outside package root: {relative_path}") from exc
+    return candidate
+
+def _read_package_json_file(root_dir: Path, relative_path: str, label: str):
+    return _read_json_file(_safe_package_path(root_dir, relative_path), label)
 ```
 
 Add `_load_detail_files()`:
@@ -602,8 +773,8 @@ def _load_detail_files(root_dir: Path, manifest: dict, kind: str) -> list[Detail
                 kind=kind,
                 key=PurePosixPath(relative_path).stem,
                 relative_path=relative_path,
-                path=root_dir / relative_path,
-                data=_read_json_file(root_dir / relative_path, relative_path),
+                path=_safe_package_path(root_dir, relative_path),
+                data=_read_package_json_file(root_dir, relative_path, relative_path),
             )
         )
     return details
@@ -684,7 +855,21 @@ git commit -m "feat: load v040 detail-list manifests"
 - Modify: `scripts/v040_schema.py`
 - Modify: `schemas/v0.4.0/chapter.schema.json`
 
-- [ ] **Step 1: Write failing schema tests**
+- [ ] **Step 1: Replace legacy aggregate schema tests and write failing schema tests**
+
+Before adding new assertions, remove or rewrite every schema test that still mutates the old aggregate files:
+
+```bash
+rg -n "chapters/04-main-flows.json|chapters/05-module-details.json|main_flows\\.flows|module_details\\.modules|intro_blocks" tests/test_v040_chapter_schema.py
+```
+
+Required replacements:
+
+- Replace `test_main_flows_flows_is_required_and_non_empty` with `test_main_flow_detail_requires_reader_goal_and_extra_subsections`.
+- Replace `test_module_details_modules_is_required_and_non_empty` with `test_module_detail_requires_responsibilities`.
+- Remove `test_module_details_intro_blocks_accepts_shared_blocks` because `module_overview` has no shared blocks and module details carry their own `blocks`.
+- Replace `test_module_details_intro_blocks_rejects_unknown_block_types` with a module-detail `blocks` unknown block test using `chapters/05-module-details/storage.json`.
+- Replace the old extra-subsection case for `("module_details", "modules", 0, "extra_subsections")` with direct detail-file validation at `$.module_details[0].extra_subsections`.
 
 Add these tests to `tests/test_v040_chapter_schema.py`:
 
@@ -879,7 +1064,7 @@ Update `schema_validation_result()`:
 def schema_validation_result(package: ManifestPackage) -> ValidationResult:
     result = ValidationResult()
     for key, def_name in STATIC_CHAPTER_DEF_BY_KEY.items():
-        _validate_value(result, def_name, package.chapters[key], f"$.{key}")
+        _validate_value(result, def_name, package.chapters[key], "$")
     for index, detail in enumerate(package.main_flow_details):
         _validate_value(result, "MainFlowDetail", detail.data, f"$.main_flow_details[{index}]")
     for index, detail in enumerate(package.module_details):
@@ -893,12 +1078,14 @@ def _validate_value(result, def_name, value, path_prefix):
         result.error("schema", _schema_error_path(path_prefix, error.path), error.message)
 ```
 
-Update `_schema_error_path()` so it accepts a full path prefix:
+Update `_schema_error_path()` so static chapter payloads keep their natural root path and detail payloads get the manifest-array prefix:
 
 ```python
 def _schema_error_path(path_prefix: str, path) -> str:
     if not path:
         return path_prefix
+    if path_prefix == "$":
+        return _json_path(path)
     return path_prefix + _json_path(path)[1:]
 ```
 
@@ -1113,7 +1300,20 @@ git commit -m "test: migrate minimal reader guide to detail lists"
 - Modify: `tests/test_v040_renderer.py`
 - Modify: `scripts/v040_renderer.py`
 
-- [ ] **Step 1: Write failing renderer tests**
+- [ ] **Step 1: Replace legacy aggregate renderer tests and write failing renderer tests**
+
+Before adding new assertions, remove or rewrite every renderer test that still mutates the old aggregate files:
+
+```bash
+rg -n "chapters/04-main-flows.json|chapters/05-module-details.json|main_flows|module_details\\[\"module_details\"\\]|intro_blocks|modules\\]" tests/test_v040_renderer.py
+```
+
+Required replacements:
+
+- Replace `test_main_flow_has_fourth_level_heading_and_no_step_headings` with an assertion that the detail file renders as `#### 初始化主线`.
+- Rewrite `test_main_flow_without_entry_location_skips_empty_position_lines` to mutate `chapters/04-main-flow-details/init-flow.json` and the matching overview row `location` to an empty string.
+- Remove `test_module_intro_blocks_render_directly_under_module_details` because `module_overview` owns only optional `intro` plus the fixed table.
+- Rewrite extra-subsection tests so main-flow extra subsections live in `chapters/04-main-flow-details/init-flow.json` and module extra subsections live in `chapters/05-module-details/storage.json`.
 
 In `tests/test_v040_renderer.py`, replace old aggregate flow and module assertions with:
 
@@ -1333,7 +1533,20 @@ git commit -m "feat: render v040 overview tables and details"
 - Modify: `scripts/v040_semantics.py`
 - Modify: `scripts/v040_mermaid.py`
 
-- [ ] **Step 1: Write failing semantic tests**
+- [ ] **Step 1: Replace legacy aggregate semantic tests and write failing semantic tests**
+
+Before adding new assertions, remove or rewrite every semantic test that still mutates the old aggregate files:
+
+```bash
+rg -n "chapters/04-main-flows.json|chapters/05-module-details.json|main_flows|module_details\\[\"module_details\"\\]|modules\\[|intro_blocks" tests/test_v040_semantics.py tests/test_v040_mermaid.py
+```
+
+Required replacements:
+
+- Rewrite main-flow count tests to append detail-file paths to `structure.manifest.json`.
+- Rewrite module file-only tests to mutate `chapters/05-module-details/storage.json` directly.
+- Rewrite process metadata tests to mutate detail files and expect `$.main_flow_details[0]` or `$.module_details[0]` paths.
+- Rewrite Mermaid tests so at least one Mermaid block is in `chapters/04-main-flow-details/init-flow.json` and one is in `chapters/05-module-details/storage.json`.
 
 Add to `tests/test_v040_semantics.py`:
 
@@ -1905,6 +2118,8 @@ Update `_unknown_manifest_shape_issue()` so the supported active 0.4.0 keys list
 
 Single-detail validators are strict for subagent handoff: schema errors, semantic errors, Mermaid rendering errors, and semantic warnings all return exit code `2`.
 
+For these single-detail validators, "package context" means the package root has a valid upgraded `structure.manifest.json`, the target detail path is listed in the matching manifest array, and the target detail JSON exists. Static chapter files, overview files, and sibling detail files may still be absent because overview synthesis happens after detail authoring and review.
+
 In `scripts/validate_flow_detail.py`, implement:
 
 ```python
@@ -2090,77 +2305,74 @@ git add tests/test_v040_cli.py scripts/validate_structure.py scripts/render_mark
 git commit -m "feat: add v040 detail validation CLIs"
 ```
 
-## Task 8: Documentation Regression Checks And Final Verification
+## Task 8: Documentation Review And Final Verification
 
-**Nature:** Mixed. Update tests with TDD only where test code changes are needed; review documentation directly.
+**Nature:** Documentation review plus code verification. Documentation changes are reviewed, not tested. Do not modify `tests/test_v040_docs.py` in this task.
 
 **Files:**
 
-- Modify: `tests/test_v040_docs.py`
-- Inspect: all files changed in Tasks 1-7.
+- Inspect: `SKILL.md`
+- Inspect: `references/dsl-spec.md`
+- Inspect: `references/dsl-authoring-guide.md`
+- Inspect: `references/document-structure.md`
+- Inspect: `references/review-checklist.md`
+- Inspect: `references/mermaid-rules.md`
+- Inspect: all code, schema, test, and example files changed in Tasks 2-7.
 
-- [ ] **Step 1: Write failing docs contract tests**
+- [ ] **Step 1: Review documentation against the spec**
 
-Update `tests/test_v040_docs.py` expected strings:
-
-```python
-def test_skill_mentions_detail_list_workflow_and_roles(self):
-    content = (ROOT / "SKILL.md").read_text(encoding="utf-8")
-
-    for expected in [
-        "main_flow_overview",
-        "main_flow_details",
-        "module_overview",
-        "module_details",
-        "validate_flow_detail.py",
-        "validate_module_detail.py",
-        "accepted_main_flows",
-        "accepted_modules",
-        "review_decision: accept | changes_applied | reject_detail | split_required",
-    ]:
-        self.assertIn(expected, content)
-
-def test_references_describe_fixed_overview_tables(self):
-    spec = (ROOT / "references/dsl-spec.md").read_text(encoding="utf-8")
-    authoring = (ROOT / "references/dsl-authoring-guide.md").read_text(encoding="utf-8")
-
-    for expected in [
-        "main_flow_overview",
-        "flow_table",
-        "module_overview",
-        "module_table",
-        "overview rows match detail arrays",
-        "chapters/04-main-flows.json",
-        "chapters/05-module-details.json",
-        "old aggregate path",
-    ]:
-        self.assertIn(expected, spec + authoring)
-```
-
-- [ ] **Step 2: Run docs tests and confirm failure if references are incomplete**
+Read:
 
 ```bash
-python -m unittest tests.test_v040_docs -v
+sed -n '1,260p' docs/superpowers/specs/2026-05-27-create-structure-md-v040-detail-list-upgrade-design.md
+sed -n '261,620p' docs/superpowers/specs/2026-05-27-create-structure-md-v040-detail-list-upgrade-design.md
 ```
 
-Expected: FAIL if documentation from Task 1 missed any required upgraded terms; PASS if Task 1 already covered them.
-
-- [ ] **Step 3: Fix docs or tests to match the approved spec**
-
-If tests fail because documentation lacks an approved term, update the relevant Markdown file. If tests fail because a string expectation is stricter than the approved wording, adjust the test to assert the approved concept using the actual wording from the Markdown.
-
-- [ ] **Step 4: Run focused docs checks again**
+Then inspect the active docs:
 
 ```bash
-python -m unittest tests.test_v040_docs -v
+sed -n '1,260p' SKILL.md
+sed -n '1,320p' references/dsl-spec.md
+sed -n '1,260p' references/dsl-authoring-guide.md
+sed -n '1,220p' references/document-structure.md
+sed -n '1,260p' references/review-checklist.md
+sed -n '1,220p' references/mermaid-rules.md
 ```
 
-Expected: PASS.
+Review checklist:
 
-- [ ] **Step 5: Run full verification**
+- `SKILL.md` says the main agent does not directly author substantive Chapter 4 or Chapter 5 detail prose.
+- `SKILL.md` requires one authoring subagent and one separate adversarial reviewer per detail file.
+- `SKILL.md` says overview files are synthesized after all accepted detail files pass review.
+- `references/dsl-spec.md` documents the upgraded eight-field manifest.
+- `references/dsl-spec.md` labels the old aggregate paths as invalid active 0.4.0 paths.
+- `references/dsl-authoring-guide.md` explains fixed table overviews and one-detail-per-subagent authoring.
+- `references/document-structure.md` shows overview tables before detail sections.
+- `references/review-checklist.md` checks behavior-path fit, responsibility-unit fit, Mermaid readability, process metadata absence, and overview/detail consistency.
+- `references/mermaid-rules.md` does not allow Mermaid in `main_flow_overview` or `module_overview`.
+
+- [ ] **Step 2: Run documentation text scans**
 
 ```bash
-python -m unittest tests.test_v040_manifest tests.test_v040_chapter_schema tests.test_v040_semantics tests.test_v040_mermaid tests.test_v040_renderer tests.test_v040_cli tests.test_v040_docs tests.test_v040_e2e -v
+rg -n "T[B]D|TO[D]O|implement[ ]later|fill[ ]in[ ]details|Similar[ ]to Task|similar[ ]to|same[ ]structure|Add[ ]appropriate|appropriate[ ]error|handle[ ]edge cases" SKILL.md references
+rg -n "main_flows|chapters/04-main-flows.json|intro_blocks|module_details\\.modules|generated_module_object" SKILL.md references
+rg -n "main_flow_overview|main_flow_details|module_overview|module_details|validate_flow_detail|validate_module_detail|accepted_main_flows|accepted_modules" SKILL.md references
+```
+
+Expected:
+
+- First command prints no matches.
+- Second command prints only explicitly rejected old active 0.4.0 shape references.
+- Third command prints upgraded workflow, manifest, validation, and subagent ownership references.
+
+- [ ] **Step 3: Fix documentation review findings**
+
+If review finds a documentation issue, edit only the relevant Markdown file. Do not add or update tests for documentation-only changes.
+
+- [ ] **Step 4: Run full code/schema/example verification**
+
+```bash
+python -m unittest tests.test_v040_manifest tests.test_v040_chapter_schema tests.test_v040_semantics tests.test_v040_mermaid tests.test_v040_renderer tests.test_v040_cli tests.test_v040_e2e -v
 python scripts/validate_structure.py examples/minimal-reader-guide/structure.manifest.json --strict
 python scripts/render_markdown.py examples/minimal-reader-guide/structure.manifest.json --output /tmp/minimal-reader-guide-v040.md
 ```
@@ -2171,7 +2383,7 @@ Expected:
 - Validation prints `Validation succeeded`.
 - Render command prints `Document written: /tmp/minimal-reader-guide-v040.md`.
 
-- [ ] **Step 6: Review generated Markdown**
+- [ ] **Step 5: Review generated Markdown**
 
 Run:
 
@@ -2192,7 +2404,7 @@ Expected Markdown contains, in order:
 ##### 追加写入
 ```
 
-- [ ] **Step 7: Print cleanup commands for the user**
+- [ ] **Step 6: Print cleanup commands for the user**
 
 Do not run these commands. Print them for the user:
 
@@ -2201,12 +2413,14 @@ rm examples/minimal-reader-guide/chapters/04-main-flows.json
 rm examples/minimal-reader-guide/chapters/05-module-details.json
 ```
 
-- [ ] **Step 8: Commit final verification updates**
+- [ ] **Step 7: Commit final documentation review fixes, if any**
 
 ```bash
-git add tests/test_v040_docs.py SKILL.md references/dsl-spec.md references/dsl-authoring-guide.md references/document-structure.md references/review-checklist.md references/mermaid-rules.md
-git commit -m "test: cover v040 detail-list docs"
+git add SKILL.md references/dsl-spec.md references/dsl-authoring-guide.md references/document-structure.md references/review-checklist.md references/mermaid-rules.md
+git commit -m "docs: review v040 detail-list references"
 ```
+
+Expected: only run this commit step if Step 3 changed documentation.
 
 ## Final Acceptance Checklist
 
