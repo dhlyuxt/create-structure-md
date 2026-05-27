@@ -212,12 +212,28 @@ class V040ChapterSchemaTests(unittest.TestCase):
                 {"type": "text", "content": "intro"},
                 {"type": "ordered_list", "items": ["one"]},
                 {"type": "table", "columns": ["a"], "rows": [["b"]]},
-                {"type": "mermaid", "diagram_type": "flowchart", "source": "flowchart LR\nA-->B"},
+                {
+                    "type": "mermaid",
+                    "title": "Intro flow",
+                    "diagram_type": "flowchart",
+                    "source": "flowchart LR\nA-->B",
+                },
                 {"type": "code", "language": "python", "content": "print('ok')"},
             ]
             write_json(root / "chapters/05-module-details.json", data)
 
         self.assertValid(self.validate_package(mutate))
+
+    def test_mermaid_block_title_is_required(self):
+        def mutate(root):
+            data = _read(root / "chapters/05-module-details.json")
+            data["module_details"]["intro_blocks"] = [
+                {"type": "mermaid", "diagram_type": "flowchart", "source": "flowchart LR\nA-->B"}
+            ]
+            write_json(root / "chapters/05-module-details.json", data)
+
+        result = self.validate_package(mutate)
+        self.assertInvalidAt(result, "$.module_details.intro_blocks[0]")
 
     def test_module_details_intro_blocks_rejects_unknown_block_types(self):
         def mutate(root):

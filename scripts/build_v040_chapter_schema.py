@@ -67,7 +67,7 @@ defs = {
         },
     ),
     "MermaidBlock": obj(
-        ["type", "diagram_type", "source"],
+        ["type", "title", "diagram_type", "source"],
         {
             "type": const("mermaid"),
             "title": string(),
