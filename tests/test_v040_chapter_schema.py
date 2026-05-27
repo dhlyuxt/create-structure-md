@@ -41,7 +41,7 @@ class V040ChapterSchemaTests(unittest.TestCase):
             write_json(root / "chapters/01-overview.json", data)
 
         result = self.validate_package(mutate)
-        self.assertInvalidAt(result, "$.overview.overview.repository_intro.blocks[0]")
+        self.assertInvalidAt(result, "$.overview.repository_intro.blocks[0]")
 
     def test_list_block_items_must_be_strings(self):
         def mutate(root):
@@ -50,7 +50,7 @@ class V040ChapterSchemaTests(unittest.TestCase):
             write_json(root / "chapters/01-overview.json", data)
 
         result = self.validate_package(mutate)
-        self.assertInvalidAt(result, "$.overview.overview.main_capabilities.blocks[0]")
+        self.assertInvalidAt(result, "$.overview.main_capabilities.blocks[0]")
 
     def test_quick_start_first_run_steps_is_required_and_non_empty(self):
         def mutate_missing(root):
@@ -65,11 +65,11 @@ class V040ChapterSchemaTests(unittest.TestCase):
 
         self.assertInvalidAt(
             self.validate_package(mutate_missing),
-            "$.quick_start.quick_start.first_run",
+            "$.quick_start.first_run",
         )
         self.assertInvalidAt(
             self.validate_package(mutate_empty),
-            "$.quick_start.quick_start.first_run.steps",
+            "$.quick_start.first_run.steps",
         )
 
     def test_main_flows_flows_is_required_and_non_empty(self):
@@ -83,8 +83,8 @@ class V040ChapterSchemaTests(unittest.TestCase):
             data["main_flows"]["flows"] = []
             write_json(root / "chapters/04-main-flows.json", data)
 
-        self.assertInvalidAt(self.validate_package(mutate_missing), "$.main_flows.main_flows")
-        self.assertInvalidAt(self.validate_package(mutate_empty), "$.main_flows.main_flows.flows")
+        self.assertInvalidAt(self.validate_package(mutate_missing), "$.main_flows")
+        self.assertInvalidAt(self.validate_package(mutate_empty), "$.main_flows.flows")
 
     def test_module_details_modules_is_required_and_non_empty(self):
         def mutate_missing(root):
@@ -99,11 +99,11 @@ class V040ChapterSchemaTests(unittest.TestCase):
 
         self.assertInvalidAt(
             self.validate_package(mutate_missing),
-            "$.module_details.module_details",
+            "$.module_details",
         )
         self.assertInvalidAt(
             self.validate_package(mutate_empty),
-            "$.module_details.module_details.modules",
+            "$.module_details.modules",
         )
 
     def test_overview_core_components_component_table_is_required(self):
@@ -112,7 +112,7 @@ class V040ChapterSchemaTests(unittest.TestCase):
             del data["overview"]["core_components"]["component_table"]
             write_json(root / "chapters/01-overview.json", data)
 
-        self.assertInvalidAt(self.validate_package(mutate), "$.overview.overview.core_components")
+        self.assertInvalidAt(self.validate_package(mutate), "$.overview.core_components")
 
     def test_architecture_layers_layer_table_is_required(self):
         def mutate(root):
@@ -122,7 +122,7 @@ class V040ChapterSchemaTests(unittest.TestCase):
 
         self.assertInvalidAt(
             self.validate_package(mutate),
-            "$.architecture_overview.architecture_overview.layers",
+            "$.architecture_overview.layers",
         )
 
     def test_architecture_module_map_module_table_is_required(self):
@@ -133,7 +133,7 @@ class V040ChapterSchemaTests(unittest.TestCase):
 
         self.assertInvalidAt(
             self.validate_package(mutate),
-            "$.architecture_overview.architecture_overview.module_map",
+            "$.architecture_overview.module_map",
         )
 
     def test_fixed_table_objects_reject_extra_caption_properties_individually(self):
@@ -226,7 +226,7 @@ class V040ChapterSchemaTests(unittest.TestCase):
             write_json(root / "chapters/05-module-details.json", data)
 
         result = self.validate_package(mutate)
-        self.assertInvalidAt(result, "$.module_details.module_details.intro_blocks[0]")
+        self.assertInvalidAt(result, "$.module_details.intro_blocks[0]")
 
     def test_code_block_title_is_optional(self):
         self.assertValid(self.validate_package())
@@ -247,14 +247,13 @@ def _read(path):
 
 
 def _package_path(keys):
-    root = str(keys[0])
     parts = []
     for key in keys:
         if isinstance(key, int):
             parts[-1] += f"[{key}]"
         else:
             parts.append(str(key))
-    return "$." + root + "." + ".".join(parts)
+    return "$." + ".".join(parts)
 
 
 if __name__ == "__main__":

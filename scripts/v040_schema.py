@@ -44,8 +44,14 @@ def schema_validation_result(package: ManifestPackage) -> ValidationResult:
             key=lambda error: list(error.path),
         )
         for error in errors:
-            result.error("schema", f"$.{key}{_json_path(error.path)[1:]}", error.message)
+            result.error("schema", _schema_error_path(key, error.path), error.message)
     return result
+
+
+def _schema_error_path(child_key: str, path) -> str:
+    if not path:
+        return f"$.{child_key}"
+    return _json_path(path)
 
 
 def _json_path(path) -> str:
