@@ -67,7 +67,6 @@ Modify:
 - `scripts/v040_mermaid.py`: Mermaid traversal over static chapters and detail arrays.
 - `scripts/v040_renderer.py`: fixed overview table rendering and detail rendering in manifest order.
 - `scripts/validate_structure.py`: upgraded manifest dispatch and old aggregate migration error.
-- `scripts/render_markdown.py`: render upgraded packages after validation.
 - `tests/helpers_v040.py`: upgraded fixture writer.
 - `tests/test_v040_manifest.py`: manifest and loader tests.
 - `tests/test_v040_chapter_schema.py`: schema tests.
@@ -385,6 +384,52 @@ def write_valid_package(root, *, include_mermaid=False):
     return root / "structure.manifest.json"
 ```
 
+Before adding new assertions, remove or rewrite every manifest test that still asserts the old aggregate package shape:
+
+```bash
+rg -n "main_flows|chapters/04-main-flows.json|chapters/05-module-details.json|module_details\\]\\[\"module_details\"|module_details\\.modules|package\\.chapters\\[\"main_flows\"\\]|package\\.chapters\\.keys\\(\\).*FIXED_MANIFEST" tests/test_v040_manifest.py
+```
+
+Required replacements:
+
+- Update helper imports to include `MAIN_FLOW_DETAIL`:
+
+```python
+from tests.helpers_v040 import FIXED_MANIFEST, MAIN_FLOW_DETAIL, write_valid_package
+```
+
+- Remove old `main_flows = package.chapters["main_flows"]["main_flows"]` fixture assertions and replace them with `package.chapters["main_flow_overview"]["main_flow_overview"]` plus `package.main_flow_details[0].data`.
+- Remove old `module_details = package.chapters["module_details"]["module_details"]` fixture assertions and replace them with `package.chapters["module_overview"]["module_overview"]` plus `package.module_details[0].data`.
+- Do not assert `package.chapters.keys() == FIXED_MANIFEST.keys()` because detail arrays are not static chapter entries.
+- Keep `package.manifest.keys() == FIXED_MANIFEST.keys()` because the manifest itself has all eight upgraded keys.
+- Replace old fixed chapter order assertions with the static chapter order:
+
+```python
+def test_loads_static_chapters_in_fixed_manifest_order_when_json_order_is_reversed(self):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        manifest_path = write_valid_package(tmpdir)
+        reversed_manifest = dict(reversed(list(FIXED_MANIFEST.items())))
+        manifest_path.write_text(
+            json.dumps(reversed_manifest, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        package = load_manifest_package(manifest_path)
+
+    self.assertEqual(
+        [
+            "document",
+            "overview",
+            "quick_start",
+            "architecture_overview",
+            "main_flow_overview",
+            "module_overview",
+        ],
+        list(package.chapters.keys()),
+    )
+    self.assertEqual(["init-flow"], [detail.key for detail in package.main_flow_details])
+    self.assertEqual(["storage"], [detail.key for detail in package.module_details])
+```
+
 In `tests/test_v040_manifest.py`, replace old aggregate expectations with:
 
 ```python
@@ -393,10 +438,25 @@ def test_loads_upgraded_manifest_with_detail_lists(self):
         package = load_manifest_package(write_valid_package(tmpdir))
 
     self.assertEqual(set(FIXED_MANIFEST.keys()), set(package.manifest.keys()))
+    self.assertEqual(
+        {
+            "document",
+            "overview",
+            "quick_start",
+            "architecture_overview",
+            "main_flow_overview",
+            "module_overview",
+        },
+        set(package.chapters.keys()),
+    )
+    self.assertIn("flow_table", package.chapters["main_flow_overview"]["main_flow_overview"])
+    self.assertIn("module_table", package.chapters["module_overview"]["module_overview"])
     self.assertEqual(["init-flow"], [detail.key for detail in package.main_flow_details])
     self.assertEqual(["storage"], [detail.key for detail in package.module_details])
     self.assertEqual("初始化主线", package.main_flow_details[0].data["title"])
+    self.assertEqual("example_init", package.main_flow_details[0].data["entry"]["name"])
     self.assertEqual("存储模块", package.module_details[0].data["name"])
+    self.assertEqual(["保存初始化结果", "提供追加写入机制"], package.module_details[0].data["responsibilities"])
 
 def test_rejects_old_active_v040_aggregate_manifest(self):
     old_manifest = {
@@ -1039,6 +1099,20 @@ wrote /home/hyx/create-structure-md/schemas/v0.4.0/chapter.schema.json
 ```
 
 - [ ] **Step 5: Update schema validation routing**
+
+In `scripts/v040_schema.py`, replace the existing package import:
+
+```python
+from scripts.v040_package import FIXED_MANIFEST, ManifestPackage
+```
+
+with:
+
+```python
+from scripts.v040_package import ManifestPackage
+```
+
+Do not import `FIXED_MANIFEST`; Task 2 removed it from `scripts/v040_package.py`.
 
 In `scripts/v040_schema.py`, replace old key routing with:
 
@@ -1915,7 +1989,6 @@ git commit -m "feat: validate v040 detail semantics"
 
 - Modify: `tests/test_v040_cli.py`
 - Modify: `scripts/validate_structure.py`
-- Modify: `scripts/render_markdown.py`
 - Create: `scripts/validate_flow_detail.py`
 - Create: `scripts/validate_module_detail.py`
 
@@ -2301,7 +2374,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit CLI work**
 
 ```bash
-git add tests/test_v040_cli.py scripts/validate_structure.py scripts/render_markdown.py scripts/validate_flow_detail.py scripts/validate_module_detail.py
+git add tests/test_v040_cli.py scripts/validate_structure.py scripts/validate_flow_detail.py scripts/validate_module_detail.py
 git commit -m "feat: add v040 detail validation CLIs"
 ```
 
