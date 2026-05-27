@@ -1,0 +1,873 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://create-structure-md.local/schemas/v0.4.0/chapter.schema.json",
+  "$defs": {
+    "TextBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "content"
+      ],
+      "properties": {
+        "type": {
+          "const": "text"
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "UnorderedListBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "items"
+      ],
+      "properties": {
+        "type": {
+          "const": "unordered_list"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "OrderedListBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "items"
+      ],
+      "properties": {
+        "type": {
+          "const": "ordered_list"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "TableBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "columns",
+        "rows"
+      ],
+      "properties": {
+        "type": {
+          "const": "table"
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "MermaidBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "diagram_type",
+        "source"
+      ],
+      "properties": {
+        "type": {
+          "const": "mermaid"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "diagram_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "CodeBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "language",
+        "content"
+      ],
+      "properties": {
+        "type": {
+          "const": "code"
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "Block": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/TextBlock"
+        },
+        {
+          "$ref": "#/$defs/UnorderedListBlock"
+        },
+        {
+          "$ref": "#/$defs/OrderedListBlock"
+        },
+        {
+          "$ref": "#/$defs/TableBlock"
+        },
+        {
+          "$ref": "#/$defs/MermaidBlock"
+        },
+        {
+          "$ref": "#/$defs/CodeBlock"
+        }
+      ]
+    },
+    "ExtraSubsection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "title",
+        "blocks"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Block"
+          }
+        }
+      }
+    },
+    "DocumentChapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "document"
+      ],
+      "properties": {
+        "document": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repository_name",
+            "output_file",
+            "summary"
+          ],
+          "properties": {
+            "repository_name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "output_file": {
+              "type": "string",
+              "minLength": 1
+            },
+            "summary": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "ComponentRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component",
+        "role",
+        "location"
+      ],
+      "properties": {
+        "component": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "location": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "LayerRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "layer",
+        "role",
+        "location"
+      ],
+      "properties": {
+        "layer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "location": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "ModuleTableRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "module",
+        "role",
+        "layer",
+        "location"
+      ],
+      "properties": {
+        "module": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "layer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "location": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "ComponentTable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rows"
+      ],
+      "properties": {
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ComponentRow"
+          }
+        }
+      }
+    },
+    "LayerTable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rows"
+      ],
+      "properties": {
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/LayerRow"
+          }
+        }
+      }
+    },
+    "ModuleTable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rows"
+      ],
+      "properties": {
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModuleTableRow"
+          }
+        }
+      }
+    },
+    "CoreComponentsSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component_table"
+      ],
+      "properties": {
+        "component_table": {
+          "$ref": "#/$defs/ComponentTable"
+        },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Block"
+          }
+        }
+      }
+    },
+    "LayersSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "layer_table"
+      ],
+      "properties": {
+        "layer_table": {
+          "$ref": "#/$defs/LayerTable"
+        },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Block"
+          }
+        }
+      }
+    },
+    "ModuleMapSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "module_table"
+      ],
+      "properties": {
+        "module_table": {
+          "$ref": "#/$defs/ModuleTable"
+        },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Block"
+          }
+        }
+      }
+    },
+    "OverviewChapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "overview"
+      ],
+      "properties": {
+        "overview": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repository_intro",
+            "problems_solved",
+            "main_capabilities",
+            "core_components",
+            "extra_subsections"
+          ],
+          "properties": {
+            "repository_intro": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "blocks"
+              ],
+              "properties": {
+                "blocks": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/Block"
+                  }
+                }
+              }
+            },
+            "problems_solved": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "blocks"
+              ],
+              "properties": {
+                "blocks": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/Block"
+                  }
+                }
+              }
+            },
+            "main_capabilities": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "blocks"
+              ],
+              "properties": {
+                "blocks": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/Block"
+                  }
+                }
+              }
+            },
+            "core_components": {
+              "$ref": "#/$defs/CoreComponentsSection"
+            },
+            "extra_subsections": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExtraSubsection"
+              }
+            }
+          }
+        }
+      }
+    },
+    "FirstRunStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "blocks"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Block"
+          }
+        }
+      }
+    },
+    "FirstRunSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "steps",
+        "blocks"
+      ],
+      "properties": {
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FirstRunStep"
+          },
+          "minItems": 1
+        },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Block"
+          }
+        }
+      }
+    },
+    "QuickStartChapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "quick_start"
+      ],
+      "properties": {
+        "quick_start": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "usage_scenarios",
+            "setup",
+            "first_run",
+            "minimal_example",
+            "expected_result",
+            "extra_subsections"
+          ],
+          "properties": {
+            "usage_scenarios": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "blocks"
+              ],
+              "properties": {
+                "blocks": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/Block"
+                  }
+                }
+              }
+            },
+            "setup": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "blocks"
+              ],
+              "properties": {
+                "blocks": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/Block"
+                  }
+                }
+              }
+            },
+            "first_run": {
+              "$ref": "#/$defs/FirstRunSection"
+            },
+            "minimal_example": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "blocks"
+              ],
+              "properties": {
+                "blocks": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/Block"
+                  }
+                }
+              }
+            },
+            "expected_result": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "blocks"
+              ],
+              "properties": {
+                "blocks": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/Block"
+                  }
+                }
+              }
+            },
+            "extra_subsections": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExtraSubsection"
+              }
+            }
+          }
+        }
+      }
+    },
+    "ArchitectureOverviewChapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "architecture_overview"
+      ],
+      "properties": {
+        "architecture_overview": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "architecture_summary",
+            "layers",
+            "module_map",
+            "repository_layout",
+            "extra_subsections"
+          ],
+          "properties": {
+            "architecture_summary": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "blocks"
+              ],
+              "properties": {
+                "blocks": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/Block"
+                  }
+                }
+              }
+            },
+            "layers": {
+              "$ref": "#/$defs/LayersSection"
+            },
+            "module_map": {
+              "$ref": "#/$defs/ModuleMapSection"
+            },
+            "repository_layout": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "blocks"
+              ],
+              "properties": {
+                "blocks": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/Block"
+                  }
+                }
+              }
+            },
+            "extra_subsections": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExtraSubsection"
+              }
+            }
+          }
+        }
+      }
+    },
+    "MainFlowEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "location": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "MainFlow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "purpose",
+        "entry",
+        "blocks"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entry": {
+          "$ref": "#/$defs/MainFlowEntry"
+        },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Block"
+          }
+        }
+      }
+    },
+    "MainFlowsChapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "main_flows"
+      ],
+      "properties": {
+        "main_flows": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "flow_overview",
+            "flows",
+            "extra_subsections"
+          ],
+          "properties": {
+            "flow_overview": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "blocks"
+              ],
+              "properties": {
+                "blocks": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/Block"
+                  }
+                }
+              }
+            },
+            "flows": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/MainFlow"
+              },
+              "minItems": 1
+            },
+            "extra_subsections": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExtraSubsection"
+              }
+            }
+          }
+        }
+      }
+    },
+    "Mechanism": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "blocks"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Block"
+          }
+        }
+      }
+    },
+    "Module": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "location",
+        "purpose",
+        "blocks",
+        "mechanisms",
+        "extra_subsections"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "location": {
+          "type": "string",
+          "minLength": 1
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Block"
+          }
+        },
+        "mechanisms": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Mechanism"
+          }
+        },
+        "extra_subsections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ExtraSubsection"
+          }
+        }
+      }
+    },
+    "ModuleDetailsChapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "module_details"
+      ],
+      "properties": {
+        "module_details": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "intro_blocks",
+            "modules",
+            "extra_subsections"
+          ],
+          "properties": {
+            "intro_blocks": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Block"
+              }
+            },
+            "modules": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Module"
+              },
+              "minItems": 1
+            },
+            "extra_subsections": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExtraSubsection"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
