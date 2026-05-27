@@ -56,7 +56,10 @@ def detail_semantic_validation_result(kind: str, index: int, data: dict) -> Vali
 
 
 def _check_main_flow_overview(package, result):
-    overview = package.chapters.get("main_flow_overview", {}).get("main_flow_overview")
+    chapter = package.chapters.get("main_flow_overview")
+    if not isinstance(chapter, dict):
+        return
+    overview = chapter.get("main_flow_overview")
     if not isinstance(overview, dict):
         return
     flow_table = overview.get("flow_table")
@@ -75,11 +78,11 @@ def _check_main_flow_overview(package, result):
         return
     for index, (row, detail) in enumerate(zip(rows, details)):
         if not isinstance(row, dict) or not isinstance(detail.data, dict):
-            return
+            continue
         flow = detail.data
         entry = flow.get("entry")
         if not isinstance(entry, dict):
-            return
+            continue
         title = flow.get("title")
         purpose = flow.get("purpose")
         entry_name = entry.get("name")
@@ -88,7 +91,7 @@ def _check_main_flow_overview(package, result):
             isinstance(value, str)
             for value in (title, purpose, entry_name, entry_location)
         ):
-            return
+            continue
         expected = {
             "flow": title,
             "purpose": purpose,
@@ -106,7 +109,10 @@ def _check_main_flow_overview(package, result):
 
 
 def _check_module_overview(package, result):
-    overview = package.chapters.get("module_overview", {}).get("module_overview")
+    chapter = package.chapters.get("module_overview")
+    if not isinstance(chapter, dict):
+        return
+    overview = chapter.get("module_overview")
     if not isinstance(overview, dict):
         return
     module_table = overview.get("module_table")
@@ -125,13 +131,13 @@ def _check_module_overview(package, result):
         return
     for index, (row, detail) in enumerate(zip(rows, details)):
         if not isinstance(row, dict) or not isinstance(detail.data, dict):
-            return
+            continue
         module = detail.data
         name = module.get("name")
         purpose = module.get("purpose")
         location = module.get("location")
         if not all(isinstance(value, str) for value in (name, purpose, location)):
-            return
+            continue
         expected = {
             "module": name,
             "purpose": purpose,

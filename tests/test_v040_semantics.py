@@ -51,24 +51,34 @@ class V040SemanticTests(unittest.TestCase):
             (
                 "missing flow table",
                 "chapters/04-main-flow-overview.json",
-                lambda data: data["main_flow_overview"].pop("flow_table"),
+                lambda data: _without_key(data, ("main_flow_overview",), "flow_table"),
+            ),
+            (
+                "array flow overview payload",
+                "chapters/04-main-flow-overview.json",
+                lambda data: [],
             ),
             (
                 "missing module table",
                 "chapters/05-module-overview.json",
-                lambda data: data["module_overview"].pop("module_table"),
+                lambda data: _without_key(data, ("module_overview",), "module_table"),
+            ),
+            (
+                "array module overview payload",
+                "chapters/05-module-overview.json",
+                lambda data: [],
             ),
             (
                 "missing flow title",
                 "chapters/04-main-flow-details/init-flow.json",
-                lambda data: data.pop("title"),
+                lambda data: _without_key(data, (), "title"),
             ),
         ]
         for label, relative_path, mutate_data in cases:
             with self.subTest(label=label):
                 def mutate(root, relative_path=relative_path, mutate_data=mutate_data):
                     data = _read(root / relative_path)
-                    mutate_data(data)
+                    data = mutate_data(data)
                     write_json(root / relative_path, data)
 
                 result = self.validate(mutate)
@@ -325,6 +335,14 @@ class V040SemanticTests(unittest.TestCase):
 
 def _read(path):
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _without_key(data, parents, key):
+    target = data
+    for parent in parents:
+        target = target[parent]
+    target.pop(key)
+    return data
 
 
 if __name__ == "__main__":
