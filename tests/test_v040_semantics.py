@@ -38,6 +38,11 @@ class V040SemanticTests(unittest.TestCase):
         result = self.validate(mutate)
 
         self.assertWarningCode(result, "semantics.main_flows.too_many")
+        self.assertWarningPath(
+            result,
+            "semantics.main_flows.too_many",
+            "$.main_flows.main_flows.flows",
+        )
 
     def test_warns_when_module_entry_looks_like_file_only_listing(self):
         def mutate(root):
@@ -55,6 +60,11 @@ class V040SemanticTests(unittest.TestCase):
         result = self.validate(mutate)
 
         self.assertWarningCode(result, "semantics.module.file_only")
+        self.assertWarningPath(
+            result,
+            "semantics.module.file_only",
+            "$.module_details.module_details.modules[0]",
+        )
 
     def test_errors_when_process_metadata_appears_in_text_content(self):
         def mutate(root):
@@ -140,6 +150,15 @@ class V040SemanticTests(unittest.TestCase):
     def assertWarningCode(self, result, code):
         self.assertTrue(
             any(issue.code == code for issue in result.warnings),
+            [issue.format() for issue in result.warnings],
+        )
+
+    def assertWarningPath(self, result, code, path):
+        self.assertTrue(
+            any(
+                issue.code == code and issue.path == path
+                for issue in result.warnings
+            ),
             [issue.format() for issue in result.warnings],
         )
 

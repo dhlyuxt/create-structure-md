@@ -1,4 +1,5 @@
 import sys
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -37,7 +38,8 @@ class V040MermaidTests(unittest.TestCase):
         self, locate_mermaid_cli, subprocess_run
     ):
         def render_svg(command, **kwargs):
-            Path(command[4]).write_text("<svg></svg>", encoding="utf-8")
+            output_path = command[command.index("-o") + 1]
+            Path(output_path).write_text("<svg></svg>", encoding="utf-8")
             return mock.Mock(returncode=0, stderr="")
 
         subprocess_run.side_effect = render_svg
@@ -51,6 +53,7 @@ class V040MermaidTests(unittest.TestCase):
         self.assertEqual("/usr/bin/mmdc", command[0])
         self.assertIn("-i", command)
         self.assertIn("-o", command)
+        self.assertEqual(30, subprocess_run.call_args.kwargs["timeout"])
 
     @mock.patch("scripts.v040_mermaid.subprocess.run")
     @mock.patch("scripts.v040_mermaid._locate_mermaid_cli", return_value=None)
@@ -96,6 +99,46 @@ class V040MermaidTests(unittest.TestCase):
 
         self.assertTrue(
             any(issue.code == "mermaid.svg_missing" for issue in result.errors),
+            [issue.format() for issue in result.errors],
+        )
+
+    @mock.patch("scripts.v040_mermaid.subprocess.run")
+    @mock.patch("scripts.v040_mermaid._locate_mermaid_cli", return_value="/usr/bin/mmdc")
+    def test_cli_os_error_is_reported_with_block_path(
+        self, locate_mermaid_cli, subprocess_run
+    ):
+        subprocess_run.side_effect = OSError("permission denied")
+
+        result = self.validate(include_mermaid=True)
+
+        self.assertTrue(
+            any(
+                issue.code == "mermaid.cli_error"
+                and "$.overview.overview.repository_intro.blocks[1]" in issue.message
+                and "permission denied" in issue.message
+                for issue in result.errors
+            ),
+            [issue.format() for issue in result.errors],
+        )
+
+    @mock.patch("scripts.v040_mermaid.subprocess.run")
+    @mock.patch("scripts.v040_mermaid._locate_mermaid_cli", return_value="/usr/bin/mmdc")
+    def test_cli_timeout_is_reported_with_block_path(
+        self, locate_mermaid_cli, subprocess_run
+    ):
+        subprocess_run.side_effect = subprocess.TimeoutExpired(
+            cmd=["mmdc"], timeout=30
+        )
+
+        result = self.validate(include_mermaid=True)
+
+        self.assertTrue(
+            any(
+                issue.code == "mermaid.timeout"
+                and "$.overview.overview.repository_intro.blocks[1]" in issue.message
+                and "30" in issue.message
+                for issue in result.errors
+            ),
             [issue.format() for issue in result.errors],
         )
 

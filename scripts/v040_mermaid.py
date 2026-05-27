@@ -6,6 +6,9 @@ from pathlib import Path
 from scripts.v040_types import ValidationResult
 
 
+MERMAID_RENDER_TIMEOUT_SECONDS = 30
+
+
 def mermaid_validation_result(package) -> ValidationResult:
     result = ValidationResult()
     blocks = list(_iter_mermaid_blocks(package))
@@ -37,11 +40,28 @@ def _validate_mermaid_block(mmdc, path, block, result):
         output_path = tmpdir / "diagram.svg"
         input_path.write_text(block.get("source", ""), encoding="utf-8")
 
-        completed = subprocess.run(
-            [mmdc, "-i", str(input_path), "-o", str(output_path)],
-            capture_output=True,
-            text=True,
-        )
+        try:
+            completed = subprocess.run(
+                [mmdc, "-i", str(input_path), "-o", str(output_path)],
+                capture_output=True,
+                text=True,
+                timeout=MERMAID_RENDER_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired as exc:
+            result.error(
+                "mermaid.timeout",
+                path,
+                f"Mermaid CLI timed out after {exc.timeout} seconds for block {path}",
+            )
+            return
+        except OSError as exc:
+            result.error(
+                "mermaid.cli_error",
+                path,
+                f"Mermaid CLI could not run for block {path}: {exc}",
+            )
+            return
+
         if completed.returncode != 0:
             stderr = (completed.stderr or "").strip()
             detail = f": {stderr}" if stderr else ""

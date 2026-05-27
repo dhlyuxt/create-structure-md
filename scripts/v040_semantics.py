@@ -38,7 +38,7 @@ def _check_main_flow_count(package, result):
     if len(flows) > 3:
         result.warning(
             "semantics.main_flows.too_many",
-            "$.main_flows.flows",
+            "$.main_flows.main_flows.flows",
             "reader guide should select at most three main flows",
         )
 
@@ -59,7 +59,7 @@ def _check_modules(package, result):
         ):
             result.warning(
                 "semantics.module.file_only",
-                f"$.module_details.modules[{index}]",
+                f"$.module_details.module_details.modules[{index}]",
                 "module entry looks like a file-only listing instead of a responsibility unit",
             )
 
