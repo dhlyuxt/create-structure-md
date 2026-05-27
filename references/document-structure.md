@@ -26,11 +26,11 @@ Rendered Markdown is generated output. The source of truth is `structure.manifes
 
 Renderer-owned fixed headings are not repeated as `title` fields in fixed DSL sections. Fixed sections also do not carry `key` fields.
 
-Main-flow detail headings come from `main_flow_detail.title`.
+Main-flow detail headings come from `main_flow_details[].title`.
 
-Module detail headings come from `module_detail.name`.
+Module detail headings come from `module_details[].name`.
 
-Mechanism headings come from `module_detail.mechanisms[].title`.
+Mechanism headings come from `module_details[].mechanisms[].title`.
 
 Extra subsection headings come from each extra subsection `title`; their stable identifiers come from `key`.
 

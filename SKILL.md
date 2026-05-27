@@ -71,7 +71,7 @@ The main agent ensures `main_flow_overview` and `module_overview` are synthesize
 
 ## Subagent Roles
 
-Planning subagents may propose reader questions, behavior paths, responsibility units, and ownership boundaries. Their reports are process records and stay outside JSON.
+Planning subagents may propose `repository_identity`, `target_readers`, `reader_questions`, behavior paths, responsibility units, and ownership boundaries. Their reports are process records and stay outside JSON.
 
 Main-flow authoring subagents write exactly one assigned flow detail file under `chapters/04-main-flow-details/<flow-key>.json`.
 

@@ -399,9 +399,10 @@ Example `chapters/04-main-flow-overview.json`:
     "flow_table": {
       "rows": [
         {
-          "title": "验证并渲染结构说明",
+          "flow": "验证并渲染结构说明",
           "purpose": "确认 DSL package 有效并生成 Markdown。",
           "entry": "structure.manifest.json",
+          "location": "package/structure.manifest.json",
           "anchor": "验证并渲染结构说明"
         }
       ]
@@ -420,41 +421,40 @@ Example `chapters/04-main-flow-details/validate-and-render.json`:
 
 ```json
 {
-  "main_flow_detail": {
-    "title": "验证并渲染结构说明",
-    "purpose": "确认 DSL package 有效并生成 Markdown。",
-    "entry": {
-      "name": "structure.manifest.json",
-      "location": "package/structure.manifest.json"
+  "title": "验证并渲染结构说明",
+  "purpose": "确认 DSL package 有效并生成 Markdown。",
+  "reader_goal": "读者想知道一个 DSL package 如何从验证进入渲染。",
+  "entry": {
+    "name": "structure.manifest.json",
+    "location": "package/structure.manifest.json"
+  },
+  "blocks": [
+    {
+      "type": "text",
+      "content": "使用者把 manifest 交给验证器，修复源 JSON 后再交给渲染器。"
     },
-    "blocks": [
-      {
-        "type": "text",
-        "content": "使用者把 manifest 交给验证器，修复源 JSON 后再交给渲染器。"
-      },
-      {
-        "type": "mermaid",
-        "title": "验证与渲染",
-        "diagram_type": "sequenceDiagram",
-        "source": "sequenceDiagram\n  participant User\n  participant Validator\n  participant Renderer\n  User->>Validator: Validate manifest\n  User->>Renderer: Render manifest"
-      }
-    ],
-    "extra_subsections": [
-      {
-        "key": "reader_checks",
-        "title": "读者检查点",
-        "blocks": [
-          {
-            "type": "unordered_list",
-            "items": [
-              "先修复源 JSON",
-              "再重新渲染 Markdown"
-            ]
-          }
-        ]
-      }
-    ]
-  }
+    {
+      "type": "mermaid",
+      "title": "验证与渲染",
+      "diagram_type": "sequenceDiagram",
+      "source": "sequenceDiagram\n  participant User\n  participant Validator\n  participant Renderer\n  User->>Validator: Validate manifest\n  User->>Renderer: Render manifest"
+    }
+  ],
+  "extra_subsections": [
+    {
+      "key": "reader_checks",
+      "title": "读者检查点",
+      "blocks": [
+        {
+          "type": "unordered_list",
+          "items": [
+            "先修复源 JSON",
+            "再重新渲染 Markdown"
+          ]
+        }
+      ]
+    }
+  ]
 }
 ```
 
@@ -476,8 +476,8 @@ Example `chapters/05-module-overview.json`:
     "module_table": {
       "rows": [
         {
-          "name": "Validator",
-          "responsibility": "检查 manifest 和 child JSON files 是否符合 0.4.0 contract。",
+          "module": "Validator",
+          "purpose": "检查 manifest 和 child JSON files 是否符合 0.4.0 contract。",
           "location": "scripts/validate_structure.py",
           "anchor": "Validator"
         }
@@ -497,45 +497,48 @@ Example `chapters/05-module-details/validator.json`:
 
 ```json
 {
-  "module_detail": {
-    "name": "Validator",
-    "location": "scripts/validate_structure.py",
-    "purpose": "检查 manifest 和 child JSON files 是否符合 0.4.0 contract。",
-    "blocks": [
-      {
-        "type": "unordered_list",
-        "items": [
-          "验证入口始终是 structure.manifest.json",
-          "错误应指向可修复的源 JSON"
-        ]
-      }
-    ],
-    "mechanisms": [
-      {
-        "title": "Strict validation",
-        "blocks": [
-          {
-            "type": "text",
-            "content": "严格模式拒绝未知字段、错误 block shape 和不符合章节约束的结构。"
-          }
-        ]
-      }
-    ],
-    "extra_subsections": [
-      {
-        "key": "validator_risks",
-        "title": "修改风险",
-        "blocks": [
-          {
-            "type": "text",
-            "content": "修改 schema 约束时要同步更新 DSL spec 和 authoring guide。"
-          }
-        ]
-      }
-    ]
-  }
+  "name": "Validator",
+  "location": "scripts/validate_structure.py",
+  "purpose": "检查 manifest 和 child JSON files 是否符合 0.4.0 contract。",
+  "responsibilities": [
+    "验证入口始终是 structure.manifest.json",
+    "错误应指向可修复的源 JSON"
+  ],
+  "blocks": [
+    {
+      "type": "text",
+      "content": "Validator 负责把 manifest、章节 JSON、语义规则和 Mermaid 渲染门禁汇总成可操作的诊断。"
+    }
+  ],
+  "mechanisms": [
+    {
+      "title": "Strict validation",
+      "blocks": [
+        {
+          "type": "text",
+          "content": "严格模式拒绝未知字段、错误 block shape 和不符合章节约束的结构。"
+        }
+      ]
+    }
+  ],
+  "extra_subsections": [
+    {
+      "key": "validator_risks",
+      "title": "修改风险",
+      "blocks": [
+        {
+          "type": "text",
+          "content": "修改 schema 约束时要同步更新 DSL spec 和 authoring guide。"
+        }
+      ]
+    }
+  ]
 }
 ```
+
+## Module Details
+
+This heading names the rendered Chapter 5 detail family. The executable DSL contract for each individual file is the singular `Module Detail` object above.
 
 ## Extra Subsections
 

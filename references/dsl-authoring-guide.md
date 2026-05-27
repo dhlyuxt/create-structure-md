@@ -66,7 +66,7 @@ Overview tables are fixed table artifacts and must link to detail headings throu
 
 Module detail files describe responsibility units, not source-file listings.
 
-模块详解回答“每个重要责任单元负责什么、靠什么机制工作、读者修改时该注意什么”。模块标题来自 `module_detail.name`。
+模块详解回答“每个重要责任单元负责什么、靠什么机制工作、读者修改时该注意什么”。模块标题来自 `module_details[].name`。
 
 Module authoring subagents write exactly one assigned module detail file.
 
