@@ -56,9 +56,15 @@ def detail_semantic_validation_result(kind: str, index: int, data: dict) -> Vali
 
 
 def _check_main_flow_overview(package, result):
-    rows = package.chapters["main_flow_overview"]["main_flow_overview"]["flow_table"][
-        "rows"
-    ]
+    overview = package.chapters.get("main_flow_overview", {}).get("main_flow_overview")
+    if not isinstance(overview, dict):
+        return
+    flow_table = overview.get("flow_table")
+    if not isinstance(flow_table, dict):
+        return
+    rows = flow_table.get("rows")
+    if not isinstance(rows, list):
+        return
     details = package.main_flow_details
     if len(rows) != len(details):
         result.error(
@@ -68,13 +74,27 @@ def _check_main_flow_overview(package, result):
         )
         return
     for index, (row, detail) in enumerate(zip(rows, details)):
+        if not isinstance(row, dict) or not isinstance(detail.data, dict):
+            return
         flow = detail.data
+        entry = flow.get("entry")
+        if not isinstance(entry, dict):
+            return
+        title = flow.get("title")
+        purpose = flow.get("purpose")
+        entry_name = entry.get("name")
+        entry_location = entry.get("location", "")
+        if not all(
+            isinstance(value, str)
+            for value in (title, purpose, entry_name, entry_location)
+        ):
+            return
         expected = {
-            "flow": flow["title"],
-            "purpose": flow["purpose"],
-            "entry": flow["entry"]["name"],
-            "location": flow["entry"].get("location", ""),
-            "anchor": flow["title"],
+            "flow": title,
+            "purpose": purpose,
+            "entry": entry_name,
+            "location": entry_location,
+            "anchor": title,
         }
         actual = {key: row.get(key, "") for key in expected}
         if actual != expected:
@@ -86,7 +106,15 @@ def _check_main_flow_overview(package, result):
 
 
 def _check_module_overview(package, result):
-    rows = package.chapters["module_overview"]["module_overview"]["module_table"]["rows"]
+    overview = package.chapters.get("module_overview", {}).get("module_overview")
+    if not isinstance(overview, dict):
+        return
+    module_table = overview.get("module_table")
+    if not isinstance(module_table, dict):
+        return
+    rows = module_table.get("rows")
+    if not isinstance(rows, list):
+        return
     details = package.module_details
     if len(rows) != len(details):
         result.error(
@@ -96,12 +124,19 @@ def _check_module_overview(package, result):
         )
         return
     for index, (row, detail) in enumerate(zip(rows, details)):
+        if not isinstance(row, dict) or not isinstance(detail.data, dict):
+            return
         module = detail.data
+        name = module.get("name")
+        purpose = module.get("purpose")
+        location = module.get("location")
+        if not all(isinstance(value, str) for value in (name, purpose, location)):
+            return
         expected = {
-            "module": module["name"],
-            "purpose": module["purpose"],
-            "location": module["location"],
-            "anchor": module["name"],
+            "module": name,
+            "purpose": purpose,
+            "location": location,
+            "anchor": name,
         }
         actual = {key: row.get(key, "") for key in expected}
         if actual != expected:

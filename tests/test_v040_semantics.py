@@ -46,6 +46,35 @@ class V040SemanticTests(unittest.TestCase):
 
         self.assertErrorCode(result, "semantics.module_overview.mismatch")
 
+    def test_malformed_overview_or_detail_shapes_do_not_raise_semantic_validation(self):
+        cases = [
+            (
+                "missing flow table",
+                "chapters/04-main-flow-overview.json",
+                lambda data: data["main_flow_overview"].pop("flow_table"),
+            ),
+            (
+                "missing module table",
+                "chapters/05-module-overview.json",
+                lambda data: data["module_overview"].pop("module_table"),
+            ),
+            (
+                "missing flow title",
+                "chapters/04-main-flow-details/init-flow.json",
+                lambda data: data.pop("title"),
+            ),
+        ]
+        for label, relative_path, mutate_data in cases:
+            with self.subTest(label=label):
+                def mutate(root, relative_path=relative_path, mutate_data=mutate_data):
+                    data = _read(root / relative_path)
+                    mutate_data(data)
+                    write_json(root / relative_path, data)
+
+                result = self.validate(mutate)
+
+                self.assertIsNotNone(result)
+
     def test_warns_when_more_than_three_main_flow_detail_files_are_selected(self):
         def mutate(root):
             manifest = _read(root / "structure.manifest.json")
