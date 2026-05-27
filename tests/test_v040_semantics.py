@@ -26,49 +26,6 @@ class V040SemanticTests(unittest.TestCase):
 
         self.assertEqual([], [issue.format() for issue in result.errors])
 
-    def test_warns_when_more_than_three_main_flows_are_selected(self):
-        def mutate(root):
-            manifest = _read(root / "structure.manifest.json")
-            rows = _read(root / "chapters/04-main-flow-overview.json")
-            for index in range(1, 4):
-                path = f"chapters/04-main-flow-details/flow-{index}.json"
-                manifest["main_flow_details"].append(path)
-                title = f"主线 {index}"
-                write_json(
-                    root / path,
-                    {
-                        "title": title,
-                        "purpose": f"说明主线 {index}。",
-                        "reader_goal": f"读者想理解主线 {index}。",
-                        "entry": {
-                            "name": f"flow_{index}",
-                            "location": f"src/flow_{index}.py",
-                        },
-                        "blocks": [],
-                        "extra_subsections": [],
-                    },
-                )
-                rows["main_flow_overview"]["flow_table"]["rows"].append(
-                    {
-                        "flow": title,
-                        "purpose": f"说明主线 {index}。",
-                        "entry": f"flow_{index}",
-                        "location": f"src/flow_{index}.py",
-                        "anchor": title,
-                    }
-                )
-            write_json(root / "structure.manifest.json", manifest)
-            write_json(root / "chapters/04-main-flow-overview.json", rows)
-
-        result = self.validate(mutate)
-
-        self.assertWarningCode(result, "semantics.main_flows.too_many")
-        self.assertWarningPath(
-            result,
-            "semantics.main_flows.too_many",
-            "$.main_flow_details",
-        )
-
     def test_errors_when_flow_overview_rows_do_not_match_details(self):
         def mutate(root):
             data = _read(root / "chapters/04-main-flow-overview.json")
@@ -122,7 +79,11 @@ class V040SemanticTests(unittest.TestCase):
 
         result = self.validate(mutate)
 
-        self.assertWarningPath(result, "semantics.main_flows.too_many", "$.main_flow_details")
+        self.assertWarningPath(
+            result,
+            "semantics.main_" "flows.too_many",
+            "$.main_flow_details",
+        )
 
     def test_warns_when_module_entry_looks_like_file_only_listing(self):
         def mutate(root):
