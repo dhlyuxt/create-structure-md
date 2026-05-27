@@ -169,6 +169,34 @@ class V040CliTests(unittest.TestCase):
         self.assertEqual(2, code)
         self.assertIn("default output_file must be relative", stderr.getvalue())
 
+    def test_render_cli_rejects_default_output_path_that_escapes_through_symlink(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package_root = Path(tmpdir) / "package"
+            outside_root = Path(tmpdir) / "outside"
+            outside_root.mkdir()
+            manifest = write_valid_package(package_root, include_mermaid=False)
+            (package_root / "linked-outside").symlink_to(
+                outside_root,
+                target_is_directory=True,
+            )
+            document_path = package_root / "chapters/00-document.json"
+            document = {
+                "document": {
+                    "repository_name": "示例仓库",
+                    "output_file": "linked-outside/rendered.md",
+                    "summary": "用于验证 0.4.0 reader guide package 的示例仓库。",
+                }
+            }
+            write_json(document_path, document)
+            stderr = io.StringIO()
+
+            with contextlib.redirect_stderr(stderr):
+                code = render_cli.main([str(manifest)])
+
+            self.assertEqual(2, code)
+            self.assertFalse((outside_root / "rendered.md").exists())
+            self.assertIn("stay within the package root", stderr.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

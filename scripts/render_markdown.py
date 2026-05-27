@@ -80,7 +80,19 @@ def _resolve_output_path(package, output):
             )
         ]
 
-    return package.root_dir / default_path, []
+    output_path = package.root_dir / default_path
+    try:
+        output_path.resolve().relative_to(package.root_dir.resolve())
+    except ValueError:
+        return output_path, [
+            ValidationIssue(
+                "render.output_path",
+                "$.document.document.output_file",
+                "default output_file must stay within the package root",
+            )
+        ]
+
+    return output_path, []
 
 
 if __name__ == "__main__":

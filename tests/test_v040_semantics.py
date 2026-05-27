@@ -116,6 +116,60 @@ class V040SemanticTests(unittest.TestCase):
 
         self.assertErrorCode(result, "semantics.process_metadata")
 
+    def test_errors_when_process_metadata_appears_in_rendered_fields(self):
+        def mutate(root):
+            document = _read(root / "chapters/00-document.json")
+            document["document"]["summary"] = "raw scan log should not ship"
+            write_json(root / "chapters/00-document.json", document)
+
+            quick_start = _read(root / "chapters/02-quick-start.json")
+            quick_start["quick_start"]["setup"]["blocks"].append(
+                {
+                    "type": "code",
+                    "title": "repo-understand log",
+                    "language": "bash",
+                    "content": "python -m example.init",
+                }
+            )
+            quick_start["quick_start"]["first_run"]["steps"][0][
+                "title"
+            ] = "执行记录"
+            write_json(root / "chapters/02-quick-start.json", quick_start)
+
+            main_flows = _read(root / "chapters/04-main-flows.json")
+            main_flows["main_flows"]["flows"][0][
+                "purpose"
+            ] = "command transcript should not appear"
+            write_json(root / "chapters/04-main-flows.json", main_flows)
+
+            module_details = _read(root / "chapters/05-module-details.json")
+            module_details["module_details"]["modules"][0][
+                "purpose"
+            ] = "subagent report should not appear"
+            module_details["module_details"]["modules"][0]["mechanisms"][0][
+                "title"
+            ] = "rejected draft"
+            write_json(root / "chapters/05-module-details.json", module_details)
+
+        result = self.validate(mutate)
+
+        error_paths = {
+            issue.path
+            for issue in result.errors
+            if issue.code == "semantics.process_metadata"
+        }
+        self.assertTrue(
+            {
+                "$.document.document.summary",
+                "$.quick_start.quick_start.setup.blocks[1].title",
+                "$.quick_start.quick_start.first_run.steps[0].title",
+                "$.main_flows.main_flows.flows[0].purpose",
+                "$.module_details.module_details.modules[0].purpose",
+                "$.module_details.module_details.modules[0].mechanisms[0].title",
+            }.issubset(error_paths),
+            [issue.format() for issue in result.errors],
+        )
+
     def test_warns_when_mermaid_block_source_uses_legacy_graph(self):
         def mutate(root):
             data = _read(root / "chapters/01-overview.json")

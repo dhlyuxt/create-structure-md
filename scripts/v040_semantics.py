@@ -72,8 +72,6 @@ def _check_process_metadata(package, result):
         for path, value in _walk(chapter, f"$.{chapter_key}"):
             if not isinstance(value, str):
                 continue
-            if not (_is_text_content_path(path) or _is_extra_subsection_title_path(path)):
-                continue
             term = _process_metadata_term(value)
             if term:
                 result.error(
@@ -132,14 +130,6 @@ def _walk(value, path):
     elif isinstance(value, list):
         for index, child in enumerate(value):
             yield from _walk(child, f"{path}[{index}]")
-
-
-def _is_text_content_path(path):
-    return path.endswith(".content") or ".items[" in path or ".rows[" in path
-
-
-def _is_extra_subsection_title_path(path):
-    return ".extra_subsections[" in path and path.endswith(".title")
 
 
 def _process_metadata_term(value):
