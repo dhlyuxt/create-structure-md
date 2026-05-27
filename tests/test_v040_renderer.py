@@ -63,20 +63,22 @@ class V040RendererTests(unittest.TestCase):
         self.assertIn("##### 1. 初始化仓库能力", markdown)
         self.assertIn("调用初始化入口。", markdown)
 
-    def test_main_flow_has_fourth_level_heading_and_no_step_headings(self):
+    def test_main_flow_detail_file_renders_as_fourth_level_heading(self):
         markdown = self.render_package()
         main_flow_section = markdown[
             markdown.index("### 主线流程") : markdown.index("### 模块详解")
         ]
         self.assertIn("#### 初始化主线", main_flow_section)
-        self.assertIn("入口：`example_init`", main_flow_section)
-        self.assertNotIn("##### 1.", main_flow_section)
 
     def test_main_flow_without_entry_location_skips_empty_position_lines(self):
         def mutate(root):
-            data = _read(root / "chapters/04-main-flows.json")
-            del data["main_flows"]["flows"][0]["entry"]["location"]
-            write_json(root / "chapters/04-main-flows.json", data)
+            detail = _read(root / "chapters/04-main-flow-details/init-flow.json")
+            detail["entry"]["location"] = ""
+            write_json(root / "chapters/04-main-flow-details/init-flow.json", detail)
+
+            overview = _read(root / "chapters/04-main-flow-overview.json")
+            overview["main_flow_overview"]["flow_table"]["rows"][0]["location"] = ""
+            write_json(root / "chapters/04-main-flow-overview.json", overview)
 
         markdown = self.render_package(mutate)
         main_flow_section = markdown[
@@ -85,22 +87,83 @@ class V040RendererTests(unittest.TestCase):
         self.assertNotIn("位置：", main_flow_section)
         self.assertNotIn("None", main_flow_section)
 
+    def test_main_flow_overview_table_links_to_detail_heading(self):
+        markdown = self.render_package()
+        self.assertIn("| 主线 | 目的 | 入口 | 位置 |", markdown)
+        self.assertIn(
+            "| [初始化主线](#初始化主线) | 准备示例仓库能力并写入初始状态。 | `example_init` | src/api/init.py |",
+            markdown,
+        )
+        self.assertLess(markdown.index("| 主线 | 目的 | 入口 | 位置 |"), markdown.index("#### 初始化主线"))
+
+    def test_module_overview_table_links_to_detail_heading(self):
+        markdown = self.render_package()
+        self.assertIn("| 模块 | 职责 | 位置 |", markdown)
+        self.assertIn(
+            "| [存储模块](#存储模块) | 保存初始化流程产生的示例状态。 | src/storage.py |",
+            markdown,
+        )
+        self.assertLess(markdown.index("| 模块 | 职责 | 位置 |"), markdown.index("#### 存储模块"))
+
+    def test_detail_files_render_in_manifest_order(self):
+        def mutate(root):
+            manifest = _read(root / "structure.manifest.json")
+            manifest["main_flow_details"].append("chapters/04-main-flow-details/render-flow.json")
+            manifest["module_details"].append("chapters/05-module-details/render.json")
+            write_json(root / "structure.manifest.json", manifest)
+            write_json(
+                root / "chapters/04-main-flow-details/render-flow.json",
+                {
+                    "title": "渲染主线",
+                    "purpose": "渲染结构文档。",
+                    "reader_goal": "读者想知道验证通过后如何生成 Markdown。",
+                    "entry": {"name": "render_markdown", "location": "scripts/render_markdown.py"},
+                    "blocks": [{"type": "text", "content": "渲染入口读取已验证包并输出 Markdown。"}],
+                    "extra_subsections": [],
+                },
+            )
+            flow_overview = _read(root / "chapters/04-main-flow-overview.json")
+            flow_overview["main_flow_overview"]["flow_table"]["rows"].append(
+                {
+                    "flow": "渲染主线",
+                    "purpose": "渲染结构文档。",
+                    "entry": "render_markdown",
+                    "location": "scripts/render_markdown.py",
+                    "anchor": "渲染主线",
+                }
+            )
+            write_json(root / "chapters/04-main-flow-overview.json", flow_overview)
+            write_json(
+                root / "chapters/05-module-details/render.json",
+                {
+                    "name": "渲染模块",
+                    "location": "scripts/v040_renderer.py",
+                    "purpose": "把结构包转换为 Markdown。",
+                    "responsibilities": ["渲染固定章节", "渲染详情文件"],
+                    "blocks": [{"type": "text", "content": "渲染模块按 manifest 顺序输出内容。"}],
+                    "mechanisms": [],
+                    "extra_subsections": [],
+                },
+            )
+            module_overview = _read(root / "chapters/05-module-overview.json")
+            module_overview["module_overview"]["module_table"]["rows"].append(
+                {
+                    "module": "渲染模块",
+                    "purpose": "把结构包转换为 Markdown。",
+                    "location": "scripts/v040_renderer.py",
+                    "anchor": "渲染模块",
+                }
+            )
+            write_json(root / "chapters/05-module-overview.json", module_overview)
+
+        markdown = self.render_package(mutate)
+
+        self.assertLess(markdown.index("#### 初始化主线"), markdown.index("#### 渲染主线"))
+        self.assertLess(markdown.index("#### 存储模块"), markdown.index("#### 渲染模块"))
+
     def test_module_mechanisms_render_inside_owning_module(self):
         markdown = self.render_package()
         self.assertLess(markdown.index("#### 存储模块"), markdown.index("##### 追加写入"))
-
-    def test_module_intro_blocks_render_directly_under_module_details(self):
-        def mutate(root):
-            data = _read(root / "chapters/05-module-details.json")
-            data["module_details"]["intro_blocks"] = [
-                {"type": "text", "content": "模块详情总览。"}
-            ]
-            write_json(root / "chapters/05-module-details.json", data)
-
-        markdown = self.render_package(mutate)
-        module_details = markdown[markdown.index("### 模块详解") :]
-        self.assertLess(module_details.index("模块详情总览。"), module_details.index("#### 存储模块"))
-        self.assertNotIn("#### 模块导语", module_details)
 
     def test_mermaid_block_renders_as_fenced_mermaid_code(self):
         markdown = self.render_package(include_mermaid=True)
@@ -234,32 +297,25 @@ class V040RendererTests(unittest.TestCase):
             ]
             write_json(root / "chapters/03-architecture-overview.json", architecture)
 
-            main_flows = _read(root / "chapters/04-main-flows.json")
-            main_flows["main_flows"]["extra_subsections"] = [
+            main_flow_detail = _read(root / "chapters/04-main-flow-details/init-flow.json")
+            main_flow_detail["extra_subsections"] = [
                 {
                     "key": "main_flow_extra_alpha",
                     "title": "主线扩展",
                     "blocks": [{"type": "text", "content": "主线扩展内容。"}],
                 }
             ]
-            write_json(root / "chapters/04-main-flows.json", main_flows)
+            write_json(root / "chapters/04-main-flow-details/init-flow.json", main_flow_detail)
 
-            module_details = _read(root / "chapters/05-module-details.json")
-            module_details["module_details"]["extra_subsections"] = [
-                {
-                    "key": "module_details_extra_alpha",
-                    "title": "模块总览扩展",
-                    "blocks": [{"type": "text", "content": "模块总览扩展内容。"}],
-                }
-            ]
-            module_details["module_details"]["modules"][0]["extra_subsections"] = [
+            module_detail = _read(root / "chapters/05-module-details/storage.json")
+            module_detail["extra_subsections"] = [
                 {
                     "key": "module_extra_alpha",
                     "title": "模块扩展一",
                     "blocks": [{"type": "text", "content": "模块扩展一内容。"}],
                 }
             ]
-            write_json(root / "chapters/05-module-details.json", module_details)
+            write_json(root / "chapters/05-module-details/storage.json", module_detail)
 
         markdown = self.render_package(mutate)
         self.assertLess(markdown.index("#### 概述扩展一"), markdown.index("#### 概述扩展二"))
@@ -267,7 +323,6 @@ class V040RendererTests(unittest.TestCase):
         self.assertGreater(markdown.index("#### 快速开始扩展"), markdown.index("#### 预期结果"))
         self.assertGreater(markdown.index("#### 架构扩展"), markdown.index("#### 目录角色"))
         self.assertGreater(markdown.index("#### 主线扩展"), markdown.index("#### 初始化主线"))
-        self.assertGreater(markdown.index("#### 模块总览扩展"), markdown.index("##### 模块扩展一"))
         self.assertIn("##### 模块扩展一", markdown)
         self.assertGreater(markdown.index("##### 模块扩展一"), markdown.index("##### 追加写入"))
         for key in [
@@ -276,7 +331,6 @@ class V040RendererTests(unittest.TestCase):
             "quick_extra_alpha",
             "architecture_extra_alpha",
             "main_flow_extra_alpha",
-            "module_details_extra_alpha",
             "module_extra_alpha",
         ]:
             self.assertNotIn(key, markdown)
