@@ -41,7 +41,7 @@ def detail_semantic_validation_result(kind: str, index: int, data: dict) -> Vali
     base_path = f"$.{kind}[{index}]"
     _check_process_metadata_value(data, base_path, result)
     _check_mermaid_readability_value(data, base_path, result)
-    if kind == "module_details":
+    if kind == "module_details" and isinstance(data, dict):
         name = str(data.get("name", ""))
         purpose = str(data.get("purpose", ""))
         blocks = data.get("blocks", [])
@@ -165,6 +165,8 @@ def _check_main_flow_count(package, result):
 def _check_modules(package, result):
     for index, detail in enumerate(package.module_details):
         module = detail.data
+        if not isinstance(module, dict):
+            continue
         name = str(module.get("name", ""))
         purpose = str(module.get("purpose", ""))
         blocks = module.get("blocks", [])

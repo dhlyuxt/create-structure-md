@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from scripts.v040_package import load_manifest_package
-from scripts.v040_semantics import semantic_validation_result
+from scripts.v040_semantics import detail_semantic_validation_result, semantic_validation_result
 from tests.helpers_v040 import write_json, write_valid_package
 
 
@@ -73,6 +73,11 @@ class V040SemanticTests(unittest.TestCase):
                 "chapters/04-main-flow-details/init-flow.json",
                 lambda data: _without_key(data, (), "title"),
             ),
+            (
+                "array module detail payload",
+                "chapters/05-module-details/storage.json",
+                lambda data: [],
+            ),
         ]
         for label, relative_path, mutate_data in cases:
             with self.subTest(label=label):
@@ -84,6 +89,11 @@ class V040SemanticTests(unittest.TestCase):
                 result = self.validate(mutate)
 
                 self.assertIsNotNone(result)
+
+    def test_malformed_module_detail_shape_does_not_raise_single_detail_semantics(self):
+        result = detail_semantic_validation_result("module_details", 0, [])
+
+        self.assertIsNotNone(result)
 
     def test_warns_when_more_than_three_main_flow_detail_files_are_selected(self):
         def mutate(root):
