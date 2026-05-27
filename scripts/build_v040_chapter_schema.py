@@ -16,6 +16,10 @@ def string():
     return {"type": "string", "minLength": 1}
 
 
+def maybe_string():
+    return {"type": "string"}
+
+
 def const(value):
     return {"const": value}
 
@@ -225,52 +229,78 @@ defs["ArchitectureOverviewChapter"] = obj(
 )
 
 defs["MainFlowEntry"] = obj(["name"], {"name": string(), "location": string()})
-defs["MainFlow"] = obj(
-    ["title", "purpose", "entry", "blocks"],
+
+defs["OverviewIntro"] = string()
+
+defs["MainFlowOverviewRow"] = obj(
+    ["flow", "purpose", "entry", "location", "anchor"],
     {
-        "title": string(),
+        "flow": string(),
         "purpose": string(),
-        "entry": ref("MainFlowEntry"),
-        "blocks": block_array(),
+        "entry": string(),
+        "location": maybe_string(),
+        "anchor": string(),
     },
 )
-defs["MainFlowsChapter"] = obj(
-    ["main_flows"],
+defs["MainFlowOverviewChapter"] = obj(
+    ["main_flow_overview"],
     {
-        "main_flows": obj(
-            ["flow_overview", "flows", "extra_subsections"],
+        "main_flow_overview": obj(
+            ["flow_table"],
             {
-                "flow_overview": fixed_section(),
-                "flows": array(ref("MainFlow"), min_items=1),
-                "extra_subsections": extra_subsections(),
+                "intro": ref("OverviewIntro"),
+                "flow_table": obj(["rows"], {"rows": array(ref("MainFlowOverviewRow"), min_items=1)}),
             },
         )
     },
 )
 
+defs["MainFlowDetail"] = obj(
+    ["title", "purpose", "reader_goal", "entry", "blocks", "extra_subsections"],
+    {
+        "title": string(),
+        "purpose": string(),
+        "reader_goal": string(),
+        "entry": ref("MainFlowEntry"),
+        "blocks": block_array(),
+        "extra_subsections": extra_subsections(),
+    },
+)
+
 defs["Mechanism"] = obj(["title", "blocks"], {"title": string(), "blocks": block_array()})
-defs["Module"] = obj(
-    ["name", "location", "purpose", "blocks", "mechanisms", "extra_subsections"],
+
+defs["ModuleOverviewRow"] = obj(
+    ["module", "purpose", "location", "anchor"],
+    {
+        "module": string(),
+        "purpose": string(),
+        "location": string(),
+        "anchor": string(),
+    },
+)
+defs["ModuleOverviewChapter"] = obj(
+    ["module_overview"],
+    {
+        "module_overview": obj(
+            ["module_table"],
+            {
+                "intro": ref("OverviewIntro"),
+                "module_table": obj(["rows"], {"rows": array(ref("ModuleOverviewRow"), min_items=1)}),
+            },
+        )
+    },
+)
+
+defs["ModuleDetail"] = obj(
+    ["name", "location", "purpose", "responsibilities", "blocks", "mechanisms", "extra_subsections"],
     {
         "name": string(),
         "location": string(),
         "purpose": string(),
+        "responsibilities": array(string(), min_items=1),
         "blocks": block_array(),
         "mechanisms": array(ref("Mechanism")),
         "extra_subsections": extra_subsections(),
-    },
-)
-defs["ModuleDetailsChapter"] = obj(
-    ["module_details"],
-    {
-        "module_details": obj(
-            ["intro_blocks", "modules", "extra_subsections"],
-            {
-                "intro_blocks": block_array(),
-                "modules": array(ref("Module"), min_items=1),
-                "extra_subsections": extra_subsections(),
-            },
-        )
     },
 )
 

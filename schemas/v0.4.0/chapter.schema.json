@@ -689,14 +689,89 @@
         }
       }
     },
-    "MainFlow": {
+    "OverviewIntro": {
+      "type": "string",
+      "minLength": 1
+    },
+    "MainFlowOverviewRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "flow",
+        "purpose",
+        "entry",
+        "location",
+        "anchor"
+      ],
+      "properties": {
+        "flow": {
+          "type": "string",
+          "minLength": 1
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entry": {
+          "type": "string",
+          "minLength": 1
+        },
+        "location": {
+          "type": "string"
+        },
+        "anchor": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "MainFlowOverviewChapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "main_flow_overview"
+      ],
+      "properties": {
+        "main_flow_overview": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "flow_table"
+          ],
+          "properties": {
+            "intro": {
+              "$ref": "#/$defs/OverviewIntro"
+            },
+            "flow_table": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "rows"
+              ],
+              "properties": {
+                "rows": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/MainFlowOverviewRow"
+                  },
+                  "minItems": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "MainFlowDetail": {
       "type": "object",
       "additionalProperties": false,
       "required": [
         "title",
         "purpose",
+        "reader_goal",
         "entry",
-        "blocks"
+        "blocks",
+        "extra_subsections"
       ],
       "properties": {
         "title": {
@@ -704,6 +779,10 @@
           "minLength": 1
         },
         "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reader_goal": {
           "type": "string",
           "minLength": 1
         },
@@ -715,53 +794,11 @@
           "items": {
             "$ref": "#/$defs/Block"
           }
-        }
-      }
-    },
-    "MainFlowsChapter": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "main_flows"
-      ],
-      "properties": {
-        "main_flows": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "flow_overview",
-            "flows",
-            "extra_subsections"
-          ],
-          "properties": {
-            "flow_overview": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "blocks"
-              ],
-              "properties": {
-                "blocks": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/$defs/Block"
-                  }
-                }
-              }
-            },
-            "flows": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/MainFlow"
-              },
-              "minItems": 1
-            },
-            "extra_subsections": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExtraSubsection"
-              }
-            }
+        },
+        "extra_subsections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ExtraSubsection"
           }
         }
       }
@@ -786,13 +823,79 @@
         }
       }
     },
-    "Module": {
+    "ModuleOverviewRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "module",
+        "purpose",
+        "location",
+        "anchor"
+      ],
+      "properties": {
+        "module": {
+          "type": "string",
+          "minLength": 1
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "location": {
+          "type": "string",
+          "minLength": 1
+        },
+        "anchor": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "ModuleOverviewChapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "module_overview"
+      ],
+      "properties": {
+        "module_overview": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "module_table"
+          ],
+          "properties": {
+            "intro": {
+              "$ref": "#/$defs/OverviewIntro"
+            },
+            "module_table": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "rows"
+              ],
+              "properties": {
+                "rows": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/ModuleOverviewRow"
+                  },
+                  "minItems": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "ModuleDetail": {
       "type": "object",
       "additionalProperties": false,
       "required": [
         "name",
         "location",
         "purpose",
+        "responsibilities",
         "blocks",
         "mechanisms",
         "extra_subsections"
@@ -810,6 +913,14 @@
           "type": "string",
           "minLength": 1
         },
+        "responsibilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
         "blocks": {
           "type": "array",
           "items": {
@@ -826,45 +937,6 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/ExtraSubsection"
-          }
-        }
-      }
-    },
-    "ModuleDetailsChapter": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "module_details"
-      ],
-      "properties": {
-        "module_details": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "intro_blocks",
-            "modules",
-            "extra_subsections"
-          ],
-          "properties": {
-            "intro_blocks": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/Block"
-              }
-            },
-            "modules": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/Module"
-              },
-              "minItems": 1
-            },
-            "extra_subsections": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExtraSubsection"
-              }
-            }
           }
         }
       }

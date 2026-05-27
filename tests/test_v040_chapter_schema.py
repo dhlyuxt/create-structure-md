@@ -80,39 +80,65 @@ class V040ChapterSchemaTests(unittest.TestCase):
             "$.quick_start.first_run.steps",
         )
 
-    def test_main_flows_flows_is_required_and_non_empty(self):
-        def mutate_missing(root):
-            data = _read(root / "chapters/04-main-flows.json")
-            del data["main_flows"]["flows"]
-            write_json(root / "chapters/04-main-flows.json", data)
+    def test_main_flow_overview_accepts_fixed_table_only(self):
+        self.assertValid(self.validate_package())
 
-        def mutate_empty(root):
-            data = _read(root / "chapters/04-main-flows.json")
-            data["main_flows"]["flows"] = []
-            write_json(root / "chapters/04-main-flows.json", data)
+    def test_main_flow_overview_rejects_blocks_and_extra_subsections(self):
+        def mutate(root):
+            data = _read(root / "chapters/04-main-flow-overview.json")
+            data["main_flow_overview"]["blocks"] = [{"type": "text", "content": "detail prose"}]
+            data["main_flow_overview"]["extra_subsections"] = []
+            write_json(root / "chapters/04-main-flow-overview.json", data)
 
-        self.assertInvalidAt(self.validate_package(mutate_missing), "$.main_flows")
-        self.assertInvalidAt(self.validate_package(mutate_empty), "$.main_flows.flows")
+        result = self.validate_package(mutate)
+        self.assertInvalidAt(result, "$.main_flow_overview")
 
-    def test_module_details_modules_is_required_and_non_empty(self):
-        def mutate_missing(root):
-            data = _read(root / "chapters/05-module-details.json")
-            del data["module_details"]["modules"]
-            write_json(root / "chapters/05-module-details.json", data)
+    def test_module_overview_rejects_mechanisms_and_detail_blocks(self):
+        def mutate(root):
+            data = _read(root / "chapters/05-module-overview.json")
+            data["module_overview"]["mechanisms"] = []
+            data["module_overview"]["blocks"] = [{"type": "text", "content": "detail prose"}]
+            write_json(root / "chapters/05-module-overview.json", data)
 
-        def mutate_empty(root):
-            data = _read(root / "chapters/05-module-details.json")
-            data["module_details"]["modules"] = []
-            write_json(root / "chapters/05-module-details.json", data)
+        result = self.validate_package(mutate)
+        self.assertInvalidAt(result, "$.module_overview")
 
-        self.assertInvalidAt(
-            self.validate_package(mutate_missing),
-            "$.module_details",
-        )
-        self.assertInvalidAt(
-            self.validate_package(mutate_empty),
-            "$.module_details.modules",
-        )
+    def test_main_flow_detail_requires_reader_goal_and_extra_subsections(self):
+        def mutate(root):
+            data = _read(root / "chapters/04-main-flow-details/init-flow.json")
+            del data["reader_goal"]
+            del data["extra_subsections"]
+            write_json(root / "chapters/04-main-flow-details/init-flow.json", data)
+
+        result = self.validate_package(mutate)
+        self.assertInvalidAt(result, "$.main_flow_details[0]")
+
+    def test_main_flow_detail_rejects_top_level_chapter(self):
+        def mutate(root):
+            data = _read(root / "chapters/04-main-flow-details/init-flow.json")
+            data["chapter"] = "主线流程"
+            write_json(root / "chapters/04-main-flow-details/init-flow.json", data)
+
+        result = self.validate_package(mutate)
+        self.assertInvalidAt(result, "$.main_flow_details[0]")
+
+    def test_module_detail_requires_responsibilities(self):
+        def mutate(root):
+            data = _read(root / "chapters/05-module-details/storage.json")
+            data["responsibilities"] = []
+            write_json(root / "chapters/05-module-details/storage.json", data)
+
+        result = self.validate_package(mutate)
+        self.assertInvalidAt(result, "$.module_details[0].responsibilities")
+
+    def test_module_detail_rejects_top_level_chapter(self):
+        def mutate(root):
+            data = _read(root / "chapters/05-module-details/storage.json")
+            data["chapter"] = "模块详解"
+            write_json(root / "chapters/05-module-details/storage.json", data)
+
+        result = self.validate_package(mutate)
+        self.assertInvalidAt(result, "$.module_details[0]")
 
     def test_overview_core_components_component_table_is_required(self):
         def mutate(root):
@@ -196,16 +222,24 @@ class V040ChapterSchemaTests(unittest.TestCase):
             ("chapters/01-overview.json", ("overview", "extra_subsections")),
             ("chapters/02-quick-start.json", ("quick_start", "extra_subsections")),
             ("chapters/03-architecture-overview.json", ("architecture_overview", "extra_subsections")),
-            ("chapters/04-main-flows.json", ("main_flows", "extra_subsections")),
-            ("chapters/05-module-details.json", ("module_details", "extra_subsections")),
-            ("chapters/05-module-details.json", ("module_details", "modules", 0, "extra_subsections")),
+            (
+                "chapters/04-main-flow-details/init-flow.json",
+                ("main_flow_details", 0, "extra_subsections"),
+            ),
+            (
+                "chapters/05-module-details/storage.json",
+                ("module_details", 0, "extra_subsections"),
+            ),
         ]
         for file_name, keys in cases:
             with self.subTest(keys=keys):
                 def mutate(root, file_name=file_name, keys=keys):
                     data = _read(root / file_name)
                     extra_subsections = data
-                    for key in keys:
+                    traversal_keys = keys
+                    if keys[0] in ("main_flow_details", "module_details"):
+                        traversal_keys = keys[2:]
+                    for key in traversal_keys:
                         extra_subsections = extra_subsections[key]
                     extra_subsections.append({"key": "Bad-Key", "title": "Bad", "blocks": []})
                     write_json(root / file_name, data)
@@ -213,53 +247,34 @@ class V040ChapterSchemaTests(unittest.TestCase):
                 result = self.validate_package(mutate)
                 self.assertInvalidAt(result, _package_path(keys) + "[0].key")
 
-    def test_module_details_intro_blocks_accepts_shared_blocks(self):
-        def mutate(root):
-            data = _read(root / "chapters/05-module-details.json")
-            data["module_details"]["intro_blocks"] = [
-                {"type": "text", "content": "intro"},
-                {"type": "ordered_list", "items": ["one"]},
-                {"type": "table", "columns": ["a"], "rows": [["b"]]},
-                {
-                    "type": "mermaid",
-                    "title": "Intro flow",
-                    "diagram_type": "flowchart",
-                    "source": "flowchart LR\nA-->B",
-                },
-                {"type": "code", "language": "python", "content": "print('ok')"},
-            ]
-            write_json(root / "chapters/05-module-details.json", data)
-
-        self.assertValid(self.validate_package(mutate))
-
     def test_mermaid_block_title_is_required(self):
         def mutate(root):
-            data = _read(root / "chapters/05-module-details.json")
-            data["module_details"]["intro_blocks"] = [
+            data = _read(root / "chapters/05-module-details/storage.json")
+            data["blocks"] = [
                 {"type": "mermaid", "diagram_type": "flowchart", "source": "flowchart LR\nA-->B"}
             ]
-            write_json(root / "chapters/05-module-details.json", data)
+            write_json(root / "chapters/05-module-details/storage.json", data)
 
         result = self.validate_package(mutate)
-        self.assertInvalidAt(result, "$.module_details.intro_blocks[0]")
+        self.assertInvalidAt(result, "$.module_details[0].blocks[0]")
 
-    def test_module_details_intro_blocks_rejects_unknown_block_types(self):
+    def test_module_detail_blocks_rejects_unknown_block_types(self):
         def mutate(root):
-            data = _read(root / "chapters/05-module-details.json")
-            data["module_details"]["intro_blocks"] = [{"type": "details"}]
-            write_json(root / "chapters/05-module-details.json", data)
+            data = _read(root / "chapters/05-module-details/storage.json")
+            data["blocks"] = [{"type": "details"}]
+            write_json(root / "chapters/05-module-details/storage.json", data)
 
         result = self.validate_package(mutate)
-        self.assertInvalidAt(result, "$.module_details.intro_blocks[0]")
+        self.assertInvalidAt(result, "$.module_details[0].blocks[0]")
 
     def test_code_block_title_is_optional(self):
         self.assertValid(self.validate_package())
 
     def test_main_flow_entry_location_is_optional(self):
         def mutate(root):
-            data = _read(root / "chapters/04-main-flows.json")
-            del data["main_flows"]["flows"][0]["entry"]["location"]
-            write_json(root / "chapters/04-main-flows.json", data)
+            data = _read(root / "chapters/04-main-flow-details/init-flow.json")
+            del data["entry"]["location"]
+            write_json(root / "chapters/04-main-flow-details/init-flow.json", data)
 
         self.assertValid(self.validate_package(mutate))
 
