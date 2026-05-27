@@ -29,6 +29,16 @@ V040_KEYS = {
     "overview",
     "quick_start",
     "architecture_overview",
+    "main_flow_overview",
+    "main_flow_details",
+    "module_overview",
+    "module_details",
+}
+OLD_ACTIVE_V040_KEYS = {
+    "document",
+    "overview",
+    "quick_start",
+    "architecture_overview",
     "main_flows",
     "module_details",
 }
@@ -140,6 +150,8 @@ def detect_manifest_version(manifest):
         return "0.3.0"
     if keys == V040_KEYS:
         return "0.4.0"
+    if keys == OLD_ACTIVE_V040_KEYS:
+        return "old-active-0.4.0"
     return "unknown"
 
 
@@ -154,6 +166,14 @@ def manifest_dispatch_result(manifest):
         ]
 
     version = detect_manifest_version(manifest)
+    if version == "old-active-0.4.0":
+        return version, [
+            ValidationIssue(
+                "manifest.v040_migration",
+                "$",
+                "breaking active 0.4.0 migration required: replace main_flows/module_details aggregate files with main_flow_overview, main_flow_details, module_overview, and module_details",
+            )
+        ]
     if version == "unknown":
         return version, [_unknown_manifest_shape_issue(manifest)]
     return version, []
