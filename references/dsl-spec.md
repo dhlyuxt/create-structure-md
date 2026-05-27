@@ -2,11 +2,13 @@
 
 ## Package Shape
 
-create-structure-md 0.4.0 package 由一个 `structure.manifest.json` 和六个固定 child JSON files 组成。`structure.manifest.json` 是入口。
+create-structure-md 0.4.0 package 由一个 `structure.manifest.json` 和 manifest 引用的 child JSON files 组成。`structure.manifest.json` 和 referenced child JSON files 是权威源；rendered Markdown 是 generated output。
 
 Payload JSON files do not carry `dsl_version`; the manifest also does not include `dsl_version`.
 
-Example `structure.manifest.json`:
+Process records, subagent reports, command transcripts, rejected drafts, scan logs, repository-understanding notes, and other process metadata stay outside JSON.
+
+Example upgraded eight-field `structure.manifest.json`:
 
 ```json
 {
@@ -14,12 +16,26 @@ Example `structure.manifest.json`:
   "overview": "chapters/01-overview.json",
   "quick_start": "chapters/02-quick-start.json",
   "architecture_overview": "chapters/03-architecture-overview.json",
-  "main_flows": "chapters/04-main-flows.json",
-  "module_details": "chapters/05-module-details.json"
+  "main_flow_overview": "chapters/04-main-flow-overview.json",
+  "main_flow_details": [
+    "chapters/04-main-flow-details/validate-and-render.json"
+  ],
+  "module_overview": "chapters/05-module-overview.json",
+  "module_details": [
+    "chapters/05-module-details/validator.json"
+  ]
 }
 ```
 
-The manifest has exactly these six keys and exactly the path values shown above. Arbitrary child filenames are invalid.
+`main_flow_details` and `module_details` are non-empty arrays.
+
+Detail keys are inferred from file stems.
+
+Detail JSON does not repeat the inferred key.
+
+Detail file stems match `^[a-z0-9][a-z0-9_-]*$`.
+
+Rejected old active 0.4.0 shape: `main_flows`, `chapters/04-main-flows.json`, one aggregate `chapters/05-module-details.json`, `intro_blocks`, `modules[]`, `module_details.modules`, and `generated_module_object`.
 
 ## Document Metadata
 
@@ -104,9 +120,9 @@ Code block:
 ```json
 {
   "type": "code",
-  "language": "c",
-  "title": "初始化",
-  "content": "easyflash_init();"
+  "language": "bash",
+  "title": "验证",
+  "content": "python scripts/validate_structure.py package/structure.manifest.json --strict"
 }
 ```
 
@@ -158,13 +174,13 @@ Example `chapters/01-overview.json`:
         "rows": [
           {
             "component": "Manifest",
-            "role": "声明六个固定 child JSON files",
+            "role": "声明 child JSON files",
             "location": "structure.manifest.json"
           },
           {
-            "component": "Chapters",
-            "role": "保存各章节源内容",
-            "location": "chapters/*.json"
+            "component": "Validator",
+            "role": "检查 0.4.0 contract",
+            "location": "scripts/validate_structure.py"
           },
           {
             "component": "Renderer",
@@ -260,7 +276,7 @@ Example `chapters/02-quick-start.json`:
         {
           "type": "code",
           "language": "json",
-          "content": "{\n  \"document\": \"chapters/00-document.json\",\n  \"overview\": \"chapters/01-overview.json\",\n  \"quick_start\": \"chapters/02-quick-start.json\",\n  \"architecture_overview\": \"chapters/03-architecture-overview.json\",\n  \"main_flows\": \"chapters/04-main-flows.json\",\n  \"module_details\": \"chapters/05-module-details.json\"\n}"
+          "content": "{\n  \"document\": \"chapters/00-document.json\",\n  \"overview\": \"chapters/01-overview.json\",\n  \"quick_start\": \"chapters/02-quick-start.json\",\n  \"architecture_overview\": \"chapters/03-architecture-overview.json\",\n  \"main_flow_overview\": \"chapters/04-main-flow-overview.json\",\n  \"main_flow_details\": [\"chapters/04-main-flow-details/validate-and-render.json\"],\n  \"module_overview\": \"chapters/05-module-overview.json\",\n  \"module_details\": [\"chapters/05-module-details/validator.json\"]\n}"
         }
       ]
     },
@@ -365,112 +381,165 @@ Example `chapters/03-architecture-overview.json`:
 }
 ```
 
-## Main Flows
+## Main Flow Overview
 
-The main flows child file contains reader-facing behavior paths. `main_flows.flows[]` must be non-empty and has no `steps` field.
+The main flow overview is synthesized after every file in `main_flow_details` passes authoring and separate adversarial review.
 
-Example `chapters/04-main-flows.json`:
+`main_flow_overview` is a fixed table artifact. It does not contain `blocks` or `extra_subsections`.
+
+Neither overview file contains detail prose, Mermaid, code, examples, or process metadata.
+
+Overview rows match detail arrays in count and order.
+
+Example `chapters/04-main-flow-overview.json`:
 
 ```json
 {
-  "main_flows": {
-    "flow_overview": {
-      "blocks": [
+  "main_flow_overview": {
+    "flow_table": {
+      "rows": [
         {
-          "type": "text",
-          "content": "主线流程说明读者关心的任务如何跨组件完成，而不是逐函数调用链。"
+          "title": "验证并渲染结构说明",
+          "purpose": "确认 DSL package 有效并生成 Markdown。",
+          "entry": "structure.manifest.json",
+          "anchor": "验证并渲染结构说明"
         }
       ]
-    },
-    "flows": [
-      {
-        "title": "验证并渲染结构说明",
-        "purpose": "确认 DSL package 有效并生成 Markdown。",
-        "entry": {
-          "name": "structure.manifest.json",
-          "location": "package/structure.manifest.json"
-        },
-        "blocks": [
-          {
-            "type": "text",
-            "content": "使用者把 manifest 交给验证器，修复源 JSON 后再交给渲染器。"
-          },
-          {
-            "type": "mermaid",
-            "title": "验证与渲染",
-            "diagram_type": "sequenceDiagram",
-            "source": "sequenceDiagram\n  participant User\n  participant Validator\n  participant Renderer\n  User->>Validator: Validate manifest\n  User->>Renderer: Render manifest"
-          }
-        ]
-      }
-    ],
-    "extra_subsections": []
+    }
   }
 }
 ```
 
-## Module Details
+## Main Flow Detail
 
-Module headings come from `module_details.modules[].name`. `module_details.modules[]` must be non-empty. Mechanisms live inside the owning module object.
+Main-flow detail files describe reader-facing behavior paths, not call-chain dumps. Each file is authored by exactly one assigned main-flow authoring subagent and reviewed by a separate adversarial review subagent.
 
-Example `chapters/05-module-details.json`:
+The detail key is inferred from the file stem under `chapters/04-main-flow-details/<flow-key>.json`; the JSON does not repeat that key.
+
+Example `chapters/04-main-flow-details/validate-and-render.json`:
 
 ```json
 {
-  "module_details": {
-    "intro_blocks": [
+  "main_flow_detail": {
+    "title": "验证并渲染结构说明",
+    "purpose": "确认 DSL package 有效并生成 Markdown。",
+    "entry": {
+      "name": "structure.manifest.json",
+      "location": "package/structure.manifest.json"
+    },
+    "blocks": [
       {
         "type": "text",
-        "content": "模块详解按责任单元组织，不按文件逐个罗列。"
+        "content": "使用者把 manifest 交给验证器，修复源 JSON 后再交给渲染器。"
+      },
+      {
+        "type": "mermaid",
+        "title": "验证与渲染",
+        "diagram_type": "sequenceDiagram",
+        "source": "sequenceDiagram\n  participant User\n  participant Validator\n  participant Renderer\n  User->>Validator: Validate manifest\n  User->>Renderer: Render manifest"
       }
     ],
-    "modules": [
+    "extra_subsections": [
       {
-        "name": "Validator",
-        "location": "scripts/validate_structure.py",
-        "purpose": "检查 manifest 和 child JSON files 是否符合 0.4.0 contract。",
+        "key": "reader_checks",
+        "title": "读者检查点",
         "blocks": [
           {
             "type": "unordered_list",
             "items": [
-              "验证入口始终是 structure.manifest.json",
-              "错误应指向可修复的源 JSON"
-            ]
-          }
-        ],
-        "mechanisms": [
-          {
-            "title": "Strict validation",
-            "blocks": [
-              {
-                "type": "text",
-                "content": "严格模式拒绝未知字段、错误 block shape 和不符合章节约束的结构。"
-              }
-            ]
-          }
-        ],
-        "extra_subsections": [
-          {
-            "key": "validator_risks",
-            "title": "修改风险",
-            "blocks": [
-              {
-                "type": "text",
-                "content": "修改 schema 约束时要同步更新 DSL spec 和 authoring guide。"
-              }
+              "先修复源 JSON",
+              "再重新渲染 Markdown"
             ]
           }
         ]
       }
+    ]
+  }
+}
+```
+
+## Module Overview
+
+The module overview is synthesized after every file in `module_details` passes authoring and separate adversarial review.
+
+`module_overview` is a fixed table artifact. It does not contain `blocks` or `extra_subsections`.
+
+Neither overview file contains detail prose, Mermaid, code, examples, or process metadata.
+
+Overview rows match detail arrays in count and order.
+
+Example `chapters/05-module-overview.json`:
+
+```json
+{
+  "module_overview": {
+    "module_table": {
+      "rows": [
+        {
+          "name": "Validator",
+          "responsibility": "检查 manifest 和 child JSON files 是否符合 0.4.0 contract。",
+          "location": "scripts/validate_structure.py",
+          "anchor": "Validator"
+        }
+      ]
+    }
+  }
+}
+```
+
+## Module Detail
+
+Module detail files describe responsibility units, not source-file listings. Each file is authored by exactly one assigned module authoring subagent and reviewed by a separate adversarial review subagent.
+
+The detail key is inferred from the file stem under `chapters/05-module-details/<module-key>.json`; the JSON does not repeat that key.
+
+Example `chapters/05-module-details/validator.json`:
+
+```json
+{
+  "module_detail": {
+    "name": "Validator",
+    "location": "scripts/validate_structure.py",
+    "purpose": "检查 manifest 和 child JSON files 是否符合 0.4.0 contract。",
+    "blocks": [
+      {
+        "type": "unordered_list",
+        "items": [
+          "验证入口始终是 structure.manifest.json",
+          "错误应指向可修复的源 JSON"
+        ]
+      }
     ],
-    "extra_subsections": []
+    "mechanisms": [
+      {
+        "title": "Strict validation",
+        "blocks": [
+          {
+            "type": "text",
+            "content": "严格模式拒绝未知字段、错误 block shape 和不符合章节约束的结构。"
+          }
+        ]
+      }
+    ],
+    "extra_subsections": [
+      {
+        "key": "validator_risks",
+        "title": "修改风险",
+        "blocks": [
+          {
+            "type": "text",
+            "content": "修改 schema 约束时要同步更新 DSL spec 和 authoring guide。"
+          }
+        ]
+      }
+    ]
   }
 }
 ```
 
 ## Extra Subsections
 
-Extra subsections are nested arrays inside fixed child files or module objects, not a separate child file. Each extra subsection carries `key`, `title`, and `blocks`.
+Extra subsections are nested arrays inside fixed child files or detail objects, not a separate child file. Each extra subsection carries `key`, `title`, and `blocks`.
 
 Example nested extra subsection:
 
@@ -493,8 +562,8 @@ Extra subsections render after fixed content in array order at the level where t
 
 Validation rejects:
 
-- manifests that do not have exactly the six fixed keys;
-- manifests that do not use the exact fixed path values shown in Package Shape;
+- manifests that do not have exactly the upgraded eight fields;
+- manifests containing the rejected old active 0.4.0 shape `main_flows`, `chapters/04-main-flows.json`, `module_details.modules`, `modules[]`, `intro_blocks`, or `generated_module_object`;
 - any manifest or payload JSON file containing `dsl_version`;
 - missing fixed sections;
 - unsupported block shapes or wrong block fields;
@@ -506,12 +575,15 @@ Validation rejects:
 - missing `architecture_overview.module_map.module_table.rows`;
 - `architecture_overview.module_map.module_table.rows[]` objects without exactly `module`, `role`, `layer`, and `location`;
 - empty `quick_start.first_run.steps`;
-- empty `main_flows.flows`;
-- any `main_flows.flows[]` entry with `steps`;
-- empty `module_details.modules`;
-- mechanisms outside owning module objects;
+- empty `main_flow_details` or `module_details` arrays;
+- detail file stems that do not match `^[a-z0-9][a-z0-9_-]*$`;
+- detail JSON that repeats the inferred key;
+- `main_flow_overview` rows that do not match `main_flow_details` in count and order;
+- `module_overview` rows that do not match `module_details` in count and order;
+- `main_flow_overview` or `module_overview` containing `blocks` or `extra_subsections`;
+- `main_flow_overview` or `module_overview` containing detail prose, Mermaid, code, examples, or process metadata;
 - fixed sections carrying renderer-owned `key` or `title` fields;
 - extra subsections without `key`, `title`, or `blocks`;
-- process metadata such as subagent names, command transcripts, raw scan logs, or rejected drafts.
+- process metadata such as subagent names, command transcripts, raw scan logs, scan logs, or rejected drafts.
 
 Mermaid blocks must follow the canonical authoring guidance and pass strict Mermaid CLI rendering when present.

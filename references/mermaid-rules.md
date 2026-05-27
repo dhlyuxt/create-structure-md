@@ -6,6 +6,8 @@ This file is auxiliary validation guidance for Mermaid blocks. It points back to
 
 Every Mermaid block must render through Mermaid CLI when Mermaid blocks exist.
 
+Mermaid blocks can appear in detail files and shared-block static chapters, but not in `main_flow_overview` or `module_overview`.
+
 Missing `mmdc` is an error.
 
 Render failure is an error.

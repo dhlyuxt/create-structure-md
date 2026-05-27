@@ -9,9 +9,9 @@ description: Use when rendering, validating, or authoring a human-first reposito
 
 Active create-structure-md is 0.4.0 only. The 0.3.0 implementation exists only under `docs/superpowers/history/V3/` as historical reference and is not the active contract.
 
-The authoritative deliverables are `structure.manifest.json` and the child JSON files it references. Rendered Markdown is generated output, not the source of truth.
+`structure.manifest.json` and referenced child JSON files are authoritative. Rendered Markdown is generated output and must not be edited as source.
 
-Keep repository-understanding notes, subagent reports, command transcripts, rejected drafts, scan logs, and other process metadata outside the DSL package.
+Process records, subagent reports, command transcripts, rejected drafts, scan logs, repository-understanding notes, and other process metadata stay outside JSON.
 
 ## Required Reading
 
@@ -21,100 +21,86 @@ Before writing, accepting, validating, or rendering DSL, read:
 - `references/dsl-authoring-guide.md`
 - `references/document-structure.md`
 - `references/review-checklist.md`
-
-Use `references/mermaid-rules.md` only as auxiliary Mermaid validation guidance. It must not redefine or fork the canonical authoring rules in `references/dsl-authoring-guide.md`.
+- `references/mermaid-rules.md`
 
 ## Input Shape
 
-A package contains a root `structure.manifest.json` plus six fixed child JSON files for the rendered reader guide sections. Neither the manifest nor payload JSON files carry `dsl_version`.
+A package contains a root `structure.manifest.json` plus referenced child JSON files. Neither the manifest nor payload JSON files carry `dsl_version`.
 
-The package should describe a repository for human readers by answering reader questions first, then grounding those answers in paths, modules, flows, and mechanisms where useful.
+The active 0.4.0 manifest uses eight fields:
 
-## Workflow
+- `document`
+- `overview`
+- `quick_start`
+- `architecture_overview`
+- `main_flow_overview`
+- `main_flow_details`
+- `module_overview`
+- `module_details`
 
-1. Confirm inputs: repository path, package path, intended output file, reader audience, and any constraints.
-2. Read the contract: `dsl-spec`, `dsl-authoring-guide`, `document-structure`, and `review-checklist`.
-3. Capture a dispatch brief for any subagent work, including scope, files to inspect, expected output shape, and non-deliverable status of reports.
-4. Plan repository content around reader questions, not directory enumeration.
-5. Freeze the outline before drafting substantial content.
-6. Draft package content in manifest and child JSON files.
-7. Run adversarial review for substantial content before accepting it.
-8. Accept or reject DSL against the spec, authoring guide, rendered order, and review checklist.
-9. Validate, render, and review the generated Markdown.
+`main_flow_details` is a non-empty array of files under `chapters/04-main-flow-details/<flow-key>.json`.
+
+`module_details` is a non-empty array of files under `chapters/05-module-details/<module-key>.json`.
+
+Rejected old active 0.4.0 shape: `main_flows` pointing to `chapters/04-main-flows.json`, `module_details` pointing to one aggregate `chapters/05-module-details.json`, `module_details.modules`, and `generated_module_object`.
+
+## Step-by-Step Workflow
+
+1. Confirm repository path, package path, intended output file, reader audience, and constraints.
+2. Load the contract from required references.
+3. Create dispatch briefs for repository planning and ownership freeze. Briefs stay outside JSON.
+4. Plan reader-facing flows and responsibility-unit modules from reader questions, not directory enumeration.
+5. Freeze ownership before detail drafting: one planned detail file belongs to one authoring subagent.
+6. Create or update `structure.manifest.json` with the eight-field manifest and referenced child file paths.
+7. Dispatch one authoring subagent per file under `chapters/04-main-flow-details/<flow-key>.json`.
+8. Dispatch one authoring subagent per file under `chapters/05-module-details/<module-key>.json`.
+9. Dispatch a separate adversarial review subagent for every accepted detail file.
+10. Accept detail files only after review findings are resolved in the assigned file.
+11. Synthesize `main_flow_overview` and `module_overview` only after all corresponding detail files pass review.
+12. Validate package and detail files.
+13. Render Markdown from the manifest.
+14. Review rendered output against the checklist, then fix source JSON if needed.
+
+## Main Agent Responsibilities
+
+The main agent owns package orchestration, dispatch briefs, contract loading, planning dispatch, ownership freeze dispatch, manifest creation, overview synthesis, validation, rendering, and final review.
+
+The main agent does not directly author substantive Chapter 4 or Chapter 5 detail prose. It may create scaffolds, assign files, reconcile contracts, apply review-required corrections, and synthesize overview tables after detail acceptance.
+
+The main agent ensures `main_flow_overview` and `module_overview` are synthesized after all detail files pass review.
 
 ## Subagent Roles
 
-The main agent owns package orchestration, cross-section consistency, validation, rendering, and final review.
+Planning subagents may propose reader questions, behavior paths, responsibility units, and ownership boundaries. Their reports are process records and stay outside JSON.
 
-Subagents may draft bounded content, but their reports are not renderable deliverables and must stay outside the DSL package.
+Main-flow authoring subagents write exactly one assigned flow detail file under `chapters/04-main-flow-details/<flow-key>.json`.
 
-Repository planning subagent output contract:
+Module authoring subagents write exactly one assigned module detail file under `chapters/05-module-details/<module-key>.json`.
 
-- `repository_identity`
-- `problems_solved`
-- `main_capabilities`
-- `core_components_candidates`
-- `quick_start_candidates`
-- `layer_candidates`
-- `module_candidates`
-- `main_flow_candidates`
-- `module_detail_candidates`
-- `suggested_extra_subsections`
-- `excluded_or_deferred_content`
-- `open_questions`
-- `repo_understand_usage`
+Every accepted detail file requires a separate adversarial review subagent. Reviewers may modify only their assigned detail file.
 
-Structure review subagent output contract:
-
-- `review_decision`
-- accepted component rows, layer rows, and module rows
-- accepted main flows and module details
-- section boundary issues
-- content budget issues
-- required revisions
-- `repo_understand_usage`
-
-Module-detail authoring subagent output contract:
-
-- `module_name`
-- `module_location`
-- `module_purpose`
-- `generated_module_object`
-- `mechanisms`
-- `source_evidence_summary`
-- `excluded_details`
-- `unresolved_gaps`
-- `repo_understand_usage`
-
-Adversarial review subagent output contract:
-
-- `review_decision`
-- section boundary findings
-- dump or overdetail findings
-- unsupported block findings
-- module and main flow fit findings
-- required revisions
+Authoring and review subagents must not write process metadata, command transcripts, raw scan logs, rejected drafts, or subagent identities into JSON.
 
 ## Acceptance Rules
 
 Accept DSL only when:
 
-- It follows create-structure-md 0.4.0.
-- `structure.manifest.json` and child JSON files are the authoritative deliverables.
-- `structure.manifest.json` has exactly these six keys: `document`, `overview`, `quick_start`, `architecture_overview`, `main_flows`, and `module_details`.
-- `structure.manifest.json` uses exactly these values: `document` is `chapters/00-document.json`, `overview` is `chapters/01-overview.json`, `quick_start` is `chapters/02-quick-start.json`, `architecture_overview` is `chapters/03-architecture-overview.json`, `main_flows` is `chapters/04-main-flows.json`, and `module_details` is `chapters/05-module-details.json`.
-- All six fixed child files and fixed sections exist; arbitrary child filenames are invalid.
-- Neither the manifest nor payload JSON files include `dsl_version`.
-- Required fixed table structures are present: `overview.core_components.component_table.rows`, `architecture_overview.layers.layer_table.rows`, and `architecture_overview.module_map.module_table.rows`.
-- Fixed sections omit renderer-owned `key` or `title` fields where the spec forbids them.
-- Extra subsections include `key`, `title`, and `blocks`.
+- It follows active create-structure-md 0.4.0.
+- `structure.manifest.json` and referenced child JSON files are authoritative.
+- Rendered Markdown is treated as generated output.
+- The manifest has exactly the upgraded eight-field shape.
+- `main_flow_details` and `module_details` are non-empty arrays of referenced detail files.
+- Detail keys are inferred from file stems and are not repeated inside detail JSON.
+- Every detail file has one owning authoring subagent and one separate adversarial review subagent.
+- `main_flow_overview` and `module_overview` are synthesized after detail review passes.
+- Overview rows match detail arrays in count and order.
+- Overview files contain fixed table artifacts only and do not contain detail prose, Mermaid, code, examples, `blocks`, or `extra_subsections`.
+- Main-flow detail files describe reader-facing behavior paths, not call-chain dumps.
+- Module detail files describe responsibility units, not source-file listings.
 - Free blocks use only supported block types: `text`, `unordered_list`, `ordered_list`, `table`, `mermaid`, and `code`.
-- `first_run.steps`, `main_flows.flows`, and `module_details.modules` are non-empty.
-- Main flows are reader-facing behavior paths, not call chains.
-- Module details describe responsibility units, not file listings.
-- Mechanisms live inside the owning module.
-- Content starts from reader questions and uses paths as evidence, not as the organizing principle.
-- Mermaid blocks, when present, follow the canonical authoring guidance and pass strict Mermaid CLI rendering.
+- List block `items` values are string arrays.
+- Extra subsections include `key`, `title`, and `blocks`.
+- Mermaid blocks, when present in allowed files, follow the canonical authoring guidance and pass strict Mermaid CLI rendering.
 - Process metadata is absent from JSON and remains outside the DSL package.
 
 ## Rejection Rules
@@ -123,9 +109,14 @@ Reject DSL that:
 
 - Treats 0.3.0 as the active contract.
 - Treats rendered Markdown as source of truth.
-- Includes repository-understanding notes, subagent names, command transcripts, raw scan logs, rejected drafts, or other process metadata in JSON.
+- Uses the rejected old active 0.4.0 aggregate shape: `main_flows`, `chapters/04-main-flows.json`, `intro_blocks`, `modules[]`, `module_details.modules`, or `generated_module_object`.
+- Includes repository-understanding notes, subagent names, command transcripts, raw scan logs, scan logs, rejected drafts, or other process metadata in JSON.
+- Lets the main agent directly author substantive Chapter 4 or Chapter 5 detail prose.
+- Reuses the same subagent for authoring and adversarial review of a detail file.
+- Lets a reviewer modify files outside the assigned detail file.
+- Writes `main_flow_overview` or `module_overview` before corresponding detail files pass review.
+- Places `blocks`, `extra_subsections`, detail prose, Mermaid, code, examples, or process metadata in overview files.
 - Dumps file lists, call chains, platform encyclopedias, or API references.
-- Places module mechanisms outside module objects.
 - Uses unsupported block shapes or list `items` values that are not string arrays.
 - Forks Mermaid authoring rules outside `references/dsl-authoring-guide.md`.
 
@@ -135,6 +126,8 @@ Validate strictly before rendering:
 
 ```bash
 python scripts/validate_structure.py <package>/structure.manifest.json --strict
+python scripts/validate_flow_detail.py <package>/chapters/04-main-flow-details/<flow-key>.json --package-root <package>
+python scripts/validate_module_detail.py <package>/chapters/05-module-details/<module-key>.json --package-root <package>
 python scripts/render_markdown.py <package>/structure.manifest.json
 ```
 
