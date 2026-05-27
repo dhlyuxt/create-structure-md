@@ -55,8 +55,6 @@ def _locate_mermaid_cli() -> str | None:
 
 def _validate_mermaid_block(mmdc, path, block, result):
     source = block.get("source", "")
-    if not isinstance(source, str):
-        return
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir = Path(tmpdir)
         input_path = tmpdir / "diagram.mmd"
@@ -119,7 +117,11 @@ def _iter_payloads(package):
 
 def _iter_mermaid_blocks_from_payload(payload, base_path):
     for path, value in _walk(payload, base_path):
-        if isinstance(value, dict) and value.get("type") == "mermaid":
+        if (
+            isinstance(value, dict)
+            and value.get("type") == "mermaid"
+            and isinstance(value.get("source", ""), str)
+        ):
             yield path, value
 
 

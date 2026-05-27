@@ -161,6 +161,57 @@ class V040MermaidTests(unittest.TestCase):
         self.assertIsNotNone(result)
         subprocess_run.assert_not_called()
 
+    @mock.patch("scripts.v040_mermaid._locate_mermaid_cli", return_value=None)
+    def test_non_string_mermaid_source_does_not_require_cli_for_package(
+        self, locate_mermaid_cli
+    ):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest = write_valid_package(tmpdir)
+            data = _read(Path(tmpdir) / "chapters/05-module-details/storage.json")
+            data["blocks"].append(
+                {
+                    "type": "mermaid",
+                    "title": "模块关系",
+                    "diagram_type": "flowchart",
+                    "source": ["not", "string"],
+                }
+            )
+            write_json(Path(tmpdir) / "chapters/05-module-details/storage.json", data)
+            package = load_manifest_package(manifest)
+
+            result = mermaid_validation_result(package)
+
+        self.assertFalse(
+            any(issue.code == "mermaid.cli_missing" for issue in result.errors),
+            [issue.format() for issue in result.errors],
+        )
+        locate_mermaid_cli.assert_not_called()
+
+    @mock.patch("scripts.v040_mermaid._locate_mermaid_cli", return_value=None)
+    def test_non_string_mermaid_source_does_not_require_cli_for_single_detail(
+        self, locate_mermaid_cli
+    ):
+        result = mermaid_detail_validation_result(
+            "module_details",
+            0,
+            {
+                "blocks": [
+                    {
+                        "type": "mermaid",
+                        "title": "模块关系",
+                        "diagram_type": "flowchart",
+                        "source": ["not", "string"],
+                    }
+                ]
+            },
+        )
+
+        self.assertFalse(
+            any(issue.code == "mermaid.cli_missing" for issue in result.errors),
+            [issue.format() for issue in result.errors],
+        )
+        locate_mermaid_cli.assert_not_called()
+
     @mock.patch("scripts.v040_mermaid.subprocess.run")
     @mock.patch("scripts.v040_mermaid._locate_mermaid_cli", return_value="/usr/bin/mmdc")
     def test_non_zero_cli_exit_is_an_error_including_stderr(
