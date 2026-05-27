@@ -7,7 +7,7 @@ def render_markdown(package) -> str:
     module_details = package.chapters["module_details"]["module_details"]
 
     renderer = _MarkdownRenderer()
-    renderer.heading(1, f'{document["repository_name"]}结构说明')
+    renderer.heading(1, f'{document["repository_name"]} 结构说明')
 
     renderer.heading(2, "入门")
     renderer.heading(3, "概述")
@@ -68,7 +68,6 @@ def render_markdown(package) -> str:
 
     renderer.heading(3, "模块详解")
     renderer.blocks(module_details.get("intro_blocks", []))
-    renderer.extra_subsections(4, module_details["extra_subsections"])
     for module in module_details["modules"]:
         renderer.heading(4, module["name"])
         renderer.paragraph(f'位置：{module["location"]}')
@@ -78,6 +77,7 @@ def render_markdown(package) -> str:
             renderer.heading(5, mechanism["title"])
             renderer.blocks(mechanism.get("blocks", []))
         renderer.extra_subsections(5, module["extra_subsections"])
+    renderer.extra_subsections(4, module_details["extra_subsections"])
 
     return renderer.render()
 

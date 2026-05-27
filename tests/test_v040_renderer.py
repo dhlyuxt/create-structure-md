@@ -13,7 +13,7 @@ from tests.helpers_v040 import write_json, write_valid_package
 
 
 EXPECTED_HEADINGS = [
-    "# 示例仓库结构说明",
+    "# 示例仓库 结构说明",
     "## 入门",
     "### 概述",
     "#### 当前仓库介绍",
@@ -181,7 +181,7 @@ class V040RendererTests(unittest.TestCase):
         self.assertGreater(markdown.index("#### 快速开始扩展"), markdown.index("#### 预期结果"))
         self.assertGreater(markdown.index("#### 架构扩展"), markdown.index("#### 目录角色"))
         self.assertGreater(markdown.index("#### 主线扩展"), markdown.index("#### 初始化主线"))
-        self.assertLess(markdown.index("#### 模块总览扩展"), markdown.index("#### 存储模块"))
+        self.assertGreater(markdown.index("#### 模块总览扩展"), markdown.index("##### 模块扩展一"))
         self.assertIn("##### 模块扩展一", markdown)
         self.assertGreater(markdown.index("##### 模块扩展一"), markdown.index("##### 追加写入"))
         for key in [
