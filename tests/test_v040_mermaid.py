@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from scripts.v040_package import load_manifest_package
-from scripts.v040_mermaid import mermaid_validation_result
+from scripts.v040_mermaid import mermaid_detail_validation_result, mermaid_validation_result
 from tests.helpers_v040 import write_json, write_valid_package
 
 
@@ -113,6 +113,53 @@ class V040MermaidTests(unittest.TestCase):
             any("$.module_details[0].blocks[1]" in issue.path for issue in result.errors),
             [issue.format() for issue in result.errors],
         )
+
+    @mock.patch("scripts.v040_mermaid.subprocess.run")
+    @mock.patch("scripts.v040_mermaid._locate_mermaid_cli", return_value="/usr/bin/mmdc")
+    def test_non_string_mermaid_source_in_detail_does_not_raise_mermaid_validation(
+        self, locate_mermaid_cli, subprocess_run
+    ):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest = write_valid_package(tmpdir)
+            data = _read(Path(tmpdir) / "chapters/05-module-details/storage.json")
+            data["blocks"].append(
+                {
+                    "type": "mermaid",
+                    "title": "模块关系",
+                    "diagram_type": "flowchart",
+                    "source": ["not", "string"],
+                }
+            )
+            write_json(Path(tmpdir) / "chapters/05-module-details/storage.json", data)
+            package = load_manifest_package(manifest)
+
+            result = mermaid_validation_result(package)
+
+        self.assertIsNotNone(result)
+        subprocess_run.assert_not_called()
+
+    @mock.patch("scripts.v040_mermaid.subprocess.run")
+    @mock.patch("scripts.v040_mermaid._locate_mermaid_cli", return_value="/usr/bin/mmdc")
+    def test_non_string_mermaid_source_does_not_raise_single_detail_mermaid_validation(
+        self, locate_mermaid_cli, subprocess_run
+    ):
+        result = mermaid_detail_validation_result(
+            "module_details",
+            0,
+            {
+                "blocks": [
+                    {
+                        "type": "mermaid",
+                        "title": "模块关系",
+                        "diagram_type": "flowchart",
+                        "source": ["not", "string"],
+                    }
+                ]
+            },
+        )
+
+        self.assertIsNotNone(result)
+        subprocess_run.assert_not_called()
 
     @mock.patch("scripts.v040_mermaid.subprocess.run")
     @mock.patch("scripts.v040_mermaid._locate_mermaid_cli", return_value="/usr/bin/mmdc")

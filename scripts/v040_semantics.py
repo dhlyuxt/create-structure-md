@@ -205,6 +205,8 @@ def _check_mermaid_readability(package, result):
 def _check_mermaid_readability_value(payload, base_path, result):
     for path, block in _iter_mermaid_blocks_from_payload(payload, base_path):
         source = block.get("source", "")
+        if not isinstance(source, str):
+            continue
         if re.match(r"^\s*graph\b", source):
             result.warning(
                 "semantics.mermaid.legacy_graph",

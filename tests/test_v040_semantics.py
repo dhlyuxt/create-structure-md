@@ -95,6 +95,41 @@ class V040SemanticTests(unittest.TestCase):
 
         self.assertIsNotNone(result)
 
+    def test_non_string_mermaid_source_in_detail_does_not_raise_semantic_validation(self):
+        def mutate(root):
+            data = _read(root / "chapters/05-module-details/storage.json")
+            data["blocks"].append(
+                {
+                    "type": "mermaid",
+                    "title": "模块关系",
+                    "diagram_type": "flowchart",
+                    "source": ["not", "string"],
+                }
+            )
+            write_json(root / "chapters/05-module-details/storage.json", data)
+
+        result = self.validate(mutate)
+
+        self.assertIsNotNone(result)
+
+    def test_non_string_mermaid_source_does_not_raise_single_detail_semantics(self):
+        result = detail_semantic_validation_result(
+            "module_details",
+            0,
+            {
+                "blocks": [
+                    {
+                        "type": "mermaid",
+                        "title": "模块关系",
+                        "diagram_type": "flowchart",
+                        "source": ["not", "string"],
+                    }
+                ]
+            },
+        )
+
+        self.assertIsNotNone(result)
+
     def test_warns_when_more_than_three_main_flow_detail_files_are_selected(self):
         def mutate(root):
             manifest = _read(root / "structure.manifest.json")

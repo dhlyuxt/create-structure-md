@@ -54,11 +54,14 @@ def _locate_mermaid_cli() -> str | None:
 
 
 def _validate_mermaid_block(mmdc, path, block, result):
+    source = block.get("source", "")
+    if not isinstance(source, str):
+        return
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir = Path(tmpdir)
         input_path = tmpdir / "diagram.mmd"
         output_path = tmpdir / "diagram.svg"
-        input_path.write_text(block.get("source", ""), encoding="utf-8")
+        input_path.write_text(source, encoding="utf-8")
 
         try:
             completed = subprocess.run(
