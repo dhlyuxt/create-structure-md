@@ -15,6 +15,19 @@ from tests.helpers_v040 import write_json, write_valid_package
 
 
 class V040CliTests(unittest.TestCase):
+    def test_validate_cli_accepts_v030_package_by_manifest_shape(self):
+        manifest = (
+            ROOT
+            / "docs/superpowers/history/V3/examples/no-mechanisms/structure.manifest.json"
+        )
+        stdout = io.StringIO()
+
+        with contextlib.redirect_stdout(stdout):
+            code = validate_cli.main([str(manifest), "--strict"])
+
+        self.assertEqual(0, code)
+        self.assertIn("Validation succeeded", stdout.getvalue())
+
     def test_validate_cli_accepts_package_without_mermaid(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest = write_valid_package(tmpdir, include_mermaid=False)
@@ -61,6 +74,55 @@ class V040CliTests(unittest.TestCase):
         self.assertEqual(2, code)
         self.assertIn("manifest JSON parse failed", stderr.getvalue())
         self.assertNotIn("Traceback", stderr.getvalue())
+
+    def test_validate_cli_reports_unknown_shape_with_supported_versions(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest = Path(tmpdir) / "structure.manifest.json"
+            write_json(manifest, {"document": "chapters/00-document.json"})
+            stderr = io.StringIO()
+
+            with contextlib.redirect_stderr(stderr):
+                code = validate_cli.main([str(manifest), "--strict"])
+
+        self.assertEqual(2, code)
+        self.assertIn("0.3.0", stderr.getvalue())
+        self.assertIn("0.4.0", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
+
+    def test_validate_cli_rejects_dsl_version_before_dispatch(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest = write_valid_package(tmpdir, include_mermaid=False)
+            manifest_data = {
+                "dsl_version": "0.4.0",
+                "document": "chapters/00-document.json",
+            }
+            write_json(manifest, manifest_data)
+            stderr = io.StringIO()
+
+            with contextlib.redirect_stderr(stderr):
+                code = validate_cli.main([str(manifest), "--strict"])
+
+        self.assertEqual(2, code)
+        self.assertIn("dsl_version", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
+
+    def test_render_cli_accepts_v030_package_by_manifest_shape(self):
+        manifest = (
+            ROOT
+            / "docs/superpowers/history/V3/examples/no-mechanisms/structure.manifest.json"
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = Path(tmpdir) / "no-mechanisms-v030.md"
+            stdout = io.StringIO()
+
+            with contextlib.redirect_stdout(stdout):
+                code = render_cli.main(
+                    [str(manifest), "--output", str(output), "--strict"]
+                )
+
+            self.assertEqual(0, code)
+            self.assertTrue(output.exists())
+            self.assertIn("Document written:", stdout.getvalue())
 
     def test_render_cli_writes_default_output(self):
         with tempfile.TemporaryDirectory() as tmpdir:
