@@ -96,6 +96,25 @@ class V040RendererTests(unittest.TestCase):
         )
         self.assertLess(markdown.index("| 主线 | 目的 | 入口 | 位置 |"), markdown.index("#### 初始化主线"))
 
+    def test_main_flow_overview_link_slug_normalizes_ascii_heading_anchor(self):
+        def mutate(root):
+            detail = _read(root / "chapters/04-main-flow-details/init-flow.json")
+            detail["title"] = "Validator Module!"
+            write_json(root / "chapters/04-main-flow-details/init-flow.json", detail)
+
+            overview = _read(root / "chapters/04-main-flow-overview.json")
+            overview["main_flow_overview"]["flow_table"]["rows"][0]["flow"] = "Validator Module!"
+            overview["main_flow_overview"]["flow_table"]["rows"][0]["anchor"] = "Validator Module!"
+            write_json(root / "chapters/04-main-flow-overview.json", overview)
+
+        markdown = self.render_package(mutate)
+
+        self.assertIn("#### Validator Module!", markdown)
+        self.assertIn(
+            "| [Validator Module!](#validator-module) | 准备示例仓库能力并写入初始状态。 | `example_init` | src/api/init.py |",
+            markdown,
+        )
+
     def test_module_overview_table_links_to_detail_heading(self):
         markdown = self.render_package()
         self.assertIn("| 模块 | 职责 | 位置 |", markdown)

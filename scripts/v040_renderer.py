@@ -195,8 +195,15 @@ def _safe_backtick_fence_length(content):
 
 
 def _markdown_link(label, anchor):
-    href = "#" + str(anchor).strip().replace(" ", "-")
+    href = "#" + _heading_fragment(anchor)
     return f"[{label}]({href})"
+
+
+def _heading_fragment(value):
+    text = str(value).strip().lower()
+    text = re.sub(r"[^\w\s-]", "", text, flags=re.UNICODE)
+    text = re.sub(r"[\s-]+", "-", text)
+    return text.strip("-")
 
 
 def _escape_table_cell(value):
