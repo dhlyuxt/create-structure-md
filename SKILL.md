@@ -14,6 +14,7 @@ Use this skill to produce one human-first repository structure Markdown document
 - Process records, subagent reports, command transcripts, rejected drafts, scan logs, repository-understanding notes, and review conclusions stay outside JSON.
 - Do not use `target_readers` or `reader_questions`. The fixed templates already cover the two content layers: users and learners.
 - The main agent coordinates the workflow and does not directly write substantive chapter prose.
+- When the target repository is C, every subagent that needs repository understanding must invoke the `repo-understand` skill first and prefer `repo-analysis-tools` before reading raw source.
 
 ## Workflow
 
@@ -37,6 +38,7 @@ Use this skill to produce one human-first repository structure Markdown document
 - Main agent uses `references/review-checklist.md` for final gates.
 - Authoring subagents use `references/dsl-authoring-guide.md`.
 - Authoring or review subagents that touch Mermaid use `references/mermaid-rules.md`.
+- For C repositories, subagents that analyze repository structure, files, symbols, or behavior must invoke `repo-understand` first and follow its `repo-analysis-tools` CLI-first route.
 
 **Watch:** The main agent routes references; it does not use authoring references to write substantive chapter prose itself.
 
