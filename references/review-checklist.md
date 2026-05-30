@@ -17,6 +17,9 @@
 - Confirms one-detail-per-subagent ownership for every file under `chapters/04-main-flow-details/`.
 - Confirms one-detail-per-subagent ownership for every file under `chapters/05-module-details/`.
 - Confirms separate adversarial detail review for every accepted detail file.
+- Confirms one repository-understanding brief was produced before chapter authoring, flow planning, and module planning.
+- Confirms the repository understanding brief stayed outside the DSL package.
+- Confirms the main agent did not open, quote, summarize, or inspect target repository source files to understand behavior, choose flows, choose modules, explain mechanisms, or select examples.
 - Confirms reviewers modified only their assigned detail file.
 - Confirms `main_flow_overview` and `module_overview` were synthesized only after details passed review.
 
@@ -30,10 +33,13 @@
 - Rejects quick start that becomes a platform encyclopedia.
 - Architecture overview explains whole-repository components and collaboration.
 - Architecture overview includes `layers.layer_table.rows` and `module_map.module_table.rows`.
+- Architecture overview includes at least one Mermaid block.
 - Rejects architecture overview that explains module internals.
 - Main-flow detail files explain important behavior paths across components.
+- Every main-flow detail file includes at least one Mermaid block.
 - Confirms main-flow behavior-path fit and rejects function-by-function call graphs.
 - Module detail files explain responsibility units, mechanisms, paths, and modification risks.
+- Every module detail file includes at least one Mermaid block.
 - Confirms module responsibility-unit fit and rejects file-by-file listings or API reference pages.
 - Confirms mechanisms live inside the owning module detail.
 
@@ -52,14 +58,16 @@
 - Ordered lists contain ordered actions.
 - Tables are compact comparisons.
 - List block `items` values are string arrays only.
-- Mermaid readability is checked before final acceptance.
+- Mermaid readability is checked for every Mermaid block before final acceptance.
 - Mermaid blocks are relationship or behavior diagrams and pass strict Mermaid CLI rendering.
+- Reviewers reject architecture overview, any main-flow detail, or any module detail that lacks Mermaid.
+- Reviewers challenge missing Mermaid in other allowed sections when relationship-heavy or order-heavy content is hard to understand from text alone.
 - Missing `mmdc`, render failure, or missing SVG output after zero exit is a rejection.
 
 ## Subagent Hygiene
 
 - Subagent reports stay outside the DSL package.
-- Repository-understanding notes stay outside the DSL package.
+- Repository-understanding briefs and notes stay outside the DSL package.
 - Command transcripts and raw scan logs stay outside the DSL package.
 - Rejected drafts stay outside the DSL package.
 - Process metadata absence is confirmed in every JSON file.
