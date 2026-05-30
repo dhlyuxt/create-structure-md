@@ -130,7 +130,7 @@ For code blocks, `title` is optional. List block `items` values are string array
 
 ## Overview
 
-The overview child file contains fixed subsections for the rendered `### 概述` section. Fixed sections are renderer-owned and do not carry `key` or `title`.
+The overview child file contains fixed subsections for the rendered `## 仓库概述` section. Fixed sections are renderer-owned and do not carry `key` or `title`.
 
 `overview.core_components.component_table` is a semantic fixed-table object, not a generic free block table. `component_table.rows[]` objects contain exactly `component`, `role`, and `location`.
 
@@ -203,7 +203,7 @@ Example `chapters/01-overview.json`:
         "blocks": [
           {
             "type": "text",
-            "content": "先读入门，再进入深入解析。"
+          "content": "先读仓库概述，再进入快速开始、架构概述、主线流程和模块详解。"
           }
         ]
       }
@@ -214,7 +214,7 @@ Example `chapters/01-overview.json`:
 
 ## Quick Start
 
-The quick start child file contains fixed subsections for the rendered `### 快速开始` section. `first_run.steps[]` is ordered by array position and must be non-empty.
+The quick start child file contains fixed subsections for the rendered `## 快速开始` section. `first_run.steps[]` is ordered by array position and must be non-empty.
 
 Example `chapters/02-quick-start.json`:
 
@@ -295,7 +295,7 @@ Example `chapters/02-quick-start.json`:
 
 ## Architecture Overview
 
-The architecture overview child file contains fixed subsections for the rendered `### 架构概述` section. Required table structures are `layers.layer_table.rows` and `module_map.module_table.rows`. These are semantic fixed-table objects, not generic free block tables.
+The architecture overview child file contains fixed subsections for the rendered `## 架构概述` section. Required table structures are `layers.layer_table.rows` and `module_map.module_table.rows`. These are semantic fixed-table objects, not generic free block tables.
 
 `layers.layer_table.rows[]` objects contain exactly `layer`, `role`, and `location`. `module_map.module_table.rows[]` objects contain exactly `module`, `role`, `layer`, and `location`.
 
@@ -538,7 +538,7 @@ Example `chapters/05-module-details/validator.json`:
 
 ## Module Details
 
-This heading names the rendered Chapter 5 detail family. The executable DSL contract for each individual file is the singular `Module Detail` object above.
+This heading names the rendered module detail family. The executable DSL contract for each individual file is the singular `Module Detail` object above.
 
 ## Extra Subsections
 

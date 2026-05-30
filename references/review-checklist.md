@@ -20,17 +20,14 @@
 - Confirms reviewers modified only their assigned detail file.
 - Confirms `main_flow_overview` and `module_overview` were synthesized only after details passed review.
 
-## 入门
+## Main Sections
 
-- Overview answers what the repository is and how to read it.
+- Repository overview answers what the repository is and how to read it.
 - Overview includes `core_components.component_table.rows`.
 - Rejects overview that contains setup steps or module mechanisms.
 - Quick start gives ordered first-run actions.
 - Quick start has non-empty `first_run.steps[]`.
 - Rejects quick start that becomes a platform encyclopedia.
-
-## 深入解析
-
 - Architecture overview explains whole-repository components and collaboration.
 - Architecture overview includes `layers.layer_table.rows` and `module_map.module_table.rows`.
 - Rejects architecture overview that explains module internals.
@@ -73,6 +70,6 @@
 - Runs flow detail validation for every file under `chapters/04-main-flow-details/`.
 - Runs module detail validation for every file under `chapters/05-module-details/`.
 - Renders Markdown from source JSON.
-- Reviews rendered structure: `# <repository_name> 结构说明`, `## 入门`, `### 概述`, `### 快速开始`, `## 深入解析`, `### 架构概述`, `### 主线流程`, and `### 模块详解`.
+- Reviews rendered structure: `# <repository_name> 结构说明`, `## 仓库概述`, `## 快速开始`, `## 架构概述`, `## 主线流程`, and `## 模块详解`.
 - Confirms extra subsections render after fixed content in array order.
 - Fixes source JSON rather than editing generated Markdown.

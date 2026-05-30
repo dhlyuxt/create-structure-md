@@ -14,26 +14,24 @@ from tests.helpers_v040 import write_json, write_valid_package
 
 EXPECTED_HEADINGS = [
     "# 示例仓库 结构说明",
-    "## 入门",
-    "### 概述",
-    "#### 当前仓库介绍",
-    "#### 解决的问题",
-    "#### 主要功能",
-    "#### 核心组件",
-    "### 快速开始",
-    "#### 使用场景",
-    "#### 准备工作",
-    "#### 第一次运行/接入",
-    "#### 最小示例",
-    "#### 预期结果",
-    "## 深入解析",
-    "### 架构概述",
-    "#### 架构总览",
-    "#### 软件分层",
-    "#### 模块划分",
-    "#### 目录角色",
-    "### 主线流程",
-    "### 模块详解",
+    "## 仓库概述",
+    "### 当前仓库介绍",
+    "### 解决的问题",
+    "### 主要功能",
+    "### 核心组件",
+    "## 快速开始",
+    "### 使用场景",
+    "### 准备工作",
+    "### 第一次运行/接入",
+    "### 最小示例",
+    "### 预期结果",
+    "## 架构概述",
+    "### 架构总览",
+    "### 软件分层",
+    "### 模块划分",
+    "### 目录角色",
+    "## 主线流程",
+    "## 模块详解",
 ]
 
 
@@ -58,17 +56,17 @@ class V040RendererTests(unittest.TestCase):
             markdown.index("公共 API 是最小调用入口。"),
         )
 
-    def test_quick_start_first_run_steps_are_fifth_level_headings(self):
+    def test_quick_start_first_run_steps_are_fourth_level_headings(self):
         markdown = self.render_package()
-        self.assertIn("##### 1. 初始化仓库能力", markdown)
+        self.assertIn("#### 1. 初始化仓库能力", markdown)
         self.assertIn("调用初始化入口。", markdown)
 
-    def test_main_flow_detail_file_renders_as_fourth_level_heading(self):
+    def test_main_flow_detail_file_renders_as_third_level_heading(self):
         markdown = self.render_package()
         main_flow_section = markdown[
-            markdown.index("### 主线流程") : markdown.index("### 模块详解")
+            markdown.index("## 主线流程") : markdown.index("## 模块详解")
         ]
-        self.assertIn("#### 初始化主线", main_flow_section)
+        self.assertIn("### 初始化主线", main_flow_section)
 
     def test_main_flow_without_entry_location_skips_empty_position_lines(self):
         def mutate(root):
@@ -82,7 +80,7 @@ class V040RendererTests(unittest.TestCase):
 
         markdown = self.render_package(mutate)
         main_flow_section = markdown[
-            markdown.index("### 主线流程") : markdown.index("### 模块详解")
+            markdown.index("## 主线流程") : markdown.index("## 模块详解")
         ]
         self.assertNotIn("位置：", main_flow_section)
         self.assertNotIn("None", main_flow_section)
@@ -94,7 +92,7 @@ class V040RendererTests(unittest.TestCase):
             "| [初始化主线](#初始化主线) | 准备示例仓库能力并写入初始状态。 | `example_init` | src/api/init.py |",
             markdown,
         )
-        self.assertLess(markdown.index("| 主线 | 目的 | 入口 | 位置 |"), markdown.index("#### 初始化主线"))
+        self.assertLess(markdown.index("| 主线 | 目的 | 入口 | 位置 |"), markdown.index("### 初始化主线"))
 
     def test_main_flow_overview_link_slug_normalizes_ascii_heading_anchor(self):
         def mutate(root):
@@ -109,7 +107,7 @@ class V040RendererTests(unittest.TestCase):
 
         markdown = self.render_package(mutate)
 
-        self.assertIn("#### Validator Module!", markdown)
+        self.assertIn("### Validator Module!", markdown)
         self.assertIn(
             "| [Validator Module!](#validator-module) | 准备示例仓库能力并写入初始状态。 | `example_init` | src/api/init.py |",
             markdown,
@@ -122,7 +120,7 @@ class V040RendererTests(unittest.TestCase):
             "| [存储模块](#存储模块) | 保存初始化流程产生的示例状态。 | src/storage.py |",
             markdown,
         )
-        self.assertLess(markdown.index("| 模块 | 职责 | 位置 |"), markdown.index("#### 存储模块"))
+        self.assertLess(markdown.index("| 模块 | 职责 | 位置 |"), markdown.index("### 存储模块"))
 
     def test_detail_files_render_in_manifest_order(self):
         def mutate(root):
@@ -177,12 +175,12 @@ class V040RendererTests(unittest.TestCase):
 
         markdown = self.render_package(mutate)
 
-        self.assertLess(markdown.index("#### 初始化主线"), markdown.index("#### 渲染主线"))
-        self.assertLess(markdown.index("#### 存储模块"), markdown.index("#### 渲染模块"))
+        self.assertLess(markdown.index("### 初始化主线"), markdown.index("### 渲染主线"))
+        self.assertLess(markdown.index("### 存储模块"), markdown.index("### 渲染模块"))
 
     def test_module_mechanisms_render_inside_owning_module(self):
         markdown = self.render_package()
-        self.assertLess(markdown.index("#### 存储模块"), markdown.index("##### 追加写入"))
+        self.assertLess(markdown.index("### 存储模块"), markdown.index("#### 追加写入"))
 
     def test_mermaid_block_renders_as_fenced_mermaid_code(self):
         markdown = self.render_package(include_mermaid=True)
@@ -215,11 +213,11 @@ class V040RendererTests(unittest.TestCase):
         markdown = self.render_package(mutate)
 
         self.assertIn(
-            "##### 安装命令\n\n```bash\npython -m example.init\n```",
+            "#### 安装命令\n\n```bash\npython -m example.init\n```",
             markdown,
         )
         self.assertIn(
-            "##### 组件关系\n\n```mermaid\nflowchart LR\n  app[应用] --> api[公共 API]\n```",
+            "#### 组件关系\n\n```mermaid\nflowchart LR\n  app[应用] --> api[公共 API]\n```",
             markdown,
         )
 
@@ -337,13 +335,13 @@ class V040RendererTests(unittest.TestCase):
             write_json(root / "chapters/05-module-details/storage.json", module_detail)
 
         markdown = self.render_package(mutate)
-        self.assertLess(markdown.index("#### 概述扩展一"), markdown.index("#### 概述扩展二"))
-        self.assertGreater(markdown.index("#### 概述扩展一"), markdown.index("公共 API 是最小调用入口。"))
-        self.assertGreater(markdown.index("#### 快速开始扩展"), markdown.index("#### 预期结果"))
-        self.assertGreater(markdown.index("#### 架构扩展"), markdown.index("#### 目录角色"))
-        self.assertGreater(markdown.index("#### 主线扩展"), markdown.index("#### 初始化主线"))
-        self.assertIn("##### 模块扩展一", markdown)
-        self.assertGreater(markdown.index("##### 模块扩展一"), markdown.index("##### 追加写入"))
+        self.assertLess(markdown.index("### 概述扩展一"), markdown.index("### 概述扩展二"))
+        self.assertGreater(markdown.index("### 概述扩展一"), markdown.index("公共 API 是最小调用入口。"))
+        self.assertGreater(markdown.index("### 快速开始扩展"), markdown.index("### 预期结果"))
+        self.assertGreater(markdown.index("### 架构扩展"), markdown.index("### 目录角色"))
+        self.assertGreater(markdown.index("#### 主线扩展"), markdown.index("### 初始化主线"))
+        self.assertIn("#### 模块扩展一", markdown)
+        self.assertGreater(markdown.index("#### 模块扩展一"), markdown.index("#### 追加写入"))
         for key in [
             "overview_extra_alpha",
             "overview_extra_beta",

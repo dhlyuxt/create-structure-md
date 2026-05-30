@@ -12,53 +12,51 @@ def render_markdown(package) -> str:
     renderer = _MarkdownRenderer()
     renderer.heading(1, f'{document["repository_name"]} 结构说明')
 
-    renderer.heading(2, "入门")
-    renderer.heading(3, "概述")
-    renderer.section(4, "当前仓库介绍", overview["repository_intro"])
-    renderer.section(4, "解决的问题", overview["problems_solved"])
-    renderer.section(4, "主要功能", overview["main_capabilities"])
-    renderer.heading(4, "核心组件")
+    renderer.heading(2, "仓库概述")
+    renderer.section(3, "当前仓库介绍", overview["repository_intro"])
+    renderer.section(3, "解决的问题", overview["problems_solved"])
+    renderer.section(3, "主要功能", overview["main_capabilities"])
+    renderer.heading(3, "核心组件")
     renderer.fixed_table(
         ["组件", "作用", "位置"],
         overview["core_components"]["component_table"].get("rows", []),
         ["component", "role", "location"],
     )
-    renderer.blocks(overview["core_components"].get("blocks", []), 5)
-    renderer.extra_subsections(4, overview["extra_subsections"])
+    renderer.blocks(overview["core_components"].get("blocks", []), 4)
+    renderer.extra_subsections(3, overview["extra_subsections"])
 
-    renderer.heading(3, "快速开始")
-    renderer.section(4, "使用场景", quick_start["usage_scenarios"])
-    renderer.section(4, "准备工作", quick_start["setup"])
-    renderer.heading(4, "第一次运行/接入")
-    renderer.blocks(quick_start["first_run"].get("blocks", []), 5)
+    renderer.heading(2, "快速开始")
+    renderer.section(3, "使用场景", quick_start["usage_scenarios"])
+    renderer.section(3, "准备工作", quick_start["setup"])
+    renderer.heading(3, "第一次运行/接入")
+    renderer.blocks(quick_start["first_run"].get("blocks", []), 4)
     for index, step in enumerate(quick_start["first_run"]["steps"], start=1):
-        renderer.heading(5, f'{index}. {step["title"]}')
-        renderer.blocks(step.get("blocks", []), 6)
-    renderer.section(4, "最小示例", quick_start["minimal_example"])
-    renderer.section(4, "预期结果", quick_start["expected_result"])
-    renderer.extra_subsections(4, quick_start["extra_subsections"])
+        renderer.heading(4, f'{index}. {step["title"]}')
+        renderer.blocks(step.get("blocks", []), 5)
+    renderer.section(3, "最小示例", quick_start["minimal_example"])
+    renderer.section(3, "预期结果", quick_start["expected_result"])
+    renderer.extra_subsections(3, quick_start["extra_subsections"])
 
-    renderer.heading(2, "深入解析")
-    renderer.heading(3, "架构概述")
-    renderer.section(4, "架构总览", architecture["architecture_summary"])
-    renderer.heading(4, "软件分层")
+    renderer.heading(2, "架构概述")
+    renderer.section(3, "架构总览", architecture["architecture_summary"])
+    renderer.heading(3, "软件分层")
     renderer.fixed_table(
         ["层", "作用", "位置"],
         architecture["layers"]["layer_table"].get("rows", []),
         ["layer", "role", "location"],
     )
-    renderer.blocks(architecture["layers"].get("blocks", []), 5)
-    renderer.heading(4, "模块划分")
+    renderer.blocks(architecture["layers"].get("blocks", []), 4)
+    renderer.heading(3, "模块划分")
     renderer.fixed_table(
         ["模块", "作用", "所在层", "位置"],
         architecture["module_map"]["module_table"].get("rows", []),
         ["module", "role", "layer", "location"],
     )
-    renderer.blocks(architecture["module_map"].get("blocks", []), 5)
-    renderer.section(4, "目录角色", architecture["repository_layout"])
-    renderer.extra_subsections(4, architecture["extra_subsections"])
+    renderer.blocks(architecture["module_map"].get("blocks", []), 4)
+    renderer.section(3, "目录角色", architecture["repository_layout"])
+    renderer.extra_subsections(3, architecture["extra_subsections"])
 
-    renderer.heading(3, "主线流程")
+    renderer.heading(2, "主线流程")
     if main_flow_overview.get("intro"):
         renderer.paragraph(main_flow_overview["intro"])
     renderer.linked_fixed_table(
@@ -71,16 +69,16 @@ def render_markdown(package) -> str:
     )
     for detail in package.main_flow_details:
         flow = detail.data
-        renderer.heading(4, flow["title"])
+        renderer.heading(3, flow["title"])
         renderer.paragraph(f'目的：{flow["purpose"]}')
         renderer.paragraph(f'读者目标：{flow["reader_goal"]}')
         renderer.paragraph(f'入口：`{flow["entry"]["name"]}`')
         if flow["entry"].get("location"):
             renderer.paragraph(f'位置：{flow["entry"]["location"]}')
-        renderer.blocks(flow.get("blocks", []), 5)
-        renderer.extra_subsections(5, flow["extra_subsections"])
+        renderer.blocks(flow.get("blocks", []), 4)
+        renderer.extra_subsections(4, flow["extra_subsections"])
 
-    renderer.heading(3, "模块详解")
+    renderer.heading(2, "模块详解")
     if module_overview.get("intro"):
         renderer.paragraph(module_overview["intro"])
     renderer.linked_fixed_table(
@@ -92,16 +90,16 @@ def render_markdown(package) -> str:
     )
     for detail in package.module_details:
         module = detail.data
-        renderer.heading(4, module["name"])
+        renderer.heading(3, module["name"])
         renderer.paragraph(f'位置：{module["location"]}')
         renderer.paragraph(f'职责：{module["purpose"]}')
-        renderer.heading(5, "责任")
+        renderer.heading(4, "责任")
         renderer.unordered_list(module["responsibilities"])
-        renderer.blocks(module.get("blocks", []), 5)
+        renderer.blocks(module.get("blocks", []), 4)
         for mechanism in module.get("mechanisms", []):
-            renderer.heading(5, mechanism["title"])
-            renderer.blocks(mechanism.get("blocks", []), 6)
-        renderer.extra_subsections(5, module["extra_subsections"])
+            renderer.heading(4, mechanism["title"])
+            renderer.blocks(mechanism.get("blocks", []), 5)
+        renderer.extra_subsections(4, module["extra_subsections"])
 
     return renderer.render()
 

@@ -5,387 +5,237 @@ description: Use when rendering, validating, or authoring a human-first reposito
 
 # create-structure-md
 
-Use this skill to produce one human-first repository structure Markdown document from a create-structure-md 0.4.0 DSL package. The main agent owns skill execution, package orchestration, package-level JSON, validation, rendering, and final review. Planning, detail authoring, and adversarial review subagents own repository understanding, reader-facing detail decisions, and source-backed detail JSON.
+Use this skill to produce one human-first repository structure Markdown document from a create-structure-md 0.4.0 DSL package. The main agent owns orchestration, package-level files, validation, rendering, and final review. Content-writing and review subagents produce and challenge chapter content.
 
-## Core Boundary
+## Core Boundaries
 
-Active create-structure-md is 0.4.0 only. The 0.3.0 implementation exists only under `docs/superpowers/history/V3/` as historical reference and is not the active contract.
+- Active create-structure-md is 0.4.0 only. Historical 0.3.0 material under `docs/superpowers/history/V3/` is not the active contract.
+- `structure.manifest.json` and referenced child JSON files are authoritative. Rendered Markdown is generated output.
+- Process records, subagent reports, command transcripts, rejected drafts, scan logs, repository-understanding notes, and review conclusions stay outside JSON.
+- Do not use `target_readers` or `reader_questions`. The fixed templates already cover the two content layers: users and learners.
+- The main agent coordinates the workflow and does not directly write substantive chapter prose.
 
-`structure.manifest.json` and referenced child JSON files are authoritative. Rendered Markdown is generated output and must not be edited as source.
+## Workflow
 
-Process records, subagent reports, command transcripts, rejected drafts, scan logs, repository-understanding notes, and other process metadata stay outside JSON.
+### Step 1: Confirm Inputs
 
-## Step-by-Step Workflow
+**Do:** Confirm repository root, package root, intended output path, scope, exclusions, and user constraints.
 
-### Step 1: Confirm Inputs And Mode
+**References:** Use `references/dsl-spec.md` only to recognize the package shape.
 
-**Do:** Establish whether the user has an existing package to validate/render or needs repository-backed DSL authoring.
+**Watch:** Do not infer content structure from source layout at this stage.
 
-**How:**
-- Confirm repository root.
-- Confirm package root containing or intended to contain `structure.manifest.json`.
-- Confirm intended Markdown output path if the user has a preference.
-- Record reader audience, language, scope, exclusions, and any user-stated constraints.
-- Check whether the package already has the active 0.4.0 child-file layout.
+**Output:** Known paths, output intent, and constraints.
 
-**References:** Use `references/dsl-spec.md` for package shape and `references/document-structure.md` for rendered section order.
+### Step 2: Load Orchestration Contract And Route References
 
-**Watch:** Do not infer target readers, flow boundaries, or module ownership from directory names before planning. If the request is ambiguous, carry the ambiguity into the planning brief or ask the user.
+**Do:** Load only the contract needed to route work and enforce gates.
 
-**Output:** Known repository root, package root, output intent, audience constraints, and task mode.
+**References:**
+- Main agent uses `references/dsl-spec.md` for manifest/package shape.
+- Main agent uses `references/document-structure.md` for rendered section order.
+- Main agent uses `references/review-checklist.md` for final gates.
+- Authoring subagents use `references/dsl-authoring-guide.md`.
+- Authoring or review subagents that touch Mermaid use `references/mermaid-rules.md`.
 
-**Continue when:** You know whether to validate/render existing JSON or author/update the package first.
+**Watch:** The main agent routes references; it does not use authoring references to write substantive chapter prose itself.
 
-### Step 2: Read The Contract And Authoring Guides
+**Output:** A routing map from each step to its reference files.
 
-**Do:** Load the DSL rules before writing, accepting, validating, or rendering JSON.
+### Step 3: Write Manifest And Document Metadata
 
-**How:**
-- Treat `references/dsl-spec.md` as the authoritative 0.4.0 DSL contract.
-- Use `references/dsl-authoring-guide.md` before writing or reviewing child JSON.
-- Use `references/document-structure.md` to keep rendered headings and ordering aligned.
-- Use `references/mermaid-rules.md` before accepting Mermaid blocks.
-- Use `references/review-checklist.md` before final acceptance.
+**Do:** Main agent writes or updates `structure.manifest.json` and `chapters/00-document.json`.
 
-**References:** Keep the five reference files above in scope for all later decisions.
+**References:** Use `references/dsl-spec.md`.
 
-**Watch:** Active create-structure-md is 0.4.0 only. Do not treat 0.3.0 or `docs/superpowers/history/V3/` as the active contract.
+**Watch:**
+- Manifest uses exactly these keys: `document`, `overview`, `quick_start`, `architecture_overview`, `main_flow_overview`, `main_flow_details`, `module_overview`, and `module_details`.
+- `chapters/00-document.json` contains only `repository_name`, `output_file`, and optional `summary`.
+- Revisit the manifest after flow/module lists are frozen so detail arrays are non-empty and ordered.
+- Reject old shapes such as `main_flows`, `chapters/04-main-flows.json`, aggregate `chapters/05-module-details.json`, `module_details.modules`, and `generated_module_object`.
+- Do not add `dsl_version`, `repository_identity`, or process metadata.
 
-**Output:** A clear map from each JSON file type to the contract rules used to author or validate it.
+**Output:** Manifest and document metadata source files.
 
-**Continue when:** You can reject old package shapes and name the active files required by 0.4.0.
+### Step 4: Write Repository Overview
 
-### Step 3: Capture Dispatch Briefs Outside JSON
+**Do:** Assign one authoring subagent to write `chapters/01-overview.json`.
 
-**Do:** Create neutral briefs for planning and ownership work without putting process records into package JSON.
+**References:** Give the subagent `references/dsl-spec.md` and `references/dsl-authoring-guide.md`.
 
-**How:**
-- Record user request, repository root, package root, output path, validation mode, and constraints.
-- Quote user-stated reader audience, scope, inclusion rules, and exclusion rules verbatim.
-- Record open questions without resolving them from source layout alone.
-- Keep subagent reports, command transcripts, scan logs, rejected drafts, repository-understanding notes, and process metadata outside the DSL package.
+**Watch:** Repository overview renders as `## 仓库概述`. It explains what the repository is, what problem it solves, and how users and learners should orient themselves. It must not contain setup steps, module mechanisms, call chains, or directory encyclopedias.
 
-**References:** Use `references/dsl-spec.md` for the process-metadata boundary and `references/review-checklist.md` for hygiene checks.
+**Output:** `chapters/01-overview.json`; authoring notes stay outside JSON.
 
-**Watch:** Do not write `repository_identity`, `target_readers`, `reader_questions`, raw scan logs, subagent identities, or review notes into JSON unless the DSL contract explicitly defines a field for that content. Planning subagents may propose `repository_identity`, `target_readers`, `reader_questions`, behavior paths, responsibility units, and ownership boundaries, but their reports are process records.
+### Step 5: Review Repository Overview
 
-**Output:** Planning and ownership dispatch briefs that can be handed to subagents.
+**Do:** Assign a separate review subagent to review `chapters/01-overview.json`.
 
-**Continue when:** The briefs contain enough context for subagents and no process metadata has entered JSON.
+**References:** Give the reviewer `references/dsl-spec.md`, `references/dsl-authoring-guide.md`, and `references/review-checklist.md`.
 
-### Step 4: Plan Reader-Facing Flows And Modules
+**Watch:** Reject missing `core_components.component_table.rows`, setup steps, architecture detail, module internals, process metadata, scan logs, or subagent identity in JSON.
 
-**Do:** Use planning subagents to identify reader-facing main flows and responsibility-unit modules.
+**Output:** Review conclusion outside JSON; approved or returned overview file.
 
-**How:**
-- Ask planning subagents to analyze the repository from the reader's questions, not from directory enumeration.
-- For main flows, prefer important behavior paths that cross components or explain how the repository accomplishes user-visible work.
-- For modules, prefer responsibility units that a maintainer or reader would understand as an owned area of change.
-- Ask planning subagents to propose includes, exclusions, merge/split notes, and unresolved questions.
-- If the repository is C code and repository analysis is needed, invoke `repo-understand` first and prefer `repo-analysis-tools`; raw source reading is supplemental.
+### Step 6: Write Quick Start
 
-**References:** Use `references/dsl-authoring-guide.md` for authoring intent, `references/document-structure.md` for the reader journey, and `references/review-checklist.md` for rejecting call-chain dumps or file listings.
+**Do:** Assign one authoring subagent to write `chapters/02-quick-start.json`.
 
-**Watch:** Reject plans that mirror folders, file lists, API catalogs, platform encyclopedias, or helper layers. A planned main flow must answer "what path does the reader need to understand?" A planned module must answer "what responsibility unit does the reader need to change or reason about?"
+**References:** Give the subagent `references/dsl-spec.md` and `references/dsl-authoring-guide.md`.
 
-**Output:** Proposed main-flow detail files and module detail files, each with reader question, scope, include reason, exclusion notes, and suggested output path.
+**Watch:** Quick start explains the first usable path and minimal verification for users, while helping learners see entry points, commands, dependencies, and outputs. It must not become a platform encyclopedia, full configuration manual, or troubleshooting catalog.
 
-**Continue when:** Planned flows and modules are reader-facing and have enough ownership information for review.
+**Output:** `chapters/02-quick-start.json`; authoring notes stay outside JSON.
 
-### Step 5: Freeze Detail Ownership
+### Step 7: Review Quick Start
 
-**Do:** Freeze the one-file-one-owner plan before any detail prose is drafted.
+**Do:** Assign a separate review subagent to review `chapters/02-quick-start.json`.
 
-**How:**
-- Dispatch an ownership review subagent to challenge the planning proposal.
-- Require a decision for every proposed flow and module: accept, merge, split, exclude, or ask planning to revise.
-- Assign exactly one authoring subagent and one separate adversarial review subagent for every accepted detail file.
-- Preserve target output paths:
-  - `chapters/04-main-flow-details/<flow-key>.json`
-  - `chapters/05-module-details/<module-key>.json`
-- If planning and ownership review disagree materially, dispatch a revised planning pass, request another review, or ask the user.
+**References:** Give the reviewer `references/dsl-spec.md`, `references/dsl-authoring-guide.md`, and `references/review-checklist.md`.
 
-**References:** Use `references/dsl-spec.md` for detail file shape and `references/review-checklist.md` for ownership and review gates.
+**Watch:** Reject missing or empty `first_run.steps[]`, unclear command order, vague outputs, process metadata, or content that belongs in overview, architecture overview, flow details, or module details.
 
-**Watch:** The main agent checks that the frozen table is complete and consistent, but does not bypass subagent repository analysis by directly authoring substantive detail prose.
+**Output:** Review conclusion outside JSON; approved or returned quick start file.
 
-**Output:** Frozen ownership table for all accepted main-flow and module detail files.
+### Step 8: Write Architecture Overview
 
-**Continue when:** Every accepted detail file has a stable path, scope, authoring owner, and separate review owner.
+**Do:** Assign one authoring subagent to write `chapters/03-architecture-overview.json`.
 
-### Step 6: Write Or Update The Manifest
+**References:** Give the subagent `references/dsl-spec.md` and `references/dsl-authoring-guide.md`.
 
-**Do:** Create or update `structure.manifest.json` with the active eight-field 0.4.0 shape.
+**Watch:** Architecture overview maps layers, modules, and collaboration for users and learners. It must not contain detailed behavior paths, module mechanisms, quick-start steps, call chains, or directory encyclopedias.
 
-**How:** The manifest must contain exactly these top-level fields:
+**Output:** `chapters/03-architecture-overview.json`; authoring notes stay outside JSON.
 
-```json
-{
-  "document": "chapters/00-document.json",
-  "overview": "chapters/01-overview.json",
-  "quick_start": "chapters/02-quick-start.json",
-  "architecture_overview": "chapters/03-architecture-overview.json",
-  "main_flow_overview": "chapters/04-main-flow-overview.json",
-  "main_flow_details": [
-    "chapters/04-main-flow-details/<flow-key>.json"
-  ],
-  "module_overview": "chapters/05-module-overview.json",
-  "module_details": [
-    "chapters/05-module-details/<module-key>.json"
-  ]
-}
-```
+### Step 9: Review Architecture Overview
 
-**References:** Use `references/dsl-spec.md` for manifest shape and key inference rules.
+**Do:** Assign a separate review subagent to review `chapters/03-architecture-overview.json`.
 
-**Watch:** Neither manifest nor payload JSON files carry `dsl_version`. `main_flow_details` and `module_details` are non-empty arrays. Detail keys are inferred from file stems and are not repeated inside detail JSON. Reject the old aggregate shape: `main_flows`, `chapters/04-main-flows.json`, one aggregate `chapters/05-module-details.json`, `intro_blocks`, `modules[]`, `module_details.modules`, and `generated_module_object`.
+**References:** Give the reviewer `references/dsl-spec.md`, `references/dsl-authoring-guide.md`, and `references/review-checklist.md`.
 
-**Output:** Manifest pointing to the planned child JSON files in render order.
+**Watch:** Reject missing `layers.layer_table.rows` or `module_map.module_table.rows`, source-directory tours, function call graphs, process metadata, and module internals.
 
-**Continue when:** The manifest contains the eight active fields and no rejected old fields.
+**Output:** Review conclusion outside JSON; approved or returned architecture overview file.
 
-### Step 7: Write Main-Owned Introductory Files
+### Step 10: Plan Main Flow List
 
-**Do:** Write or update the child JSON files owned by the main agent before or alongside detail dispatch.
+**Do:** Assign one subagent to decide which main flow detail files should exist.
 
-**How:**
-- Write `chapters/00-document.json` for repository identity, output file, and summary.
-- Write `chapters/01-overview.json` for repository intro, problems solved, main capabilities, and core components.
-- Write `chapters/02-quick-start.json` for reader scenarios, setup, first run, and verification.
-- Write `chapters/03-architecture-overview.json` for whole-repository layers, module map, and collaboration at a high level.
-- Use blocks only where the DSL allows blocks.
+**References:** Give the subagent `references/dsl-authoring-guide.md` and relevant repository context.
 
-**References:** Use `references/dsl-spec.md`, `references/dsl-authoring-guide.md`, and `references/document-structure.md`.
+**Watch:** Flow selection is driven by what users want to know. Do not split flows too finely. Do not create separate flows for auxiliary paths, glue work, non-essential implementation details, source directories, or function call chains.
 
-**Watch:** Keep introductory files human-first. Do not turn quick start into a platform encyclopedia, and do not put module internals into architecture overview. Keep process notes outside JSON.
+**Output:** Candidate flow list outside JSON, with `flow_key`, title, scope, include reason, merge or exclude notes, and target path `chapters/04-main-flow-details/<flow-key>.json`.
 
-**Output:** Main-owned child JSON for document metadata, overview, quick start, and architecture overview.
+### Step 11: Review Main Flow List
 
-**Continue when:** Introductory files validate conceptually against their section purpose and do not duplicate detail-file responsibilities.
+**Do:** Assign a separate review subagent to challenge and freeze the main flow list.
 
-### Step 8: Dispatch Main-Flow Detail Authoring
+**References:** Give the reviewer the candidate list, `references/dsl-authoring-guide.md`, and `references/review-checklist.md`.
 
-**Do:** Send each main-flow authoring subagent exactly one assigned flow detail file.
+**Watch:** Reject too many or too few flows, overlapping flows, directory-driven flow names, call-chain flow names, detail prose in the list, or missing include/exclude rationale.
 
-**How:** Give each subagent:
-- repository root
-- package root
-- frozen flow scope
-- reader question
-- target output path `chapters/04-main-flow-details/<flow-key>.json`
-- relevant source areas or evidence from planning
-- `references/dsl-spec.md`
-- `references/dsl-authoring-guide.md`
-- `references/mermaid-rules.md` when diagrams are expected
-- validation command for its assigned file
+**Output:** Frozen main flow list outside JSON.
 
-Ask the subagent to describe the behavior path across components, including reader-visible inputs, actions, handoffs, outputs, and modification risks.
+### Step 12: Write Main Flow Details
 
-**References:** Use `references/dsl-authoring-guide.md` for detail authoring and `references/mermaid-rules.md` for Mermaid blocks.
+**Do:** Assign one authoring subagent per frozen main flow detail file. Dispatch at most 3 authoring subagents at the same time.
 
-**Watch:** A main-flow detail is not a function-by-function call graph. Reject raw call-chain dumps, scan logs, command transcripts, repository-understanding notes, or subagent identity markers inside JSON.
+**References:** Give each subagent its frozen list row, `references/dsl-spec.md`, `references/dsl-authoring-guide.md`, and `references/mermaid-rules.md` when diagrams are expected.
 
-**Output:** One JSON file per accepted main flow under `chapters/04-main-flow-details/<flow-key>.json`.
+**Watch:** Each subagent writes only its assigned `chapters/04-main-flow-details/<flow-key>.json`. It must not change the flow list, overview files, manifest, or other detail files.
 
-**Continue when:** Every planned main-flow detail file exists or has an explicit rejection/regeneration path.
+**Output:** One main flow detail JSON per frozen flow; authoring reports stay outside JSON.
 
-### Step 9: Dispatch Module Detail Authoring
+### Step 13: Review Main Flow Details
 
-**Do:** Send each module authoring subagent exactly one assigned module detail file.
+**Do:** Assign one separate review subagent per main flow detail file. Dispatch at most 3 review subagents at the same time.
 
-**How:** Give each subagent:
-- repository root
-- package root
-- frozen module scope
-- responsibility-unit description
-- reader question
-- target output path `chapters/05-module-details/<module-key>.json`
-- relevant source areas or evidence from planning
-- `references/dsl-spec.md`
-- `references/dsl-authoring-guide.md`
-- `references/mermaid-rules.md` when diagrams are expected
-- validation command for its assigned file
+**References:** Give each reviewer the frozen list row, assigned detail JSON, `references/dsl-spec.md`, `references/dsl-authoring-guide.md`, `references/mermaid-rules.md` when needed, and `references/review-checklist.md`.
 
-Ask the subagent to describe the module's responsibility, mechanisms, key files or paths, collaboration points, and modification risks.
+**Watch:** Reject content that deviates from the frozen flow, becomes a call graph, duplicates module detail, includes process metadata, or modifies files outside the assigned detail file.
 
-**References:** Use `references/dsl-authoring-guide.md` for module detail requirements and `references/review-checklist.md` for responsibility-unit fit.
+**Output:** Accepted main flow detail files, or rejection instructions outside JSON.
 
-**Watch:** A module detail is not a file-by-file listing, generated API reference, or source directory tour. Keep mechanisms inside the owning module detail and keep process metadata outside JSON.
+### Step 14: Plan Module List
 
-**Output:** One JSON file per accepted module under `chapters/05-module-details/<module-key>.json`.
+**Do:** Assign one subagent to decide which module detail files should exist.
 
-**Continue when:** Every planned module detail file exists or has an explicit rejection/regeneration path.
+**References:** Give the subagent `references/dsl-authoring-guide.md` and relevant repository context.
 
-### Step 10: Run Adversarial Detail Reviews
+**Watch:** Module selection is driven by what users want to know. Do not split modules too finely. Do not create standalone modules for auxiliary code, glue code, non-important implementation layers, source directories, file groups, or helper APIs. Merge auxiliary material into the larger responsibility unit it supports.
 
-**Do:** Assign a separate reviewer to challenge every authored main-flow and module detail file.
+**Output:** Candidate module list outside JSON, with `module_key`, module name, responsibility scope, include reason, merge or exclude notes, and target path `chapters/05-module-details/<module-key>.json`.
 
-**How:**
-- Provide the reviewer the assigned JSON file, frozen ownership row, reader question, package root, repository root, DSL contract, authoring guide, Mermaid guidance, and validation command.
-- Allow the reviewer to modify only the assigned detail file.
-- Require the reviewer to report accepted content, removed or rewritten content, remaining risks, validation result, and whether the detail still fits its frozen scope.
-- If a reviewer requests split, merge, or rejection, route that back through ownership review instead of silently rewriting ownership.
+### Step 15: Review Module List
 
-**References:** Use `references/review-checklist.md` for review gates, `references/dsl-authoring-guide.md` for block rules, and `references/mermaid-rules.md` for diagram checks.
+**Do:** Assign a separate review subagent to challenge and freeze the module list.
 
-**Watch:** The same subagent must not author and review the same detail file. Reviewers must not edit manifest, overview files, another detail file, or rendered Markdown.
+**References:** Give the reviewer the candidate list, `references/dsl-authoring-guide.md`, and `references/review-checklist.md`.
 
-**Output:** Reviewed detail files plus external reviewer reports that remain outside JSON.
+**Watch:** Reject too many or too few modules, directory-driven modules, auxiliary-code modules, overlapping responsibilities, detail prose in the list, or missing include/exclude rationale.
 
-**Continue when:** Every accepted detail file has a separate adversarial review decision and all findings are resolved in the assigned file.
+**Output:** Frozen module list outside JSON.
 
-### Step 11: Accept Or Reject Detail Files
+### Step 16: Write Module Details
 
-**Do:** Accept only reviewed detail files that satisfy the frozen scope, DSL contract, and rendered-reader purpose.
+**Do:** Assign one authoring subagent per frozen module detail file. Dispatch at most 3 authoring subagents at the same time.
 
-**How:** For each detail file, check:
-- file exists at the frozen target path
-- required top-level fields are present
-- detail key is inferred from the file stem and not repeated inside JSON
-- blocks use supported types: `text`, `unordered_list`, `ordered_list`, `table`, `mermaid`, and `code`
-- list block `items` values are string arrays
-- extra subsections include `key`, `title`, and `blocks`
-- Mermaid blocks follow canonical guidance and pass strict rendering when Mermaid validation is available
-- review report confirms the file fits the assigned flow or module
+**References:** Give each subagent its frozen list row, `references/dsl-spec.md`, `references/dsl-authoring-guide.md`, and `references/mermaid-rules.md` when diagrams are expected.
 
-**References:** Use `references/dsl-spec.md` for shape, `references/dsl-authoring-guide.md` for content rules, `references/mermaid-rules.md` for diagrams, and `references/review-checklist.md` for acceptance gates.
+**Watch:** Each subagent writes only its assigned `chapters/05-module-details/<module-key>.json`. It must not change the module list, overview files, manifest, or other detail files.
 
-**Watch:** Reject files that contain process metadata, raw logs, rejected drafts, scan logs, subagent names, call-chain dumps, file-list dumps, unsupported blocks, or unreviewed detail prose.
+**Output:** One module detail JSON per frozen module; authoring reports stay outside JSON.
 
-**Output:** Accepted detail files, or rejection instructions sent back to the responsible subagent.
+### Step 17: Review Module Details
 
-**Continue when:** All detail files needed by the manifest are accepted.
+**Do:** Assign one separate review subagent per module detail file. Dispatch at most 3 review subagents at the same time.
 
-### Step 12: Synthesize Overview Tables From Accepted Details
+**References:** Give each reviewer the frozen list row, assigned detail JSON, `references/dsl-spec.md`, `references/dsl-authoring-guide.md`, `references/mermaid-rules.md` when needed, and `references/review-checklist.md`.
 
-**Do:** Write `main_flow_overview` and `module_overview` only after corresponding detail files pass review.
+**Watch:** Reject content that deviates from the frozen module, becomes a directory encyclopedia, API reference, file list, or call chain, makes auxiliary code the module focus, includes process metadata, or modifies files outside the assigned detail file.
 
-**How:**
-- Build `chapters/04-main-flow-overview.json` from accepted main-flow details in manifest order.
-- Build `chapters/05-module-overview.json` from accepted module details in manifest order.
-- Keep rows aligned with detail arrays in count and order.
-- Use anchors that link to rendered detail headings.
-- Summarize accepted detail purpose without copying detail prose.
+**Output:** Accepted module detail files, or rejection instructions outside JSON.
 
-**References:** Use `references/dsl-spec.md` for fixed overview table shapes and `references/document-structure.md` for rendered placement.
+### Step 18: Synthesize Overview Tables
 
-**Watch:** Overview files contain fixed table artifacts only. Do not put `blocks`, `extra_subsections`, detail prose, Mermaid, code, examples, or process metadata in `main_flow_overview` or `module_overview`.
+**Do:** Main agent writes `chapters/04-main-flow-overview.json` and `chapters/05-module-overview.json` after all corresponding detail files pass review.
 
-**Output:** Reviewed `chapters/04-main-flow-overview.json` and `chapters/05-module-overview.json`.
+**References:** Use `references/dsl-spec.md`, `references/document-structure.md`, and `references/review-checklist.md`.
 
-**Continue when:** Overview rows match accepted detail arrays exactly.
+**Watch:** Overview rows must match manifest detail arrays in count and order. Overview files contain fixed table artifacts only; no `blocks`, `extra_subsections`, Mermaid, code, examples, detail prose, or process metadata.
 
-### Step 13: Validate The Package And Detail Files
+**Output:** Main flow and module overview table JSON files.
 
-**Do:** Run strict validation before rendering.
+### Step 19: Validate, Render, And Final Review
 
-**How:** Validate the package and any changed detail files:
+**Do:** Main agent validates every relevant source file, renders Markdown, and reviews the rendered result.
+
+**References:** Use `references/review-checklist.md`, `references/document-structure.md`, and `references/mermaid-rules.md` when diagrams are present.
+
+**Commands:**
 
 ```bash
 python scripts/validate_structure.py <package>/structure.manifest.json --strict
 python scripts/validate_flow_detail.py <package>/chapters/04-main-flow-details/<flow-key>.json --package-root <package>
 python scripts/validate_module_detail.py <package>/chapters/05-module-details/<module-key>.json --package-root <package>
-```
-
-**References:** Use `references/review-checklist.md` for required validation coverage and `references/mermaid-rules.md` for diagram validation expectations.
-
-**Watch:** If validation fails in main-owned files, fix those source JSON files. If validation fails in subagent-owned detail prose, reject the file back to the responsible subagent or reviewer unless the fix is purely mechanical and within the accepted scope.
-
-**Output:** Passing validation output or a concrete list of files that must be fixed.
-
-**Continue when:** Strict package validation and relevant detail validation pass.
-
-### Step 14: Render And Review The Markdown
-
-**Do:** Render Markdown from the manifest and review the generated document.
-
-**How:**
-
-```bash
 python scripts/render_markdown.py <package>/structure.manifest.json
 ```
 
-Then inspect the rendered Markdown against the expected section order from `references/document-structure.md`.
+**Watch:** If output is wrong, fix source JSON and render again. Do not edit generated Markdown as source. Do not put validation logs or review notes into JSON.
 
-**References:** Use `references/document-structure.md` for section order and `references/review-checklist.md` for final acceptance.
+**Output:** One rendered repository structure Markdown document plus validation evidence outside JSON.
 
-**Watch:** Rendered Markdown is generated output. If the rendered document is wrong, fix source JSON and render again; do not edit the Markdown as source.
+## Non-Negotiables
 
-**Output:** One human-first repository structure Markdown document.
-
-**Continue when:** The rendered document matches the package intent, validation evidence is recorded outside JSON, and any remaining gaps are reported clearly.
-
-## Main Agent Responsibilities
-
-The main agent owns package orchestration, dispatch briefs, contract loading, planning dispatch, ownership freeze dispatch, manifest creation, overview synthesis, validation, rendering, and final review.
-
-The main agent does not directly author substantive Chapter 4 or Chapter 5 detail prose. It may create scaffolds, assign files, reconcile contracts, apply review-required corrections, and synthesize overview tables after detail acceptance.
-
-The main agent ensures `main_flow_overview` and `module_overview` are synthesized after all detail files pass review.
-
-## Subagent Roles
-
-Planning subagents may propose `repository_identity`, `target_readers`, `reader_questions`, behavior paths, responsibility units, and ownership boundaries. Their reports are process records and stay outside JSON.
-
-Main-flow authoring subagents write exactly one assigned flow detail file under `chapters/04-main-flow-details/<flow-key>.json`.
-
-Module authoring subagents write exactly one assigned module detail file under `chapters/05-module-details/<module-key>.json`.
-
-Every accepted detail file requires a separate adversarial review subagent. Reviewers may modify only their assigned detail file.
-
-Authoring and review subagents must not write process metadata, command transcripts, raw scan logs, rejected drafts, or subagent identities into JSON.
-
-## Acceptance Rules
-
-Accept DSL only when:
-
-- It follows active create-structure-md 0.4.0.
-- `structure.manifest.json` and referenced child JSON files are authoritative.
-- Rendered Markdown is treated as generated output.
-- The manifest has exactly the upgraded eight-field shape.
-- `main_flow_details` and `module_details` are non-empty arrays of referenced detail files.
+- JSON files contain accepted content only, never process records.
+- The same subagent must not both write and review the same assigned file or list.
+- Main flow and module detail writers/reviewers are batched with a maximum concurrency of 3.
 - Detail keys are inferred from file stems and are not repeated inside detail JSON.
-- Every detail file has one owning authoring subagent and one separate adversarial review subagent.
-- `main_flow_overview` and `module_overview` are synthesized after detail review passes.
-- Overview rows match detail arrays in count and order.
-- Overview files contain fixed table artifacts only and do not contain detail prose, Mermaid, code, examples, `blocks`, or `extra_subsections`.
-- Main-flow detail files describe reader-facing behavior paths, not call-chain dumps.
-- Module detail files describe responsibility units, not source-file listings.
-- Free blocks use only supported block types: `text`, `unordered_list`, `ordered_list`, `table`, `mermaid`, and `code`.
 - List block `items` values are string arrays.
-- Extra subsections include `key`, `title`, and `blocks`.
-- Mermaid blocks, when present in allowed files, follow the canonical authoring guidance and pass strict Mermaid CLI rendering.
-- Process metadata is absent from JSON and remains outside the DSL package.
-
-## Rejection Rules
-
-Reject DSL that:
-
-- Treats 0.3.0 as the active contract.
-- Treats rendered Markdown as source of truth.
-- Uses the rejected old active 0.4.0 aggregate shape: `main_flows`, `chapters/04-main-flows.json`, `intro_blocks`, `modules[]`, `module_details.modules`, or `generated_module_object`.
-- Includes repository-understanding notes, subagent names, command transcripts, raw scan logs, scan logs, rejected drafts, or other process metadata in JSON.
-- Lets the main agent directly author substantive Chapter 4 or Chapter 5 detail prose.
-- Reuses the same subagent for authoring and adversarial review of a detail file.
-- Lets a reviewer modify files outside the assigned detail file.
-- Writes `main_flow_overview` or `module_overview` before corresponding detail files pass review.
-- Places `blocks`, `extra_subsections`, detail prose, Mermaid, code, examples, or process metadata in overview files.
-- Dumps file lists, call chains, platform encyclopedias, or API references.
-- Uses unsupported block shapes or list `items` values that are not string arrays.
-- Forks Mermaid authoring rules outside `references/dsl-authoring-guide.md`.
-
-## Validate And Render
-
-Validate strictly before rendering:
-
-```bash
-python scripts/validate_structure.py <package>/structure.manifest.json --strict
-python scripts/validate_flow_detail.py <package>/chapters/04-main-flow-details/<flow-key>.json --package-root <package>
-python scripts/validate_module_detail.py <package>/chapters/05-module-details/<module-key>.json --package-root <package>
-python scripts/render_markdown.py <package>/structure.manifest.json
-```
-
-Review the rendered Markdown after generation, but fix source JSON rather than editing generated output.
+- Mermaid blocks, when present, follow `references/mermaid-rules.md` and must render under strict validation.
+- Overview tables are synthesized only after corresponding detail files pass review.
+- Generated Markdown is never the source of truth.
 
 ## References
 

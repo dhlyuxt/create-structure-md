@@ -25,7 +25,7 @@ class V040DocsTests(unittest.TestCase):
         for heading in [
             "## 总原则",
             "## 内容块使用规则",
-            "## 概述怎么写",
+            "## 仓库概述怎么写",
             "## 快速开始怎么写",
             "## 架构概述怎么写",
             "## 主线流程怎么写",
@@ -39,6 +39,7 @@ class V040DocsTests(unittest.TestCase):
         content = (ROOT / "references/dsl-spec.md").read_text(encoding="utf-8")
 
         self.assertIn("## Overview", content)
+        self.assertIn("rendered `## 仓库概述` section", content)
         self.assertIn("## Module Details", content)
         self.assertNotIn("key_mechanisms", content)
         self.assertNotIn("risks_validation", content)

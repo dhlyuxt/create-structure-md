@@ -66,9 +66,11 @@ class V040E2ETests(unittest.TestCase):
             self.assertEqual(0, completed.returncode, completed.stderr)
             markdown = output.read_text(encoding="utf-8")
 
-        self.assertIn("## 入门", markdown)
-        self.assertIn("### 快速开始", markdown)
-        self.assertIn("### 模块详解", markdown)
+        self.assertIn("## 仓库概述", markdown)
+        self.assertIn("## 快速开始", markdown)
+        self.assertIn("## 模块详解", markdown)
+        self.assertNotIn("## 入门", markdown)
+        self.assertNotIn("## 深入解析", markdown)
 
 
 if __name__ == "__main__":
